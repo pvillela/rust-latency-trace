@@ -18,6 +18,7 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+use thread_local_drop;
 use tracing::{
     callsite::Identifier,
     info, instrument,
@@ -31,10 +32,56 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
     Layer, Registry,
 };
-use thread_local_drop;
 
 //=================
 // Types
+
+#[derive(Debug)]
+pub struct SpanGroup {
+    callsite: Identifier,
+    code_line: String,
+    name: String,
+    props: Option<HashMap<String, String>>,
+}
+
+impl SpanGroup {
+    fn new_priv(attrs: &Attributes, props: Option<HashMap<String, String>>) -> Self {
+        let meta = attrs.metadata();
+        SpanGroup {
+            callsite: meta.callsite(),
+            code_line: format!("{}:{}", meta.module_path().unwrap(), meta.line().unwrap()),
+            name: meta.name().to_owned(),
+            props,
+        }
+    }
+
+    fn new_default(attrs: &Attributes) -> Self {
+        Self::new_priv(attrs, None)
+    }
+
+    fn new_custom(
+        attrs: &Attributes,
+        f: impl FnOnce(&Attributes) -> HashMap<String, String>,
+    ) -> Self {
+        Self::new_priv(attrs, Some(f(attrs)))
+    }
+
+    pub fn callsite_id(&self) -> &Identifier {
+        &self.callsite
+    }
+
+    pub fn code_line(&self) -> &str {
+        &self.code_line
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn props(&self) -> Option<&HashMap<String, String>> {
+        self.props.as_ref()
+    }
+}
 
 /// Globally collected information for a callsite.
 #[derive(Debug)]
@@ -72,6 +119,7 @@ struct SpanTiming {
 pub struct Latencies {
     timings: Arc<RwLock<Timings>>,
     parents: Arc<RwLock<Parents>>,
+    span_grouper: Option<fn(&Attributes) -> HashMap<String, String>>,
 }
 
 //=================
@@ -89,13 +137,24 @@ thread_local! {
 // impls
 
 impl Latencies {
-    pub fn new() -> Latencies {
+    fn new_priv(span_grouper: Option<fn(&Attributes) -> HashMap<String, String>>) -> Latencies {
         let timings = RwLock::new(HashMap::new());
         let parents = RwLock::new(HashMap::new());
         Latencies {
             timings: Arc::new(timings),
             parents: Arc::new(parents),
+            span_grouper,
         }
+    }
+
+    pub fn new_default() -> Latencies {
+        Self::new_priv(None)
+    }
+
+    pub fn new_with_custom_grouping(
+        span_grouper: fn(&Attributes) -> HashMap<String, String>,
+    ) -> Latencies {
+        Self::new_priv(Some(span_grouper))
     }
 
     fn refresh(&self) {
@@ -324,12 +383,30 @@ where
 
 /// Measures latencies of spans in `f`.
 /// May only be called once per process and will panic if called more than once.
-pub fn measure_latencies(f: impl FnOnce() -> () + Send + 'static) -> Latencies {
-    let latencies = Latencies::new();
+fn measure_latencies_priv(
+    span_grouper: Option<fn(&Attributes) -> HashMap<String, String>>,
+    f: impl FnOnce() -> () + Send + 'static,
+) -> Latencies {
+    let latencies = Latencies::new_priv(span_grouper);
     Registry::default().with(latencies.clone()).init();
     thread::spawn(f).join().unwrap();
     latencies.refresh();
     latencies
+}
+
+/// Measures latencies of spans in `f`.
+/// May only be called once per process and will panic if called more than once.
+pub fn measure_latencies(f: impl FnOnce() -> () + Send + 'static) -> Latencies {
+    measure_latencies_priv(None, f)
+}
+
+/// Measures latencies of spans in `f`.
+/// May only be called once per process and will panic if called more than once.
+pub fn measure_latencies_with_custom_grouping(
+    span_grouper: fn(&Attributes) -> HashMap<String, String>,
+    f: impl FnOnce() -> () + Send + 'static,
+) -> Latencies {
+    measure_latencies_priv(Some(span_grouper), f)
 }
 
 /// Measures latencies of spans in async function `f` running on the [tokio] runtime.
@@ -339,6 +416,26 @@ where
     F: Future<Output = ()> + Send,
 {
     measure_latencies(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                f().await;
+            });
+    })
+}
+
+/// Measures latencies of spans in async function `f` running on the [tokio] runtime.
+/// May only be called once per process and will panic if called more than once.
+pub fn measure_latencies_with_custom_grouping_tokio<F>(
+    span_grouper: fn(&Attributes) -> HashMap<String, String>,
+    f: impl FnOnce() -> F + Send + 'static,
+) -> Latencies
+where
+    F: Future<Output = ()> + Send,
+{
+    measure_latencies_with_custom_grouping(span_grouper, || {
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
