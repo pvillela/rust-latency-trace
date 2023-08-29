@@ -31,11 +31,11 @@ pub struct SpanGroup {
     callsite: Identifier,
     code_line: String,
     name: String,
-    props: Option<Vec<(String, String)>>,
+    props: Vec<(String, String)>,
 }
 
 impl SpanGroup {
-    fn new(attrs: &Attributes, props: Option<Vec<(String, String)>>) -> Self {
+    fn new(attrs: &Attributes, props: Vec<(String, String)>) -> Self {
         let meta = attrs.metadata();
         SpanGroup {
             callsite: meta.callsite(),
@@ -57,12 +57,12 @@ impl SpanGroup {
         &self.name
     }
 
-    pub fn props(&self) -> Option<&Vec<(String, String)>> {
-        self.props.as_ref()
+    pub fn props(&self) -> &Vec<(String, String)> {
+        &self.props
     }
 }
 
-struct Timing {
+pub struct Timing {
     total_time: Histogram<u64>,
     active_time: Histogram<u64>,
 }
@@ -80,9 +80,9 @@ impl Timing {
     }
 }
 
-struct Info {
-    parents: HashMap<Identifier, Option<Identifier>>,
-    timings: HashMap<SpanGroup, Timing>,
+pub struct Info {
+    pub parents: HashMap<Identifier, Option<Identifier>>,
+    pub timings: HashMap<SpanGroup, Timing>,
 }
 
 impl Info {
@@ -144,26 +144,30 @@ impl Latencies {
         }
     }
 
-    pub fn print_mean_timings(&self) {
+    pub fn with<V>(&self, f: impl FnOnce(&Info) -> V) -> V {
         let acc = self.control.accumulator().unwrap();
-        println!("\nMean timing values by span:");
+        let info = &acc.acc;
+        f(info)
+    }
 
-        let parents = &acc.acc.parents;
+    pub fn print_mean_timings(&self) {
+        self.with(|info| {
+            println!("\nMean timing values by span group:");
 
-        for (span_group, v) in acc.acc.timings.iter() {
-            let mean_total_time = v.total_time.mean();
-            let mean_active_time = v.active_time.mean();
-            let total_time_count = v.total_time.len();
-            let active_time_count = v.active_time.len();
-            let parent = parents.get(span_group.callsite_id()).unwrap();
-            let callsite_id = span_group.callsite_id();
-            let code_line = span_group.code_line();
-            let span_name = span_group.name();
-            println!(
-                    "  callsite_id={:?}, parent={:?}, code_line={}, span_name={}, mean_total_time={}μs, total_time_count={}, mean_active_time={}μs, active_time_count={}",
-                    callsite_id, parent, code_line, span_name, mean_total_time, total_time_count, mean_active_time,active_time_count
+            let parents = &info.parents;
+
+            for (span_group, v) in info.timings.iter() {
+                let mean_total_time = v.total_time.mean();
+                let mean_active_time = v.active_time.mean();
+                let total_time_count = v.total_time.len();
+                let active_time_count = v.active_time.len();
+                let parent = parents.get(span_group.callsite_id()).unwrap();
+                println!(
+                    "  span_group={:?}, parent={:?}, mean_total_time={}μs, total_time_count={}, mean_active_time={}μs, active_time_count={}",
+                    span_group, parent, mean_total_time, total_time_count, mean_active_time,active_time_count
                 );
-        }
+            }
+        });
     }
 
     fn update_parents(&self, callsite: &Identifier, parent: &Option<Identifier>) {
@@ -172,7 +176,7 @@ impl Latencies {
             callsite,
             thread::current().id(),
         );
-        self.control.with_mut(&LOCAL_INFO, |info| {
+        self.control.with_tl_mut(&LOCAL_INFO, |info| {
             let parents = &mut info.parents;
             if parents.contains_key(callsite) {
                 // Both local and global parents info are good for this callsite.
@@ -187,7 +191,7 @@ impl Latencies {
     }
 
     fn update_timings(&self, span_group: &SpanGroup, f: impl Fn(&mut Timing)) {
-        self.control.with_mut(&LOCAL_INFO,|info| {
+        self.control.with_tl_mut(&LOCAL_INFO,|info| {
             let  timings = &mut info.timings;
             let mut timing = timings
                 .entry(span_group.clone())
@@ -220,7 +224,8 @@ where
         let span = ctx.span(id).unwrap();
         let parent_span = span.parent();
         let parent_callsite = parent_span.map(|span_ref| span_ref.metadata().callsite());
-        let span_group = SpanGroup::new(attrs, self.span_grouper.map(|f| f(attrs)));
+        let span_group =
+            SpanGroup::new(attrs, self.span_grouper.map(|f| f(attrs)).unwrap_or(vec![]));
 
         span.extensions_mut().insert(SpanTiming {
             span_group,
@@ -283,11 +288,11 @@ where
 /// May only be called once per process and will panic if called more than once.
 fn measure_latencies_priv(
     span_grouper: Option<fn(&Attributes) -> Vec<(String, String)>>,
-    f: impl FnOnce() -> () + Send + 'static,
+    f: impl FnOnce() + Send + 'static,
 ) -> Latencies {
     let latencies = Latencies::new(span_grouper);
     Registry::default().with(latencies.clone()).init();
-    thread::spawn(f).join().unwrap();
+    f();
     latencies.control.ensure_tls_dropped();
     latencies
 }
@@ -396,17 +401,21 @@ fn main() {
 
     latencies.print_mean_timings();
 
-    // latencies.with(|timings, parents| {
-    // println!("\nMedian timings by span:");
-    // for (callsite, v) in timings.iter() {
-    //     let median_total_time = v.total_time.value_at_quantile(0.5);
-    //     let median_active_time = v.active_time.value_at_quantile(0.5);
-    //     let total_time_count = v.total_time.len();
-    //     let active_time_count = v.active_time.len();
-    //     let parent = parents.get(callsite).unwrap();
-    //     println!(
-    //         "  callsite_id={:?}, parent_callsite={:?}, callsite_str={}, span_name={}, median_total_time={}μs, total_time_count={}, median_active_time={}μs, active_time_count={}",
-    //         callsite, parent, v.callsite_str, v.span_name, median_total_time, total_time_count, median_active_time,active_time_count
-    //     );
-    // }});
+    latencies.with(|info| {
+        println!("\nMedian timings by span group:");
+
+        let parents = &info.parents;
+
+        for (span_group, v) in info.timings.iter() {
+            let median_total_time = v.total_time.value_at_percentile(50.0);
+            let median_active_time = v.active_time.value_at_percentile(50.0);
+            let total_time_count = v.total_time.len();
+            let active_time_count = v.active_time.len();
+            let parent = parents.get(span_group.callsite_id()).unwrap();
+            println!(
+                "  span_group={:?}, parent={:?}, median_total_time={}μs, total_time_count={}, median_active_time={}μs, active_time_count={}",
+                span_group, parent, median_total_time, total_time_count, median_active_time,active_time_count
+            );
+        }
+    });
 }
