@@ -145,9 +145,7 @@ impl Latencies {
     }
 
     pub fn with<V>(&self, f: impl FnOnce(&Info) -> V) -> V {
-        let acc = self.control.accumulator().unwrap();
-        let info = &acc.acc;
-        f(info)
+        self.control.with_acc(f).unwrap()
     }
 
     pub fn print_mean_timings(&self) {
