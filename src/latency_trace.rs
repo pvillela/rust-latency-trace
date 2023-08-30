@@ -12,6 +12,7 @@ use std::{
     collections::HashMap,
     future::Future,
     hash::Hash,
+    sync::Arc,
     thread::{self, ThreadId},
     time::Instant,
 };
@@ -37,7 +38,7 @@ pub struct SpanGroup {
 }
 
 impl SpanGroup {
-    fn new(attrs: &Attributes, props: Vec<(String, String)>) -> Self {
+    pub fn new(attrs: &Attributes, props: Vec<(String, String)>) -> Self {
         let meta = attrs.metadata();
         SpanGroup {
             callsite: meta.callsite(),
@@ -110,7 +111,7 @@ struct SpanTiming {
 #[derive(Clone)]
 pub struct Latencies {
     control: Control<Info, Info>,
-    span_grouper: Option<fn(&Attributes) -> Vec<(String, String)>>,
+    span_grouper: Option<Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>>,
 }
 
 //=================
@@ -139,7 +140,11 @@ fn op(data: &Info, acc: &mut Info, tid: &ThreadId) {
 }
 
 impl Latencies {
-    fn new(span_grouper: Option<fn(&Attributes) -> Vec<(String, String)>>) -> Latencies {
+    fn new(
+        span_grouper: Option<
+            Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>,
+        >,
+    ) -> Latencies {
         Latencies {
             control: Control::new(Info::new(), op),
             span_grouper,
@@ -163,7 +168,7 @@ impl Latencies {
                 let active_time_count = v.active_time.len();
                 let parent = parents.get(span_group.callsite_id()).unwrap();
                 println!(
-                    "  span_group={:?}, parent={:?}, mean_total_time={}μs, total_time_count={}, mean_active_time={}μs, active_time_count={}",
+                    "  * span_group={:?}, parent={:?}, mean_total_time={}μs, total_time_count={}, mean_active_time={}μs, active_time_count={}",
                     span_group, parent, mean_total_time, total_time_count, mean_active_time,active_time_count
                 );
             }
@@ -224,8 +229,13 @@ where
         let span = ctx.span(id).unwrap();
         let parent_span = span.parent();
         let parent_callsite = parent_span.map(|span_ref| span_ref.metadata().callsite());
-        let span_group =
-            SpanGroup::new(attrs, self.span_grouper.map(|f| f(attrs)).unwrap_or(vec![]));
+        let span_group = SpanGroup::new(
+            attrs,
+            self.span_grouper
+                .as_ref()
+                .map(|f| f(attrs))
+                .unwrap_or(vec![]),
+        );
 
         span.extensions_mut().insert(SpanTiming {
             span_group,
@@ -287,7 +297,7 @@ where
 /// Measures latencies of spans in `f`.
 /// May only be called once per process and will panic if called more than once.
 fn measure_latencies_priv(
-    span_grouper: Option<fn(&Attributes) -> Vec<(String, String)>>,
+    span_grouper: Option<Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>>,
     f: impl FnOnce() + Send + 'static,
 ) -> Latencies {
     let latencies = Latencies::new(span_grouper);
@@ -306,10 +316,10 @@ pub fn measure_latencies(f: impl FnOnce() -> () + Send + 'static) -> Latencies {
 /// Measures latencies of spans in `f`.
 /// May only be called once per process and will panic if called more than once.
 pub fn measure_latencies_with_custom_grouping(
-    span_grouper: fn(&Attributes) -> Vec<(String, String)>,
+    span_grouper: impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static,
     f: impl FnOnce() -> () + Send + 'static,
 ) -> Latencies {
-    measure_latencies_priv(Some(span_grouper), f)
+    measure_latencies_priv(Some(Arc::new(span_grouper)), f)
 }
 
 /// Measures latencies of spans in async function `f` running on the [tokio] runtime.
@@ -332,7 +342,7 @@ where
 /// Measures latencies of spans in async function `f` running on the [tokio] runtime.
 /// May only be called once per process and will panic if called more than once.
 pub fn measure_latencies_with_custom_grouping_tokio<F>(
-    span_grouper: fn(&Attributes) -> Vec<(String, String)>,
+    span_grouper: impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static,
     f: impl FnOnce() -> F + Send + 'static,
 ) -> Latencies
 where
