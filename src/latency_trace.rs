@@ -9,7 +9,7 @@
 use hdrhistogram::Histogram;
 use log;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     future::Future,
     hash::Hash,
     sync::Arc,
@@ -25,8 +25,6 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
     Layer, Registry,
 };
-
-use crate::map::{BTreeMapExt, HashMapExt};
 
 //=================
 // SpanGroup
@@ -50,7 +48,7 @@ impl SpanGroup {
         }
     }
 
-    pub fn callsite_id(&self) -> &Identifier {
+    pub fn callsite(&self) -> &Identifier {
         &self.callsite
     }
 
@@ -104,36 +102,6 @@ impl Info {
             timings: HashMap::new(),
         }
     }
-
-    // pub fn name_to_span_group_timing_pairs(&self) -> BTreeMapExt<String, Vec<(SpanGroup, Timing)>> {
-    //     let mut outer_map: BTreeMap<String, Vec<(SpanGroup, Timing)>> = BTreeMap::new();
-
-    //     self.timings.iter().for_each(|(span_group, timing)| {
-    //         let name = span_group.name.clone();
-    //         outer_map
-    //             .entry(name)
-    //             .or_insert_with(|| Vec::new())
-    //             .push((span_group.clone(), timing.clone()));
-    //     });
-
-    //     outer_map.into()
-    // }
-
-    // pub fn callsite_to_span_group_timing_pairs(
-    //     &self,
-    // ) -> HashMapExt<Identifier, Vec<(SpanGroup, Timing)>> {
-    //     let mut outer_map: HashMap<Identifier, Vec<(SpanGroup, Timing)>> = HashMap::new();
-
-    //     self.timings.iter().for_each(|(span_group, timing)| {
-    //         let callsite = span_group.callsite.clone();
-    //         outer_map
-    //             .entry(callsite)
-    //             .or_insert_with(|| Vec::new())
-    //             .push((span_group.clone(), timing.clone()));
-    //     });
-
-    //     outer_map.into()
-    // }
 }
 
 //=================
@@ -380,223 +348,4 @@ where
                 f().await;
             });
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use std::time::Duration;
-    use tracing::{info, instrument, warn, Instrument};
-
-    #[instrument(level = "trace")]
-    pub async fn f() {
-        let mut foo: u64 = 1;
-
-        for i in 0..8 {
-            log::trace!("Before my_great_span");
-
-            async {
-                thread::sleep(Duration::from_millis(3));
-                tokio::time::sleep(Duration::from_millis(100)).await;
-                foo += 1;
-                info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
-                log::trace!("Before my_other_span");
-                async {
-                    thread::sleep(Duration::from_millis(2));
-                    tokio::time::sleep(Duration::from_millis(25)).await;
-                    warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
-                }
-                .instrument(tracing::trace_span!("my_other_span", foo = i % 2))
-                .await;
-            }
-            .instrument(tracing::trace_span!(
-                "my_great_span",
-                foo = i % 2,
-                bar = i % 4
-            ))
-            .await
-        }
-    }
-
-    fn are_close(left: f64, right: f64, pct: f64) -> bool {
-        let avg_abs = (left.abs() + right.abs()) / 2.0;
-        (left - right).abs() <= avg_abs * pct
-    }
-
-    #[test]
-    fn test_default_grouping() {
-        let latencies = measure_latencies_tokio(|| async {
-            let h1 = tokio::spawn(f());
-            let h2 = tokio::spawn(f());
-            _ = h1.await;
-            _ = h2.await;
-        });
-
-        latencies.with(|info| {
-            let parents = &info.parents;
-
-            let name_to_timing: BTreeMap<String, Timing> = HashMapExt(&info.timings)
-                .map_to_btree_map(|k, v| (k.name.clone(), v.clone()))
-                .into();
-
-            let name_to_callsite: BTreeMap<String, Identifier> = HashMapExt(&info.timings)
-                .map_to_btree_map(|k, _| (k.name.clone(), k.callsite.clone()))
-                .into();
-
-            for name in ["f", "my_great_span", "my_other_span"] {
-                let parent = parents
-                    .get(name_to_callsite.get(name).unwrap())
-                    .unwrap()
-                    .as_ref();
-                let timing = name_to_timing.get(name).unwrap();
-                let total_time_mean = timing.total_time.mean();
-                let total_time_count = timing.total_time.len();
-                let active_time_mean = timing.active_time.mean();
-                let active_time_count = timing.active_time.len();
-
-                match name {
-                    "f" => {
-                        let expected_parent = None;
-                        let expected_total_time_mean = 130.0 * 8.0 * 1000.0;
-                        let expected_active_time_mean = 5.0 * 8.0 * 1000.0;
-                        let expected_total_time_count = 2;
-                        let expected_active_time_count = 2;
-
-                        assert_eq!(parent, expected_parent, "{name} parent");
-
-                        println!(
-                            "** {name} total_time_mean: {total_time_mean}, {}",
-                            expected_total_time_mean
-                        );
-                        assert!(
-                            are_close(total_time_mean, expected_total_time_mean, 0.1),
-                            "{name} total_time mean"
-                        );
-
-                        println!(
-                            "** {name} total_time_count: {total_time_count}, {}",
-                            expected_total_time_count
-                        );
-                        assert_eq!(
-                            total_time_count, expected_total_time_count,
-                            "{name} total_time count"
-                        );
-
-                        println!(
-                            "** {name} active_time_mean: {active_time_mean}, {}",
-                            expected_active_time_mean
-                        );
-                        assert!(
-                            are_close(active_time_mean, expected_active_time_mean, 0.2),
-                            "{name} active_time mean"
-                        );
-
-                        println!(
-                            "** {name} active_time_count: {active_time_count}, {}",
-                            expected_active_time_count
-                        );
-                        assert_eq!(
-                            active_time_count, expected_active_time_count,
-                            "{name} active_time count"
-                        );
-                    }
-
-                    "my_great_span" => {
-                        let expected_parent = Some(name_to_callsite.get("f").unwrap());
-                        let expected_total_time_mean = 130.0 * 1000.0;
-                        let expected_active_time_mean = 5.0 * 1000.0;
-                        let expected_total_time_count = 16;
-                        let expected_active_time_count = 16;
-
-                        assert_eq!(parent, expected_parent, "{name} parent");
-
-                        println!(
-                            "** {name} total_time_mean: {total_time_mean}, {}",
-                            expected_total_time_mean
-                        );
-                        assert!(
-                            are_close(total_time_mean, expected_total_time_mean, 0.1),
-                            "{name} total_time mean"
-                        );
-
-                        println!(
-                            "** {name} total_time_count: {total_time_count}, {}",
-                            expected_total_time_count
-                        );
-                        assert_eq!(
-                            total_time_count, expected_total_time_count,
-                            "{name} total_time count"
-                        );
-
-                        println!(
-                            "** {name} active_time_mean: {active_time_mean}, {}",
-                            expected_active_time_mean
-                        );
-                        assert!(
-                            are_close(active_time_mean, expected_active_time_mean, 0.2),
-                            "{name} active_time mean"
-                        );
-
-                        println!(
-                            "** {name} active_time_count: {active_time_count}, {}",
-                            expected_active_time_count
-                        );
-                        assert_eq!(
-                            active_time_count, expected_active_time_count,
-                            "{name} active_time count"
-                        );
-                    }
-
-                    "my_other_span" => {
-                        let expected_parent = Some(name_to_callsite.get("my_great_span").unwrap());
-                        let expected_total_time_mean = 27.0 * 1000.0;
-                        let expected_active_time_mean = 2.0 * 1000.0;
-                        let expected_total_time_count = 16;
-                        let expected_active_time_count = 16;
-
-                        assert_eq!(parent, expected_parent, "{name} parent");
-
-                        println!(
-                            "** {name} total_time_mean: {total_time_mean}, {}",
-                            expected_total_time_mean
-                        );
-                        assert!(
-                            are_close(total_time_mean, expected_total_time_mean, 0.1),
-                            "{name} total_time mean"
-                        );
-
-                        println!(
-                            "** {name} total_time_count: {total_time_count}, {}",
-                            expected_total_time_count
-                        );
-                        assert_eq!(
-                            total_time_count, expected_total_time_count,
-                            "{name} total_time count"
-                        );
-
-                        println!(
-                            "** {name} active_time_mean: {active_time_mean}, {}",
-                            expected_active_time_mean
-                        );
-                        assert!(
-                            are_close(active_time_mean, expected_active_time_mean, 0.2),
-                            "{name} active_time mean"
-                        );
-
-                        println!(
-                            "** {name} active_time_count: {active_time_count}, {}",
-                            expected_active_time_count
-                        );
-                        assert_eq!(
-                            active_time_count, expected_active_time_count,
-                            "{name} active_time count"
-                        );
-                    }
-
-                    _ => {}
-                }
-            }
-        });
-    }
 }
