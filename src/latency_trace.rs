@@ -9,7 +9,7 @@
 use hdrhistogram::Histogram;
 use log;
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     future::Future,
     hash::Hash,
     sync::Arc,
@@ -26,8 +26,10 @@ use tracing_subscriber::{
     Layer, Registry,
 };
 
+use crate::map::{BTreeMapExt, HashMapExt};
+
 //=================
-// Types
+// SpanGroup
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
@@ -65,6 +67,9 @@ impl SpanGroup {
     }
 }
 
+//=================
+// Timing
+
 #[derive(Clone)]
 pub struct Timing {
     pub total_time: Histogram<u64>,
@@ -84,6 +89,9 @@ impl Timing {
     }
 }
 
+//=================
+// Info
+
 pub struct Info {
     pub parents: HashMap<Identifier, Option<Identifier>>,
     pub timings: HashMap<SpanGroup, Timing>,
@@ -96,7 +104,40 @@ impl Info {
             timings: HashMap::new(),
         }
     }
+
+    // pub fn name_to_span_group_timing_pairs(&self) -> BTreeMapExt<String, Vec<(SpanGroup, Timing)>> {
+    //     let mut outer_map: BTreeMap<String, Vec<(SpanGroup, Timing)>> = BTreeMap::new();
+
+    //     self.timings.iter().for_each(|(span_group, timing)| {
+    //         let name = span_group.name.clone();
+    //         outer_map
+    //             .entry(name)
+    //             .or_insert_with(|| Vec::new())
+    //             .push((span_group.clone(), timing.clone()));
+    //     });
+
+    //     outer_map.into()
+    // }
+
+    // pub fn callsite_to_span_group_timing_pairs(
+    //     &self,
+    // ) -> HashMapExt<Identifier, Vec<(SpanGroup, Timing)>> {
+    //     let mut outer_map: HashMap<Identifier, Vec<(SpanGroup, Timing)>> = HashMap::new();
+
+    //     self.timings.iter().for_each(|(span_group, timing)| {
+    //         let callsite = span_group.callsite.clone();
+    //         outer_map
+    //             .entry(callsite)
+    //             .or_insert_with(|| Vec::new())
+    //             .push((span_group.clone(), timing.clone()));
+    //     });
+
+    //     outer_map.into()
+    // }
 }
+
+//=================
+// SpanTiming
 
 /// Information about a span stored in the registry.
 #[derive(Debug)]
@@ -108,36 +149,14 @@ struct SpanTiming {
     parent_callsite: Option<Identifier>,
 }
 
+//=================
+// Latencies
+
 /// Provides access a [Timings] containing the latencies collected for different span callsites.
 #[derive(Clone)]
 pub struct Latencies {
     control: Control<Info, Info>,
     span_grouper: Option<Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>>,
-}
-
-//=================
-// Thread-locals
-
-thread_local! {
-    static LOCAL_INFO: Holder<Info, Info> = Holder::new(|| Info::new());
-}
-
-//=================
-// impls
-
-fn op(data: &Info, acc: &mut Info, tid: &ThreadId) {
-    log::debug!("executing `op` for {:?}", tid);
-    for (k, v) in data.parents.iter() {
-        acc.parents.entry(k.clone()).or_insert_with(|| v.clone());
-    }
-    for (k, v) in data.timings.iter() {
-        let timing = acc
-            .timings
-            .entry(k.clone())
-            .or_insert_with(|| Timing::new());
-        timing.total_time.add(v.total_time.clone()).unwrap();
-        timing.active_time.add(v.active_time.clone()).unwrap();
-    }
 }
 
 impl Latencies {
@@ -196,7 +215,7 @@ impl Latencies {
                 span_group,
                 thread::current().id()
             );
-});
+        });
     }
 }
 
@@ -273,7 +292,30 @@ where
 }
 
 //=================
+// Thread-locals
+
+thread_local! {
+    static LOCAL_INFO: Holder<Info, Info> = Holder::new(|| Info::new());
+}
+
+//=================
 // functions
+
+/// Used to accumulate results on [`Control`].
+fn op(data: &Info, acc: &mut Info, tid: &ThreadId) {
+    log::debug!("executing `op` for {:?}", tid);
+    for (k, v) in data.parents.iter() {
+        acc.parents.entry(k.clone()).or_insert_with(|| v.clone());
+    }
+    for (k, v) in data.timings.iter() {
+        let timing = acc
+            .timings
+            .entry(k.clone())
+            .or_insert_with(|| Timing::new());
+        timing.total_time.add(v.total_time.clone()).unwrap();
+        timing.active_time.add(v.active_time.clone()).unwrap();
+    }
+}
 
 /// Measures latencies of spans in `f`.
 /// May only be called once per process and will panic if called more than once.
@@ -393,16 +435,14 @@ mod tests {
 
         latencies.with(|info| {
             let parents = &info.parents;
-            let name_to_timing: HashMap<String, Timing> = info
-                .timings
-                .iter()
-                .map(|(k, v)| (k.name().to_owned(), v.clone()))
-                .collect();
-            let name_to_callsite: HashMap<String, Identifier> = info
-                .timings
-                .iter()
-                .map(|(k, _)| (k.name().to_owned(), k.callsite.clone()))
-                .collect();
+
+            let name_to_timing: BTreeMap<String, Timing> = HashMapExt(&info.timings)
+                .map_to_btree_map(|k, v| (k.name.clone(), v.clone()))
+                .into();
+
+            let name_to_callsite: BTreeMap<String, Identifier> = HashMapExt(&info.timings)
+                .map_to_btree_map(|k, _| (k.name.clone(), k.callsite.clone()))
+                .into();
 
             for name in ["f", "my_great_span", "my_other_span"] {
                 let parent = parents
