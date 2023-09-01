@@ -3,16 +3,11 @@ use std::collections::BTreeMap;
 use tracing_core::callsite::Identifier;
 
 mod common;
-use common::{are_close, f};
+use common::{are_close, target_fn};
 
 #[test]
 fn test_default_grouping() {
-    let latencies = measure_latencies_tokio(|| async {
-        let h1 = tokio::spawn(f());
-        let h2 = tokio::spawn(f());
-        _ = h1.await;
-        _ = h2.await;
-    });
+    let latencies = measure_latencies_tokio(target_fn);
 
     latencies.with(|info| {
         let parents = &info.parents;

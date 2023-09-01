@@ -1,20 +1,15 @@
 use latency_trace::{
-    group_by_all_fields, map::HashMapExt, measure_latencies_with_custom_grouping_tokio, Timing,
+    group_by_all_fields, map::HashMapExt, measure_latencies_with_custom_grouping_tokio,
 };
-use std::{collections::BTreeMap, ops::Deref};
+use std::collections::BTreeMap;
 use tracing_core::callsite::Identifier;
 
 mod common;
-use common::{are_close, f, Key};
+use common::{are_close, target_fn};
 
 #[test]
 fn test_grouping_by_all_fields() {
-    let latencies = measure_latencies_with_custom_grouping_tokio(group_by_all_fields, || async {
-        let h1 = tokio::spawn(f());
-        let h2 = tokio::spawn(f());
-        _ = h1.await;
-        _ = h2.await;
-    });
+    let latencies = measure_latencies_with_custom_grouping_tokio(group_by_all_fields, target_fn);
 
     let span_group_count = 7;
 

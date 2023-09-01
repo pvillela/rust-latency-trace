@@ -39,18 +39,6 @@ where
 
 pub struct BTreeMapExt<K, V>(pub BTreeMap<K, V>);
 
-// impl<K, V> From<BTreeMap<K, V>> for BTreeMapExt<K, V> {
-//     fn from(value: BTreeMap<K, V>) -> Self {
-//         BTreeMapExt(value)
-//     }
-// }
-
-// impl<K, V> Into<BTreeMap<K, V>> for BTreeMapExt<K, V> {
-//     fn into(self) -> BTreeMap<K, V> {
-//         self.0
-//     }
-// }
-
 impl<K, V> BTreeMapExt<K, V> {
     pub fn map_to_btree_map<K1, V1>(&self, f: impl FnMut(&K, &V) -> (K1, V1)) -> BTreeMap<K1, V1>
     where
@@ -87,18 +75,6 @@ impl<K, V> BTreeMapExt<K, V> {
 }
 
 pub struct HashMapExt<'a, K, V>(pub &'a HashMap<K, V>);
-
-// impl<'a, K, V> From<&'a HashMap<K, V>> for HashMapExt<'a, K, V> {
-//     fn from(value: &'a HashMap<K, V>) -> Self {
-//         HashMapExt(value)
-//     }
-// }
-
-// impl<'a, K, V> Into<&'a HashMap<K, V>> for HashMapExt<'a, K, V> {
-//     fn into(self) -> &'a HashMap<K, V> {
-//         self.0
-//     }
-// }
 
 impl<'a, K, V> HashMapExt<'a, K, V> {
     pub fn map_to_btree_map<K1, V1>(&self, f: impl FnMut(&K, &V) -> (K1, V1)) -> BTreeMap<K1, V1>
