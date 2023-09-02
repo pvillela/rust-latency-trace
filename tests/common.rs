@@ -1,4 +1,7 @@
-use latency_trace::{map::HashMapExt, Latencies, SpanGroup};
+use latency_trace::{
+    map::{BTreeMapExt, HashMapExt},
+    Latencies, SpanGroup,
+};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     future::Future,
@@ -52,14 +55,14 @@ pub fn are_close(left: f64, right: f64, pct: f64) -> bool {
 
 pub struct SpanNameTestSpec {
     pub expected_parent_name: Option<String>,
-    pub allowed_props: Vec<Vec<(&'static str, &'static str)>>,
+    pub expected_props: Vec<Vec<(&'static str, &'static str)>>,
     pub expected_total_time_mean: f64,
     pub expected_active_time_mean: f64,
     pub expected_total_time_count: u64,
     pub expected_active_time_count: u64,
 }
 
-pub struct OverallTestSpec<F, G, H, Fut>
+pub struct TestSpec<F, G, H, Fut>
 where
     F: Fn(G, H) -> Latencies,
     G: Fn(&Attributes) -> SpanGroup,
@@ -70,17 +73,17 @@ where
     pub grouper: G,
     pub span_group_count: usize,
     pub target_fn: H,
-    pub span_name_test_specs: HashMap<String, SpanNameTestSpec>,
+    pub span_name_test_specs: HashMap<&'static str, SpanNameTestSpec>,
 }
 
-pub fn run_test<F, G, H, Fut>(overall_test_def: OverallTestSpec<F, G, H, Fut>)
+pub fn run_test<F, G, H, Fut>(overall_test_def: TestSpec<F, G, H, Fut>)
 where
     F: Fn(G, H) -> Latencies,
     G: Fn(&Attributes) -> SpanGroup,
     H: Fn() -> Fut,
     Fut: Future<Output = ()>,
 {
-    let OverallTestSpec {
+    let TestSpec {
         measurement_fn,
         grouper,
         span_group_count,
@@ -90,6 +93,12 @@ where
 
     let latencies = measurement_fn(grouper, target_fn);
 
+    let expected_names: HashSet<&'static str> = span_name_test_specs.keys().map(|s| *s).collect();
+    let mut remaining_names = expected_names.clone();
+
+    let mut remaining_props =
+        HashMapExt(&span_name_test_specs).map_values(|v| v.expected_props.clone());
+
     latencies.with(|info| {
         let parents = &info.parents;
         let timings = &info.timings;
@@ -98,13 +107,15 @@ where
 
         assert_eq!(timings.len(), span_group_count, "Number of span groups");
 
-        let mut names = HashSet::<&str>::new();
-
         for (span_group, timing) in timings {
             let parent = parents.get(span_group.callsite()).unwrap().as_ref();
 
             let name = span_group.name();
-            names.insert(name);
+            assert!(
+                expected_names.contains(name),
+                "{name} must be in expected_names"
+            );
+            remaining_names.remove(name);
 
             let props = Vec::from_iter(
                 span_group
@@ -118,10 +129,10 @@ where
             let active_time_mean = timing.active_time.mean();
             let active_time_count = timing.active_time.len();
 
-            let run_test_for_span_name = |name: &str| {
+            {
                 let SpanNameTestSpec {
                     expected_parent_name,
-                    allowed_props,
+                    expected_props,
                     expected_total_time_mean,
                     expected_total_time_count,
                     expected_active_time_mean,
@@ -137,7 +148,17 @@ where
                 });
                 assert_eq!(parent, expected_parent, "{name} parent");
 
-                assert!(allowed_props.contains(&props), "{name} props");
+                assert!(expected_props.contains(&props), "{name} props");
+
+                // Remove props from remaining_props. For each name, an allowed props value should occur exactly once.
+                {
+                    let v = remaining_props.get_mut(name).unwrap();
+                    let idx = v
+                        .iter()
+                        .position(|p| *p == props)
+                        .expect(&format!("props={:?} not found for {name}", props));
+                    v.remove(idx);
+                }
 
                 println!(
                     "** {name} total_time_mean: {total_time_mean}, {}",
@@ -175,11 +196,15 @@ where
                     "{name} active_time count"
                 );
             };
-
-            run_test_for_span_name(name);
         }
 
-        let expected_names = HashSet::from(["f", "my_great_span", "my_other_span"]);
-        assert_eq!(names, expected_names, "expected names");
+        assert!(
+            remaining_names.is_empty(),
+            "remaining_names must be empty at the end"
+        );
+        assert!(
+            remaining_props.iter().all(|(_, v)| v.is_empty()),
+            "remaining_props must be empty for each name at the end"
+        );
     });
 }
