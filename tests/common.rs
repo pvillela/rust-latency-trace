@@ -18,13 +18,13 @@ async fn f() {
         log::trace!("Before my_great_span");
 
         async {
-            thread::sleep(Duration::from_millis(3));
+            thread::sleep(Duration::from_millis(13));
             tokio::time::sleep(Duration::from_millis(100)).await;
             foo += 1;
             info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
             log::trace!("Before my_other_span");
             async {
-                thread::sleep(Duration::from_millis(2));
+                thread::sleep(Duration::from_millis(12));
                 tokio::time::sleep(Duration::from_millis(25)).await;
                 warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
             }
@@ -167,7 +167,7 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
                         expected_active_time_mean
                     );
                     assert!(
-                        are_close(active_time_mean, *expected_active_time_mean, 0.25),
+                        are_close(active_time_mean, *expected_active_time_mean, 0.1),
                         "{name} active_time mean"
                     );
 

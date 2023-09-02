@@ -16,8 +16,8 @@ fn test_default_grouping() {
                 SpanNameTestSpec {
                     expected_parent_name: None,
                     expected_props: vec![vec![]],
-                    expected_total_time_mean: 130.0 * 8.0 * 1000.0,
-                    expected_active_time_mean: 5.0 * 8.0 * 1000.0,
+                    expected_total_time_mean: 150.0 * 8.0 * 1000.0,
+                    expected_active_time_mean: 25.0 * 8.0 * 1000.0,
                     expected_total_time_count: 2,
                     expected_active_time_count: 2,
                 },
@@ -27,8 +27,8 @@ fn test_default_grouping() {
                 SpanNameTestSpec {
                     expected_parent_name: Some("f"),
                     expected_props: vec![vec![]],
-                    expected_total_time_mean: 130.0 * 1000.0,
-                    expected_active_time_mean: 5.0 * 1000.0,
+                    expected_total_time_mean: 150.0 * 1000.0,
+                    expected_active_time_mean: 25.0 * 1000.0,
                     expected_total_time_count: 16,
                     expected_active_time_count: 16,
                 },
@@ -38,8 +38,8 @@ fn test_default_grouping() {
                 SpanNameTestSpec {
                     expected_parent_name: Some("my_great_span"),
                     expected_props: vec![vec![]],
-                    expected_total_time_mean: 27.0 * 1000.0,
-                    expected_active_time_mean: 2.0 * 1000.0,
+                    expected_total_time_mean: 37.0 * 1000.0,
+                    expected_active_time_mean: 12.0 * 1000.0,
                     expected_total_time_count: 16,
                     expected_active_time_count: 16,
                 },
