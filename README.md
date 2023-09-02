@@ -9,5 +9,4 @@ Given code instrumented wth the Rust [tracing](https://crates.io/crates/tracing)
 
 ## TODOs
 
-- Add sync spans to tests.
 - Allow a SpanGroup to be the parent of another SpanGroup, not restricting parenthood to callsites. Use a combination of callsite and props as the key.

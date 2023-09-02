@@ -20,9 +20,9 @@ use std::{
 };
 use tracing::{
     callsite::Identifier,
-    info, span,
+    span,
     subscriber::{Interest, Subscriber},
-    warn, Id, Level, Metadata,
+    Id, Level, Metadata,
 };
 use tracing_core::span::Attributes;
 use tracing_subscriber::{
@@ -273,10 +273,9 @@ fn main() {
 
                 for _ in 0..4 {
                     println!("Before top-level span! macro");
-                    span!(Level::TRACE, "my_great_span", foo_count = &foo).in_scope(|| {
+                    span!(Level::TRACE, "outer_async_span", foo_count = &foo).in_scope(|| {
                         thread::sleep(Duration::from_millis(100));
                         foo += 1;
-                        info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
                         println!("Before lower-level span! macro");
                         span!(
                             Level::TRACE,
@@ -286,7 +285,6 @@ fn main() {
                         )
                         .in_scope(|| {
                             thread::sleep(Duration::from_millis(25));
-                            warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
                         });
                     });
                 }

@@ -20,9 +20,9 @@ use std::{
 };
 use tracing::{
     callsite::Identifier,
-    info, instrument, span,
+    instrument, span,
     subscriber::{Interest, Subscriber},
-    warn, Id, Level, Metadata,
+    Id, Level, Metadata,
 };
 use tracing_core::span::Attributes;
 use tracing_subscriber::{
@@ -266,12 +266,11 @@ async fn f() {
     for _ in 0..4 {
         println!("Before top-level span! macro");
 
-        span!(Level::TRACE, "my_great_span", foo_count = &foo)
+        span!(Level::TRACE, "outer_async_span", foo_count = &foo)
             .in_scope(|| async {
                 async {
                     tokio::time::sleep(Duration::from_millis(100)).await;
                     foo += 1;
-                    info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
                     println!("Before lower-level span! macro");
                     span!(
                         Level::TRACE,
@@ -281,7 +280,6 @@ async fn f() {
                     )
                     .in_scope(|| {
                         thread::sleep(Duration::from_millis(25));
-                        warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
                     });
                 }
                 .await
@@ -304,11 +302,10 @@ fn main() {
 
     //             for _ in 0..4 {
     //                 println!("Before top-level span! macro");
-    //                 span!(Level::TRACE, "my_great_span", foo_count = &foo).in_scope(|| {
+    //                 span!(Level::TRACE, "outer_async_span", foo_count = &foo).in_scope(|| {
     //                     thread::sleep(Duration::from_millis(100));
     //                     foo += 1;
-    //                     info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
-    //                     println!("Before lower-level span! macro");
+    //             //                     println!("Before lower-level span! macro");
     //                     span!(
     //                         Level::TRACE,
     //                         "my other span",
@@ -317,8 +314,7 @@ fn main() {
     //                     )
     //                     .in_scope(|| {
     //                         thread::sleep(Duration::from_millis(25));
-    //                         warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
-    //                     });
+    //             //                     });
     //                 });
     //             }
     //         });

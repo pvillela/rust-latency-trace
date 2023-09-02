@@ -9,7 +9,7 @@ fn test_default_grouping() {
     let latencies = measure_latencies_tokio(target_fn);
 
     let test_spec = TestSpec {
-        span_group_count: 3,
+        span_group_count: 5,
         span_name_test_specs: BTreeMap::from([
             (
                 "f",
@@ -23,7 +23,7 @@ fn test_default_grouping() {
                 },
             ),
             (
-                "my_great_span",
+                "outer_async_span",
                 SpanNameTestSpec {
                     expected_parent_name: Some("f"),
                     expected_props: vec![vec![]],
@@ -34,11 +34,33 @@ fn test_default_grouping() {
                 },
             ),
             (
-                "my_other_span",
+                "inner_async_span",
                 SpanNameTestSpec {
-                    expected_parent_name: Some("my_great_span"),
+                    expected_parent_name: Some("outer_async_span"),
                     expected_props: vec![vec![]],
                     expected_total_time_mean: 37.0 * 1000.0,
+                    expected_active_time_mean: 12.0 * 1000.0,
+                    expected_total_time_count: 16,
+                    expected_active_time_count: 16,
+                },
+            ),
+            (
+                "sync_span_1",
+                SpanNameTestSpec {
+                    expected_parent_name: Some("outer_async_span"),
+                    expected_props: vec![vec![]],
+                    expected_total_time_mean: 13.0 * 1000.0,
+                    expected_active_time_mean: 13.0 * 1000.0,
+                    expected_total_time_count: 16,
+                    expected_active_time_count: 16,
+                },
+            ),
+            (
+                "sync_span_2",
+                SpanNameTestSpec {
+                    expected_parent_name: Some("inner_async_span"),
+                    expected_props: vec![vec![]],
+                    expected_total_time_mean: 12.0 * 1000.0,
                     expected_active_time_mean: 12.0 * 1000.0,
                     expected_total_time_count: 16,
                     expected_active_time_count: 16,

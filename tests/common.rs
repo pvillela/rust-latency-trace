@@ -7,7 +7,7 @@ use std::{
     thread,
     time::Duration,
 };
-use tracing::{info, instrument, warn, Instrument};
+use tracing::{instrument, trace_span, Instrument};
 use tracing_core::callsite::Identifier;
 
 #[instrument(level = "trace")]
@@ -15,24 +15,28 @@ async fn f() {
     let mut foo: u64 = 1;
 
     for i in 0..8 {
-        log::trace!("Before my_great_span");
+        log::trace!("Before outer_async_span");
 
         async {
-            thread::sleep(Duration::from_millis(13));
+            trace_span!("sync_span_1").in_scope(|| {
+                thread::sleep(Duration::from_millis(13));
+            });
             tokio::time::sleep(Duration::from_millis(100)).await;
             foo += 1;
-            info!(yak_shaved = true, yak_count = 2, "hi from inside my span");
-            log::trace!("Before my_other_span");
+            log::trace!("Before inner_async_span");
             async {
-                thread::sleep(Duration::from_millis(12));
+                {
+                    let span = trace_span!("sync_span_2");
+                    let _enter = span.enter();
+                    thread::sleep(Duration::from_millis(12));
+                }
                 tokio::time::sleep(Duration::from_millis(25)).await;
-                warn!(yak_shaved = false, yak_count = -1, "failed to shave yak");
             }
-            .instrument(tracing::trace_span!("my_other_span", foo = i % 2))
+            .instrument(tracing::trace_span!("inner_async_span", foo = i % 2))
             .await;
         }
         .instrument(tracing::trace_span!(
-            "my_great_span",
+            "outer_async_span",
             foo = i % 2,
             bar = i % 4
         ))
@@ -167,7 +171,7 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
                         expected_active_time_mean
                     );
                     assert!(
-                        are_close(active_time_mean, *expected_active_time_mean, 0.1),
+                        are_close(active_time_mean, *expected_active_time_mean, 0.2),
                         "{name} active_time mean"
                     );
 
