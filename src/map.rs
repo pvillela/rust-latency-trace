@@ -37,9 +37,9 @@ where
         .map(|(k, v)| (k.clone(), v.clone()))
 }
 
-pub struct BTreeMapExt<K, V>(pub BTreeMap<K, V>);
+pub struct BTreeMapExt<'a, K, V>(pub &'a BTreeMap<K, V>);
 
-impl<K, V> BTreeMapExt<K, V> {
+impl<'a, K, V> BTreeMapExt<'a, K, V> {
     pub fn map_to_btree_map<K1, V1>(&self, f: impl FnMut(&K, &V) -> (K1, V1)) -> BTreeMap<K1, V1>
     where
         K1: Ord,

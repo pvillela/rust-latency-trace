@@ -68,7 +68,7 @@ impl SpanGroup {
 //=================
 // Timing
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Timing {
     pub total_time: Histogram<u64>,
     pub active_time: Histogram<u64>,
