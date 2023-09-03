@@ -10,7 +10,6 @@ use hdrhistogram::Histogram;
 use log;
 use std::{
     collections::HashMap,
-    future::Future,
     hash::Hash,
     sync::Arc,
     thread::{self, ThreadId},
@@ -19,33 +18,28 @@ use std::{
 use thread_local_drop::{self, Control, Holder};
 use tracing::{callsite::Identifier, Id, Subscriber};
 use tracing_core::span::Attributes;
-use tracing_subscriber::{
-    layer::{Context, SubscriberExt},
-    registry::LookupSpan,
-    util::SubscriberInitExt,
-    Layer, Registry,
-};
+use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
 //=================
 // SpanGroup
 
-pub type Props = Option<Vec<Vec<(String, String)>>>;
+pub type Props = Vec<Vec<(&'static str, String)>>;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
-    callsite: Identifier,
-    code_line: String,
-    name: String,
-    props: Props,
+    pub(crate) callsite: Identifier,
+    pub(crate) code_line: String,
+    pub(crate) name: &'static str,
+    pub(crate) props: Props,
 }
 
 impl SpanGroup {
-    fn new(attrs: &Attributes, props: Props) -> Self {
+    pub fn new(attrs: &Attributes, props: Props) -> Self {
         let meta = attrs.metadata();
         SpanGroup {
             callsite: meta.callsite(),
             code_line: format!("{}:{}", meta.module_path().unwrap(), meta.line().unwrap()),
-            name: meta.name().to_owned(),
+            name: meta.name(),
             props,
         }
     }
@@ -122,18 +116,18 @@ struct SpanTiming {
 //=================
 // Latencies
 
-pub type SpanGrouper =
+type SpanGrouper =
     Arc<dyn Fn(&Option<SpanGroup>, &Attributes) -> SpanGroup + Send + Sync + 'static>;
 
 /// Provides access a [Timings] containing the latencies collected for different span callsites.
 #[derive(Clone)]
 pub struct Latencies {
-    control: Control<Info, Info>,
+    pub(crate) control: Control<Info, Info>,
     span_grouper: SpanGrouper,
 }
 
 impl Latencies {
-    fn new(span_grouper: SpanGrouper) -> Latencies {
+    pub(crate) fn new(span_grouper: SpanGrouper) -> Latencies {
         Latencies {
             control: Control::new(Info::new(), op),
             span_grouper,
@@ -142,6 +136,13 @@ impl Latencies {
 
     pub fn with<V>(&self, f: impl FnOnce(&Info) -> V) -> V {
         self.control.with_acc(f).unwrap()
+    }
+
+    pub fn aggregate_results<G>(&self, _f: impl Fn(&SpanGroup) -> G) -> HashMap<G, Timing>
+    where
+        G: Eq + Hash,
+    {
+        todo!()
     }
 
     fn update_parents(&self, span_group: &SpanGroup, parent: &Option<SpanGroup>) {
@@ -208,7 +209,6 @@ where
 
         let span_group = (self.span_grouper)(&parent_group, attrs);
 
-        let mut ext = span.extensions_mut();
         span.extensions_mut().insert(SpanTiming {
             span_group,
             created_at: Instant::now(),
@@ -286,83 +286,4 @@ fn op(data: &Info, acc: &mut Info, tid: &ThreadId) {
         timing.total_time.add(v.total_time.clone()).unwrap();
         timing.active_time.add(v.active_time.clone()).unwrap();
     }
-}
-
-/// Measures latencies of spans in `f`.
-/// May only be called once per process and will panic if called more than once.
-fn measure_latencies_priv(
-    span_grouper: SpanGrouper,
-    f: impl FnOnce() + Send + 'static,
-) -> Latencies {
-    let latencies = Latencies::new(span_grouper);
-    Registry::default().with(latencies.clone()).init();
-    f();
-    latencies.control.ensure_tls_dropped();
-    latencies
-}
-
-fn default_span_grouper(_parent_group: &Option<SpanGroup>, attrs: &Attributes) -> SpanGroup {
-    let meta = attrs.metadata();
-    SpanGroup {
-        callsite: meta.callsite(),
-        code_line: format!(
-            "{}:{}",
-            meta.module_path().unwrap().to_owned(),
-            meta.line().unwrap().to_owned()
-        ),
-        name: meta.name().to_owned(),
-        props: None,
-    }
-}
-
-/// Measures latencies of spans in `f`.
-/// May only be called once per process and will panic if called more than once.
-pub fn measure_latencies(f: impl FnOnce() -> () + Send + 'static) -> Latencies {
-    measure_latencies_priv(Arc::new(default_span_grouper), f)
-}
-
-/// Measures latencies of spans in `f`.
-/// May only be called once per process and will panic if called more than once.
-pub fn measure_latencies_with_custom_grouping(
-    span_grouper: SpanGrouper,
-    f: impl FnOnce() -> () + Send + 'static,
-) -> Latencies {
-    measure_latencies_priv(span_grouper, f)
-}
-
-/// Measures latencies of spans in async function `f` running on the [tokio] runtime.
-/// May only be called once per process and will panic if called more than once.
-pub fn measure_latencies_tokio<F>(f: impl FnOnce() -> F + Send + 'static) -> Latencies
-where
-    F: Future<Output = ()> + Send,
-{
-    measure_latencies(|| {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async {
-                f().await;
-            });
-    })
-}
-
-/// Measures latencies of spans in async function `f` running on the [tokio] runtime.
-/// May only be called once per process and will panic if called more than once.
-pub fn measure_latencies_with_custom_grouping_tokio<F>(
-    span_grouper: SpanGrouper,
-    f: impl FnOnce() -> F + Send + 'static,
-) -> Latencies
-where
-    F: Future<Output = ()> + Send,
-{
-    measure_latencies_with_custom_grouping(span_grouper, || {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async {
-                f().await;
-            });
-    })
 }
