@@ -1,7 +1,7 @@
 use latency_trace::Latencies;
 use log;
 use std::{thread, time::Duration};
-use tracing::{instrument, Instrument};
+use tracing::{instrument, trace_span, Instrument};
 
 #[instrument(level = "trace")]
 pub async fn f() {
@@ -11,12 +11,18 @@ pub async fn f() {
         log::trace!("Before outer_async_span");
 
         async {
-            thread::sleep(Duration::from_millis(3));
+            trace_span!("sync_span_1").in_scope(|| {
+                thread::sleep(Duration::from_millis(13));
+            });
             tokio::time::sleep(Duration::from_millis(100)).await;
             foo += 1;
             log::trace!("Before inner_async_span");
             async {
-                thread::sleep(Duration::from_millis(2));
+                {
+                    let span = trace_span!("sync_span_2");
+                    let _enter = span.enter();
+                    thread::sleep(Duration::from_millis(12));
+                }
                 tokio::time::sleep(Duration::from_millis(25)).await;
             }
             .instrument(tracing::trace_span!("inner_async_span", foo = i % 2))

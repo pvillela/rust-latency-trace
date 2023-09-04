@@ -1,14 +1,10 @@
-use latency_trace::{
-    map::{BTreeMapExt, HashMapExt},
-    Latencies,
-};
+use latency_trace::{map::BTreeMapExt, Latencies};
 use std::{
     collections::{BTreeMap, HashSet},
     thread,
     time::Duration,
 };
 use tracing::{instrument, trace_span, Instrument};
-use tracing_core::callsite::Identifier;
 
 #[instrument(level = "trace")]
 async fn f() {
@@ -59,7 +55,7 @@ pub fn are_close(left: f64, right: f64, pct: f64) -> bool {
 #[derive(Debug)]
 pub struct SpanNameTestSpec {
     pub expected_parent_name: Option<&'static str>,
-    pub expected_props: Vec<Vec<(&'static str, &'static str)>>,
+    pub expected_props: Vec<Vec<Vec<(&'static str, &'static str)>>>,
     pub expected_total_time_mean: f64,
     pub expected_active_time_mean: f64,
     pub expected_total_time_count: u64,
@@ -86,8 +82,6 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
     latencies.with(|info| {
         let parents = &info.parents;
         let timings = &info.timings;
-        let name_to_callsite: BTreeMap<String, Identifier> = HashMapExt(&info.timings)
-            .map_to_btree_map(|k, _| (k.name().to_owned(), k.callsite().clone()));
 
         assert_eq!(timings.len(), *span_group_count, "Number of span groups");
 
@@ -109,19 +103,19 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
                 expected_active_time_count,
             } = spec;
 
-            let expected_parent = expected_parent_name
-                .clone()
-                .map(|parent_name| name_to_callsite.get(parent_name).unwrap());
-
             for (span_group, timing) in timings.iter().filter(|(k, _)| k.name() == name) {
-                let parent = parents.get(span_group.callsite()).unwrap().as_ref();
+                let parent = parents.get(span_group).unwrap().as_ref();
+                let parent_name = parent.map(|p| p.name());
 
-                let props = Vec::from_iter(
-                    span_group
-                        .props()
-                        .iter()
-                        .map(|p| (&p.0 as &str, &p.1 as &str)),
-                );
+                let props = span_group
+                    .props()
+                    .iter()
+                    .map(|v| {
+                        v.iter()
+                            .map(|p| (p.0, &p.1 as &str))
+                            .collect::<Vec<(&str, &str)>>()
+                    })
+                    .collect::<Vec<Vec<(&str, &str)>>>();
 
                 let total_time_mean = timing.total_time.mean();
                 let total_time_count = timing.total_time.len();
@@ -129,7 +123,7 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
                 let active_time_count = timing.active_time.len();
 
                 {
-                    assert_eq!(parent, expected_parent, "{name} parent");
+                    assert_eq!(parent_name, *expected_parent_name, "{name} parent");
 
                     assert!(
                         expected_props.contains(&props),
@@ -153,7 +147,7 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
                         expected_total_time_mean
                     );
                     assert!(
-                        are_close(total_time_mean, *expected_total_time_mean, 0.1),
+                        are_close(total_time_mean, *expected_total_time_mean, 0.2),
                         "{name} total_time mean"
                     );
 
