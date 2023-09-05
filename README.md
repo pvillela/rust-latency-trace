@@ -9,4 +9,5 @@ Given code instrumented wth the Rust [tracing](https://crates.io/crates/tracing)
 
 ## TODOs
 
-- Allow a SpanGroup to be the parent of another SpanGroup, not restricting parenthood to callsites. Use a combination of callsite and props as the key.
+- Support aggregation of timings by using a function that groups span groups.
+- Support filtering of spans

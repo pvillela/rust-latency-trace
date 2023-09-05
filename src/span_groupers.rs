@@ -1,4 +1,4 @@
-use crate::SpanGroup;
+use crate::SpanGroupPriv;
 use std::{collections::BTreeMap, fmt};
 use tracing::{
     field::{Field, Visit},
@@ -6,8 +6,11 @@ use tracing::{
 };
 
 /// Default span grouper. Groups spans by callsite.
-pub fn default_span_grouper(_parent_group: &Option<SpanGroup>, attrs: &Attributes) -> SpanGroup {
-    SpanGroup::new(attrs, Vec::new())
+pub fn default_span_grouper(
+    _parent_group: &Option<SpanGroupPriv>,
+    attrs: &Attributes,
+) -> SpanGroupPriv {
+    SpanGroupPriv::new(attrs, Vec::new())
 }
 
 struct FieldReader(BTreeMap<&'static str, String>);
@@ -32,14 +35,17 @@ fn extract_props_by_all_fields(attrs: &Attributes) -> Vec<(&'static str, String)
 }
 
 /// Custom span grouper that groups by all fields and their values.
-pub fn group_by_all_fields(parent_group: &Option<SpanGroup>, attrs: &Attributes) -> SpanGroup {
+pub fn group_by_all_fields(
+    parent_group: &Option<SpanGroupPriv>,
+    attrs: &Attributes,
+) -> SpanGroupPriv {
     let mut props = vec![extract_props_by_all_fields(attrs)];
     if let Some(parent_group) = parent_group {
         for p in &parent_group.props {
             props.push(p.clone());
         }
     }
-    SpanGroup::new(attrs, props)
+    SpanGroupPriv::new(attrs, props)
 }
 
 // fn group_by_given_fields0<'a>(
@@ -76,14 +82,14 @@ pub fn extract_props_by_given_fields<'a>(
 /// Custom span grouper that groups by given fields and their values.
 pub fn group_by_given_fields<'a>(
     given_names: &'a [&'a str],
-) -> impl Fn(&Option<SpanGroup>, &Attributes) -> SpanGroup + Send + Sync + 'a {
-    |parent_group: &Option<SpanGroup>, attrs: &Attributes| {
+) -> impl Fn(&Option<SpanGroupPriv>, &Attributes) -> SpanGroupPriv + Send + Sync + 'a {
+    |parent_group: &Option<SpanGroupPriv>, attrs: &Attributes| {
         let mut props = vec![extract_props_by_given_fields(given_names)(attrs)];
         if let Some(parent_group) = parent_group {
             for p in &parent_group.props {
                 props.push(p.clone());
             }
         }
-        SpanGroup::new(attrs, props)
+        SpanGroupPriv::new(attrs, props)
     }
 }

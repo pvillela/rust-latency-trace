@@ -79,8 +79,8 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
     let mut remaining_props =
         BTreeMapExt(&span_name_test_specs).map_values(|v| v.expected_props.clone());
 
-    latencies.with(|info| {
-        let parents = &info.parents;
+    latencies.priv_with(|info| {
+        let parents = &info.callsites;
         let timings = &info.timings;
 
         assert_eq!(timings.len(), *span_group_count, "Number of span groups");
