@@ -30,7 +30,7 @@ pub struct Callsite {
 }
 
 impl Callsite {
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &'static str {
         self.name
     }
 
@@ -66,7 +66,7 @@ impl SpanGroup {
         &self.props
     }
 
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &'static str {
         self.callsite.name
     }
 
@@ -86,8 +86,8 @@ struct SpanGroupPriv {
 
 #[derive(Clone, Debug)]
 pub struct Timing {
-    pub total_time: Histogram<u64>,
-    pub active_time: Histogram<u64>,
+    pub(crate) total_time: Histogram<u64>,
+    pub(crate) active_time: Histogram<u64>,
 }
 
 impl Timing {
@@ -100,6 +100,14 @@ impl Timing {
             total_time: hist,
             active_time: hist2,
         }
+    }
+
+    pub fn total_time(&self) -> &Histogram<u64> {
+        &self.total_time
+    }
+
+    pub fn active_time(&self) -> &Histogram<u64> {
+        &self.active_time
     }
 }
 

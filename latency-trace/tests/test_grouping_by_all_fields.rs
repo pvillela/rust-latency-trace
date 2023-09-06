@@ -21,6 +21,7 @@ fn test_grouping_by_all_fields() {
                     expected_active_time_mean: 25.0 * 8.0 * 1000.0,
                     expected_total_time_count: 2,
                     expected_active_time_count: 2,
+                    expected_agg_by_name_count: 2,
                 },
             ),
             (
@@ -37,6 +38,7 @@ fn test_grouping_by_all_fields() {
                     expected_active_time_mean: 25.0 * 1000.0,
                     expected_total_time_count: 4,
                     expected_active_time_count: 4,
+                    expected_agg_by_name_count: 16,
                 },
             ),
             (
@@ -53,6 +55,7 @@ fn test_grouping_by_all_fields() {
                     expected_active_time_mean: 12.0 * 1000.0,
                     expected_total_time_count: 4,
                     expected_active_time_count: 4,
+                    expected_agg_by_name_count: 16,
                 },
             ),
             (
@@ -69,6 +72,7 @@ fn test_grouping_by_all_fields() {
                     expected_active_time_mean: 13.0 * 1000.0,
                     expected_total_time_count: 4,
                     expected_active_time_count: 4,
+                    expected_agg_by_name_count: 16,
                 },
             ),
             (
@@ -105,6 +109,7 @@ fn test_grouping_by_all_fields() {
                     expected_active_time_mean: 12.0 * 1000.0,
                     expected_total_time_count: 4,
                     expected_active_time_count: 4,
+                    expected_agg_by_name_count: 16,
                 },
             ),
         ]),

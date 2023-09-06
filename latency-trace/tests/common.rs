@@ -1,5 +1,5 @@
 use dev_utils::utils::are_close;
-use latency_trace::{map::BTreeMapExt, Latencies};
+use latency_trace::{aggregate_timings, map::BTreeMapExt, Latencies};
 use std::collections::{BTreeMap, HashSet};
 
 #[derive(Debug)]
@@ -10,6 +10,7 @@ pub struct SpanNameTestSpec {
     pub expected_active_time_mean: f64,
     pub expected_total_time_count: u64,
     pub expected_active_time_count: u64,
+    pub expected_agg_by_name_count: u64,
 }
 
 pub struct TestSpec {
@@ -31,6 +32,13 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
 
     assert_eq!(latencies.len(), *span_group_count, "Number of span groups");
 
+    let agg_timings = aggregate_timings(latencies, |sg| sg.name());
+    assert_eq!(
+        agg_timings.len(),
+        span_name_test_specs.len(),
+        "aggregation by name - number of aggregate values"
+    );
+
     // Force tests to proceed aphabetically by span name.
     for (name, spec) in span_name_test_specs {
         let name = *name;
@@ -47,8 +55,56 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
             expected_total_time_count,
             expected_active_time_mean,
             expected_active_time_count,
+            expected_agg_by_name_count,
         } = spec;
 
+        // Aggregation assertions.
+        {
+            let agg_timing = agg_timings.get(name).unwrap();
+
+            let total_time_mean = agg_timing.total_time().mean();
+            let total_time_count = agg_timing.total_time().len();
+            let active_time_mean = agg_timing.active_time().mean();
+            let active_time_count = agg_timing.active_time().len();
+
+            println!(
+                "** {name} aggregate total_time_mean: {total_time_mean}, {}",
+                expected_total_time_mean
+            );
+            assert!(
+                are_close(total_time_mean, *expected_total_time_mean, 0.2),
+                "{name} aggregate total_time mean"
+            );
+
+            println!(
+                "** {name} aggregate total_time_count: {total_time_count}, {}",
+                expected_agg_by_name_count
+            );
+            assert_eq!(
+                total_time_count, *expected_agg_by_name_count,
+                "{name} aggregate total_time count"
+            );
+
+            println!(
+                "** {name} aggregate active_time_mean: {active_time_mean}, {}",
+                expected_active_time_mean
+            );
+            assert!(
+                are_close(active_time_mean, *expected_active_time_mean, 0.2),
+                "{name} aggregate active_time mean"
+            );
+
+            println!(
+                "** {name} aggregate active_time_count: {active_time_count}, {}",
+                expected_agg_by_name_count
+            );
+            assert_eq!(
+                active_time_count, *expected_agg_by_name_count,
+                "{name} aggregate active_time count"
+            );
+        }
+
+        // Assertions by SpanGroup
         for (span_group, sg_info) in latencies.iter().filter(|(k, _)| k.name() == name) {
             let parent = sg_info.parent();
             let parent_name = parent.map(|p| p.name());
@@ -126,6 +182,8 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
             };
         }
     }
+
+    // Exhaustiveness assertions.
     assert!(
         remaining_names.is_empty(),
         "remaining_names must be empty at the end"
