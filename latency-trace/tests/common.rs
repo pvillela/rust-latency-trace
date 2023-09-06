@@ -144,6 +144,9 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
                     v.remove(idx);
                 }
 
+                // The tolerance used below for means is 0.2 due to test framework overhead. Running the example
+                // executables shows that the actual and expected means are withing 0.1 (10%) of each other.
+
                 println!(
                     "** {name} total_time_mean: {total_time_mean}, {}",
                     expected_total_time_mean

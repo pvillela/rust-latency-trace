@@ -10,7 +10,7 @@ pub fn print_mean_timings(latencies: &Latencies) {
         let active_time_count = v.active_time().len();
         let parent = v.parent();
         println!(
-                "  * span_group={:?}, parent={:?}, mean_total_time={}μs, total_time_count={}, mean_active_time={}μs, active_time_count={}",
+                "  * {:?}, parent={:?}, mean_total_time={}μs, total_time_count={}, mean_active_time={}μs, active_time_count={}",
                 span_group, parent, mean_total_time, total_time_count, mean_active_time,active_time_count
             );
     }
@@ -26,7 +26,7 @@ pub fn print_median_timings(latencies: &Latencies) {
         let active_time_count = v.active_time().len();
         let parent = v.parent();
         println!(
-                "  span_group={:?}, parent={:?}, median_total_time={}μs, total_time_count={}, median_active_time={}μs, active_time_count={}",
+                "  {:?}, parent={:?}, median_total_time={}μs, total_time_count={}, median_active_time={}μs, active_time_count={}",
                 span_group, parent, median_total_time, total_time_count, median_active_time,active_time_count
             );
     }
