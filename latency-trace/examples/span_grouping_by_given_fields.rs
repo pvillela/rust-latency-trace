@@ -1,11 +1,12 @@
 //! Example using custom grouping by given fields.
 
+use dev_utils::target_fns::f;
 use env_logger;
 use latency_trace::{group_by_given_fields, measure_latencies_with_custom_grouping_tokio};
 use std::env::set_var;
 
 mod examples_support;
-use examples_support::{f, print_mean_timings, print_median_timings};
+use examples_support::{print_mean_timings, print_median_timings};
 
 fn main() {
     // Set below value to "trace" to enable full library tracing.

@@ -1,6 +1,7 @@
 mod common;
 
-use common::{run_test, target_fn, SpanNameTestSpec, TestSpec};
+use common::{run_test, SpanNameTestSpec, TestSpec};
+use dev_utils::target_fns::target_fn;
 use latency_trace::measure_latencies_tokio;
 use std::collections::BTreeMap;
 
