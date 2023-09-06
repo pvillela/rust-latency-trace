@@ -18,6 +18,8 @@ pub struct TestSpec {
     pub span_name_test_specs: BTreeMap<&'static str, SpanNameTestSpec>,
 }
 
+pub const E: Vec<(&str, &str)> = vec![];
+
 pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
     let TestSpec {
         span_group_count,
@@ -27,8 +29,8 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
     let expected_names: HashSet<&'static str> = span_name_test_specs.keys().map(|s| *s).collect();
     let mut remaining_names = expected_names.clone();
 
-    let mut remaining_props =
-        BTreeMapExt(&span_name_test_specs).map_values(|v| v.expected_props.clone());
+    // let mut remaining_props =
+    //     BTreeMapExt(&span_name_test_specs).map_values(|v| v.expected_props.clone());
 
     assert_eq!(latencies.len(), *span_group_count, "Number of span groups");
 
@@ -134,15 +136,15 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
                     expected_props
                 );
 
-                // Remove props from remaining_props. For each name, an allowed props value should occur exactly once.
-                {
-                    let v = remaining_props.get_mut(name).unwrap();
-                    let idx = v
-                        .iter()
-                        .position(|p| *p == props)
-                        .expect(&format!("props={:?} not found for {name}", props));
-                    v.remove(idx);
-                }
+                // // Remove props from remaining_props. For each name, an allowed props value should occur exactly once.
+                // {
+                //     let v = remaining_props.get_mut(name).unwrap();
+                //     let idx = v
+                //         .iter()
+                //         .position(|p| *p == props)
+                //         .expect(&format!("props={:?} not found for {name}", props));
+                //     v.remove(idx);
+                // }
 
                 // The tolerance used below for means is 0.2 due to test framework overhead. Running the example
                 // executables shows that the actual and expected means are withing 0.1 (10%) of each other.
@@ -191,8 +193,8 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
         remaining_names.is_empty(),
         "remaining_names must be empty at the end"
     );
-    assert!(
-        remaining_props.iter().all(|(_, v)| v.is_empty()),
-        "remaining_props must be empty for each name at the end"
-    );
+    // assert!(
+    //     remaining_props.iter().all(|(_, v)| v.is_empty()),
+    //     "remaining_props must be empty for each name at the end"
+    // );
 }

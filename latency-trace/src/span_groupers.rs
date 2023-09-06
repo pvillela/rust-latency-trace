@@ -5,7 +5,7 @@ use tracing::{
 };
 
 /// Default span grouper. Groups spans by callsite.
-pub fn default_span_grouper(_attrs: &Attributes) -> Vec<(&'static str, String)> {
+pub fn default_span_grouper(_attrs: &Attributes) -> Vec<(String, String)> {
     vec![]
 }
 
@@ -24,16 +24,20 @@ impl Visit for FieldReader {
 }
 
 /// Custom span grouper that groups by all fields and their values.
-pub fn group_by_all_fields(attrs: &Attributes) -> Vec<(&'static str, String)> {
+pub fn group_by_all_fields(attrs: &Attributes) -> Vec<(String, String)> {
     let reader = &mut FieldReader::new();
     attrs.values().record(reader);
-    reader.0.iter().map(|(k, v)| (*k, v.to_owned())).collect()
+    reader
+        .0
+        .iter()
+        .map(|(k, v)| ((*k).to_owned(), v.to_owned()))
+        .collect()
 }
 
 /// Custom span grouper that groups by given fields and their values.
 pub fn group_by_given_fields<'a>(
     given_names: &'a [&'a str],
-) -> impl Fn(&Attributes) -> Vec<(&'static str, String)> + Send + Sync + 'a {
+) -> impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'a {
     move |attrs: &Attributes| {
         let reader = &mut FieldReader::new();
         attrs.values().record(reader);
@@ -41,7 +45,7 @@ pub fn group_by_given_fields<'a>(
             .0
             .iter()
             .filter(|(k, _)| (given_names.contains(*k)))
-            .map(|(k, v)| (*k, v.to_owned()))
+            .map(|(k, v)| ((*k).to_owned(), v.to_owned()))
             .collect()
     }
 }

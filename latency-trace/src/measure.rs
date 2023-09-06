@@ -6,7 +6,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry
 /// Measures latencies of spans in `f`.
 /// May only be called once per process and will panic if called more than once.
 fn measure_latencies_priv(
-    span_grouper: impl Fn(&Attributes) -> Vec<(&'static str, String)> + Send + Sync + 'static,
+    span_grouper: impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static,
     f: impl FnOnce() + Send + 'static,
 ) -> Latencies {
     let lt = LatencyTrace::new(Arc::new(span_grouper));
@@ -25,7 +25,7 @@ pub fn measure_latencies(f: impl FnOnce() -> () + Send + 'static) -> Latencies {
 /// Measures latencies of spans in `f`.
 /// May only be called once per process and will panic if called more than once.
 pub fn measure_latencies_with_custom_grouping(
-    span_grouper: impl Fn(&Attributes) -> Vec<(&'static str, String)> + Send + Sync + 'static,
+    span_grouper: impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static,
     f: impl FnOnce() -> () + Send + 'static,
 ) -> Latencies {
     measure_latencies_priv(span_grouper, f)
@@ -51,7 +51,7 @@ where
 /// Measures latencies of spans in async function `f` running on the [tokio] runtime.
 /// May only be called once per process and will panic if called more than once.
 pub fn measure_latencies_with_custom_grouping_tokio<F>(
-    span_grouper: impl Fn(&Attributes) -> Vec<(&'static str, String)> + Send + Sync + 'static,
+    span_grouper: impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static,
     f: impl FnOnce() -> F + Send + 'static,
 ) -> Latencies
 where

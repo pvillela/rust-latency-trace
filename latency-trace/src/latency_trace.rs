@@ -39,46 +39,42 @@ impl Callsite {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub(crate) struct CallsitePriv {
-    pub(crate) parent_callsite_id: Option<Identifier>,
-    pub(crate) name: &'static str,
-    pub(crate) code_line: String,
-}
-
 //=================
 // SpanGroup
 
-pub type Props = Vec<Vec<(&'static str, String)>>;
+pub type Props = Vec<Vec<(String, String)>>;
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
-    pub(crate) callsite: Callsite,
-    pub(crate) props: Props,
+    pub(crate) callsite_path: Vec<Callsite>,
+    pub(crate) props_path: Props,
 }
 
 impl SpanGroup {
-    pub fn callsite(&self) -> &Callsite {
-        &self.callsite
+    pub fn callsites(&self) -> &Vec<Callsite> {
+        &self.callsite_path
     }
 
     pub fn props(&self) -> &Props {
-        &self.props
+        &self.props_path
     }
 
     pub fn name(&self) -> &'static str {
-        self.callsite.name
+        self.callsite_path[0].name
     }
 
     pub fn code_line(&self) -> &str {
-        &self.callsite.code_line()
+        &self.callsite_path[0].code_line()
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct SpanGroupPriv {
-    callsite_id: Identifier,
-    props: Props,
+    /// callsite ID of the span group followed by the callsite IDs of its ancestors.
+    callsite_id_path: Vec<Identifier>,
+
+    /// Properties of the span group followed by the properties of its ancestors.
+    props_path: Props,
 }
 
 //=================
@@ -141,7 +137,7 @@ impl SpanGroupInfo {
 }
 
 pub(crate) struct InfoPriv {
-    callsites: HashMap<Identifier, CallsitePriv>,
+    callsites: HashMap<Identifier, Callsite>,
     timings: HashMap<SpanGroupPriv, Timing>,
 }
 
@@ -160,11 +156,8 @@ impl InfoPriv {
 /// Information about a span stored in the registry.
 #[derive(Debug)]
 struct SpanTiming {
-    // callsite_id: Identifier,
-    // name: &'static str,
-    // code_line: String,
-    props: Vec<Vec<(&'static str, String)>>,
-    // parent_callsite_id: Option<Identifier>,
+    callsite_id_path: Vec<Identifier>,
+    props_path: Vec<Vec<(String, String)>>,
     created_at: Instant,
     entered_at: Instant,
     acc_active_time: u64,
@@ -173,7 +166,7 @@ struct SpanTiming {
 //=================
 // LatencyTrace
 
-type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(&'static str, String)> + Send + Sync + 'static>;
+type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>;
 
 /// Provides access a [Timings] containing the latencies collected for different span callsites.
 #[derive(Clone)]
@@ -193,10 +186,10 @@ impl LatencyTrace {
     fn ensure_callsites_updated(
         &self,
         callsite_id: Identifier,
-        callsite_priv_fn: impl FnOnce() -> CallsitePriv,
+        callsite_fn: impl FnOnce() -> Callsite,
     ) {
         log::trace!(
-            "entered `update_callsites`for {:?} on {:?}",
+            "entered `ensure_callsites_updated`for {:?} on {:?}",
             callsite_id,
             thread::current().id(),
         );
@@ -209,7 +202,7 @@ impl LatencyTrace {
 
             // Update local callsites
             {
-                callsites.insert(callsite_id, callsite_priv_fn());
+                callsites.insert(callsite_id, callsite_fn());
             }
         });
     }
@@ -246,37 +239,32 @@ impl LatencyTrace {
         info_priv: &InfoPriv,
         sg_priv: &SpanGroupPriv,
     ) -> (SpanGroup, SpanGroupInfo) {
-        let callsite_id = &sg_priv.callsite_id;
-        let callsite_priv = info_priv.callsites.get(callsite_id).unwrap();
-        let props = sg_priv.props.clone();
+        let props_path = &sg_priv.props_path;
+        let callsite_path: Vec<Callsite> = sg_priv
+            .callsite_id_path
+            .iter()
+            .map(|id| info_priv.callsites.get(id).unwrap().clone())
+            .collect();
+        let timing = info_priv.timings.get(sg_priv).unwrap();
+
+        let parent = if sg_priv.callsite_id_path.len() == 1 {
+            None
+        } else {
+            Some(SpanGroup {
+                callsite_path: Vec::from(&callsite_path[1..]),
+                props_path: Vec::from(&props_path[1..]),
+            })
+        };
+
         let span_group = SpanGroup {
-            callsite: Callsite {
-                name: callsite_priv.name,
-                code_line: callsite_priv.code_line.clone(),
-            },
-            props: props.clone(),
-        };
-        let timing = info_priv.timings.get(sg_priv).unwrap().clone();
-
-        let parent_id = callsite_priv.parent_callsite_id.as_ref();
-        let parent = match parent_id {
-            None => None,
-            Some(parent_id) => {
-                let parent_callsite_priv = info_priv.callsites.get(parent_id).unwrap();
-                let parent_callsite = Callsite {
-                    name: parent_callsite_priv.name,
-                    code_line: parent_callsite_priv.code_line.clone(),
-                };
-                let parent_props = Vec::from(&props[1..]);
-
-                Some(SpanGroup {
-                    callsite: parent_callsite,
-                    props: parent_props,
-                })
-            }
+            callsite_path,
+            props_path: props_path.clone(),
         };
 
-        let info = SpanGroupInfo { parent, timing };
+        let info = SpanGroupInfo {
+            parent,
+            timing: timing.clone(),
+        };
 
         (span_group, info)
     }
@@ -303,18 +291,20 @@ where
     fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
         log::trace!("entered `on_new_span`");
         let span = ctx.span(id).unwrap();
-
         let parent_span = span.parent();
-        let parent_span_props =
-            parent_span.map(|ps| ps.extensions().get::<SpanTiming>().unwrap().props.clone());
 
-        let mut props = vec![(self.span_grouper)(attrs)];
-        if let Some(mut x) = parent_span_props {
-            props.append(&mut x);
+        let mut callsite_id_path = vec![span.metadata().callsite()];
+        let mut props_path = vec![(self.span_grouper)(attrs)];
+        if let Some(parent_span) = parent_span {
+            let ext = parent_span.extensions();
+            let pst = ext.get::<SpanTiming>().unwrap();
+            callsite_id_path.append(&mut pst.callsite_id_path.clone());
+            props_path.append(&mut pst.props_path.clone());
         }
 
         span.extensions_mut().insert(SpanTiming {
-            props,
+            callsite_id_path,
+            props_path,
             created_at: Instant::now(),
             entered_at: Instant::now(),
             acc_active_time: 0,
@@ -347,14 +337,13 @@ where
         let span = ctx.span(&id).unwrap();
         let meta = span.metadata();
         let callsite_id = meta.callsite();
-        let code_line = format!("{}:{}", meta.file().unwrap(), meta.line().unwrap());
 
         let ext = span.extensions();
         let span_timing = ext.get::<SpanTiming>().unwrap();
 
         let span_group_priv = SpanGroupPriv {
-            callsite_id: callsite_id.clone(),
-            props: span_timing.props.clone(),
+            callsite_id_path: span_timing.callsite_id_path.clone(),
+            props_path: span_timing.props_path.clone(),
         };
 
         self.update_timings(&span_group_priv, |timing| {
@@ -369,23 +358,15 @@ where
         });
 
         log::trace!(
-            "`on_close` completed call to with_local_callsite_info for span id {:?}",
+            "`on_close` completed call to update_timings for span id {:?}",
             id
         );
 
-        let callsite_priv_fn = || {
+        self.ensure_callsites_updated(callsite_id, || {
             let name = meta.name();
-            let parent_span = span.parent();
-            let parent_callsite_id = parent_span.map(|ps| ps.metadata().callsite());
-
-            CallsitePriv {
-                parent_callsite_id,
-                name,
-                code_line,
-            }
-        };
-
-        self.ensure_callsites_updated(callsite_id, callsite_priv_fn);
+            let code_line = format!("{}:{}", meta.file().unwrap(), meta.line().unwrap());
+            Callsite { name, code_line }
+        });
 
         log::trace!("`on_close` executed for span id {:?}", id);
     }
@@ -399,7 +380,7 @@ thread_local! {
 }
 
 //=================
-// functions
+// Functions
 
 /// Used to accumulate results on [`Control`].
 fn op(data: &InfoPriv, acc: &mut InfoPriv, tid: &ThreadId) {

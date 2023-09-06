@@ -23,21 +23,17 @@ pub async fn f() {
                 }
                 tokio::time::sleep(Duration::from_millis(25)).await;
             }
-            .instrument(tracing::trace_span!("inner_async_span", foo = i % 2))
+            .instrument(trace_span!("inner_async_span", foo = i % 2))
             .await;
         }
-        .instrument(tracing::trace_span!(
-            "outer_async_span",
-            foo = i % 2,
-            bar = i % 4
-        ))
+        .instrument(trace_span!("outer_async_span", foo = i % 2, bar = i % 4))
         .await
     }
 }
 
 pub async fn target_fn() {
-    let h1 = tokio::spawn(f());
-    let h2 = tokio::spawn(f());
+    let h1 = tokio::spawn(async { f().await }.instrument(trace_span!("root_async_1")));
+    let h2 = tokio::spawn(async { f().await }.instrument(trace_span!("root_async_2")));
     _ = h1.await;
     _ = h2.await;
 }
