@@ -86,12 +86,12 @@ struct SpanGroupPriv {
 
 #[derive(Clone, Debug)]
 pub struct Timing {
-    total_time: Histogram<u64>,
-    active_time: Histogram<u64>,
+    pub total_time: Histogram<u64>,
+    pub active_time: Histogram<u64>,
 }
 
 impl Timing {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let mut hist = Histogram::<u64>::new_with_bounds(1, 60 * 1000, 1).unwrap();
         hist.auto(true);
         let hist2 = hist.clone();
@@ -101,20 +101,12 @@ impl Timing {
             active_time: hist2,
         }
     }
-
-    pub fn total_time(&self) -> &Histogram<u64> {
-        &self.total_time
-    }
-
-    pub fn active_time(&self) -> &Histogram<u64> {
-        &self.active_time
-    }
 }
 
 //=================
 // Info
 
-pub type InfoMap = BTreeMap<SpanGroup, SpanGroupInfo>;
+pub type Latencies = BTreeMap<SpanGroup, SpanGroupInfo>;
 
 #[derive(Clone)]
 pub struct SpanGroupInfo {
@@ -171,36 +163,23 @@ struct SpanTiming {
 }
 
 //=================
-// Latencies
+// LatencyTrace
 
 type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(&'static str, String)> + Send + Sync + 'static>;
 
 /// Provides access a [Timings] containing the latencies collected for different span callsites.
 #[derive(Clone)]
-pub struct Latencies {
+pub(crate) struct LatencyTrace {
     pub(crate) control: Control<InfoPriv, InfoPriv>,
     span_grouper: SpanGrouper,
-    info: BTreeMap<SpanGroup, SpanGroupInfo>,
 }
 
-impl Latencies {
-    pub(crate) fn new(span_grouper: SpanGrouper) -> Latencies {
-        Latencies {
+impl LatencyTrace {
+    pub(crate) fn new(span_grouper: SpanGrouper) -> LatencyTrace {
+        LatencyTrace {
             control: Control::new(InfoPriv::new(), op),
             span_grouper,
-            info: BTreeMap::new(),
         }
-    }
-
-    pub fn with<V>(&self, f: impl FnOnce(&InfoMap) -> V) -> V {
-        f(&self.info)
-    }
-
-    pub fn aggregate_timings<G>(&self, _f: impl Fn(&SpanGroup) -> G) -> HashMap<G, Timing>
-    where
-        G: Eq + Hash,
-    {
-        todo!()
     }
 
     fn ensure_callsites_updated(
@@ -254,7 +233,7 @@ impl Latencies {
         });
     }
 
-    /// Helper to `generate_info`.
+    /// Helper to `generate_latencies`.
     fn to_span_group_info_pair(
         info_priv: &InfoPriv,
         sg_priv: &SpanGroupPriv,
@@ -294,26 +273,21 @@ impl Latencies {
         (span_group, info)
     }
 
-    /// Generates the publicly accessible info fiels as a post-processing step after all thrread-local
+    /// Generates the publicly accessible [`Latencies`] as a post-processing step after all thread-local
     /// data has been accumulated.
-    fn generate_info(&self) -> InfoMap {
+    pub(crate) fn generate_latencies(&self) -> Latencies {
         self.control
             .with_acc(|info_priv| {
                 let sg_privs = info_priv.timings.keys();
                 let pairs =
                     sg_privs.map(|sg_priv| Self::to_span_group_info_pair(info_priv, sg_priv));
-                pairs.collect::<InfoMap>()
+                pairs.collect::<Latencies>()
             })
             .unwrap()
     }
-
-    /// Uses `generate_info` to update the info field.
-    pub(crate) fn update_info(&mut self) {
-        self.info = self.generate_info();
-    }
 }
 
-impl<S> Layer<S> for Latencies
+impl<S> Layer<S> for LatencyTrace
 where
     S: Subscriber,
     S: for<'lookup> LookupSpan<'lookup>,
@@ -365,7 +339,7 @@ where
         let span = ctx.span(&id).unwrap();
         let meta = span.metadata();
         let callsite_id = meta.callsite();
-        let code_line = format!("{}:{}", meta.module_path().unwrap(), meta.line().unwrap());
+        let code_line = format!("{}:{}", meta.file().unwrap(), meta.line().unwrap());
 
         let ext = span.extensions();
         let span_timing = ext.get::<SpanTiming>().unwrap();

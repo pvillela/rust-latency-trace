@@ -30,21 +30,6 @@ pub fn group_by_all_fields(attrs: &Attributes) -> Vec<(&'static str, String)> {
     reader.0.iter().map(|(k, v)| (*k, v.to_owned())).collect()
 }
 
-// fn group_by_given_fields0<'a>(
-//     given_names: &'a [&'a str],
-// ) -> impl Fn(&Attributes) -> Vec<(&'static str, String)> + Send + Sync + 'a {
-//     // let given_names: Vec<&str> = given_names.iter().map(|s| *s).collect();
-//     move |attrs: &Attributes| {
-//         let reader = &mut FieldReader::new();
-//         attrs.values().record(reader);
-//         given_names
-//             .iter()
-//             .filter_map(|k| reader.0.get_key_value(k))
-//             .map(|(k, v)| (*k, v.to_owned()))
-//             .collect()
-//     }
-// }
-
 /// Custom span grouper that groups by given fields and their values.
 pub fn group_by_given_fields<'a>(
     given_names: &'a [&'a str],

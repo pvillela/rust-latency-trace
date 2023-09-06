@@ -15,7 +15,7 @@ fn test_default_grouping() {
                 "f",
                 SpanNameTestSpec {
                     expected_parent_name: None,
-                    expected_props: vec![vec![]],
+                    expected_props: vec![vec![vec![]]],
                     expected_total_time_mean: 150.0 * 8.0 * 1000.0,
                     expected_active_time_mean: 25.0 * 8.0 * 1000.0,
                     expected_total_time_count: 2,
@@ -26,7 +26,7 @@ fn test_default_grouping() {
                 "outer_async_span",
                 SpanNameTestSpec {
                     expected_parent_name: Some("f"),
-                    expected_props: vec![vec![]],
+                    expected_props: vec![vec![vec![], vec![]]],
                     expected_total_time_mean: 150.0 * 1000.0,
                     expected_active_time_mean: 25.0 * 1000.0,
                     expected_total_time_count: 16,
@@ -37,7 +37,7 @@ fn test_default_grouping() {
                 "inner_async_span",
                 SpanNameTestSpec {
                     expected_parent_name: Some("outer_async_span"),
-                    expected_props: vec![vec![]],
+                    expected_props: vec![vec![vec![], vec![], vec![]]],
                     expected_total_time_mean: 37.0 * 1000.0,
                     expected_active_time_mean: 12.0 * 1000.0,
                     expected_total_time_count: 16,
@@ -48,7 +48,7 @@ fn test_default_grouping() {
                 "sync_span_1",
                 SpanNameTestSpec {
                     expected_parent_name: Some("outer_async_span"),
-                    expected_props: vec![vec![]],
+                    expected_props: vec![vec![vec![], vec![], vec![]]],
                     expected_total_time_mean: 13.0 * 1000.0,
                     expected_active_time_mean: 13.0 * 1000.0,
                     expected_total_time_count: 16,
@@ -59,7 +59,7 @@ fn test_default_grouping() {
                 "sync_span_2",
                 SpanNameTestSpec {
                     expected_parent_name: Some("inner_async_span"),
-                    expected_props: vec![vec![]],
+                    expected_props: vec![vec![vec![], vec![], vec![], vec![]]],
                     expected_total_time_mean: 12.0 * 1000.0,
                     expected_active_time_mean: 12.0 * 1000.0,
                     expected_total_time_count: 16,
