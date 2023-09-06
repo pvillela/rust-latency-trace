@@ -38,7 +38,7 @@ pub async fn f() {
 }
 
 pub fn print_mean_timings(latencies: &Latencies) {
-    latencies.priv_with(|info| {
+    latencies.with(|info| {
         println!("\nMean timing values by span group:");
 
         let parents = &info.callsites;
@@ -58,7 +58,7 @@ pub fn print_mean_timings(latencies: &Latencies) {
 }
 
 pub fn print_median_timings(latencies: &Latencies) {
-    latencies.priv_with(|info| {
+    latencies.with(|info| {
         println!("\nMedian timings by span group:");
 
         let parents = &info.callsites;

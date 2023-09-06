@@ -9,7 +9,7 @@
 use hdrhistogram::Histogram;
 use log;
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     hash::Hash,
     sync::Arc,
     thread::{self, ThreadId},
@@ -31,7 +31,7 @@ pub struct Callsite {
 
 impl Callsite {
     pub fn name(&self) -> &str {
-        &self.name
+        self.name
     }
 
     pub fn code_line(&self) -> &str {
@@ -40,10 +40,10 @@ impl Callsite {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-struct CallsitePriv {
-    parent_callsite_id: Option<Identifier>,
-    name: &'static str,
-    code_line: String,
+pub(crate) struct CallsitePriv {
+    pub(crate) parent_callsite_id: Option<Identifier>,
+    pub(crate) name: &'static str,
+    pub(crate) code_line: String,
 }
 
 //=================
@@ -58,19 +58,20 @@ pub struct SpanGroup {
 }
 
 impl SpanGroup {
-    fn new(sg_priv: SpanGroupPriv, callsite: Callsite) -> Self {
-        SpanGroup {
-            callsite: callsite,
-            props: sg_priv.props,
-        }
-    }
-
     pub fn callsite(&self) -> &Callsite {
         &self.callsite
     }
 
     pub fn props(&self) -> &Props {
         &self.props
+    }
+
+    pub fn name(&self) -> &str {
+        self.callsite.name
+    }
+
+    pub fn code_line(&self) -> &str {
+        &self.callsite.code_line()
     }
 }
 
@@ -80,22 +81,13 @@ struct SpanGroupPriv {
     props: Props,
 }
 
-impl SpanGroupPriv {
-    fn new(attrs: &Attributes, props: Props) -> Self {
-        SpanGroupPriv {
-            callsite_id: attrs.metadata().callsite(),
-            props,
-        }
-    }
-}
-
 //=================
 // Timing
 
 #[derive(Clone, Debug)]
 pub struct Timing {
-    pub total_time: Histogram<u64>,
-    pub active_time: Histogram<u64>,
+    total_time: Histogram<u64>,
+    active_time: Histogram<u64>,
 }
 
 impl Timing {
@@ -109,28 +101,48 @@ impl Timing {
             active_time: hist2,
         }
     }
+
+    pub fn total_time(&self) -> &Histogram<u64> {
+        &self.total_time
+    }
+
+    pub fn active_time(&self) -> &Histogram<u64> {
+        &self.active_time
+    }
 }
 
 //=================
 // Info
 
-struct Info {
-    pub parents: HashMap<SpanGroup, Option<SpanGroup>>,
-    pub timings: HashMap<SpanGroup, Timing>,
+pub type InfoMap = BTreeMap<SpanGroup, SpanGroupInfo>;
+
+#[derive(Clone)]
+pub struct SpanGroupInfo {
+    parent: Option<SpanGroup>,
+    timing: Timing,
 }
 
-impl Info {
-    fn new() -> Self {
-        Self {
-            parents: HashMap::new(),
-            timings: HashMap::new(),
-        }
+impl SpanGroupInfo {
+    pub fn parent(&self) -> Option<&SpanGroup> {
+        self.parent.as_ref()
+    }
+
+    pub fn timing(&self) -> &Timing {
+        &self.timing
+    }
+
+    pub fn total_time(&self) -> &Histogram<u64> {
+        &self.timing.total_time
+    }
+
+    pub fn active_time(&self) -> &Histogram<u64> {
+        &self.timing.active_time
     }
 }
 
-struct InfoPriv {
-    pub callsites: HashMap<Identifier, CallsitePriv>,
-    pub timings: HashMap<SpanGroupPriv, Timing>,
+pub(crate) struct InfoPriv {
+    callsites: HashMap<Identifier, CallsitePriv>,
+    timings: HashMap<SpanGroupPriv, Timing>,
 }
 
 impl InfoPriv {
@@ -168,7 +180,7 @@ type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(&'static str, String)> + Send
 pub struct Latencies {
     pub(crate) control: Control<InfoPriv, InfoPriv>,
     span_grouper: SpanGrouper,
-    info: Arc<Info>,
+    info: BTreeMap<SpanGroup, SpanGroupInfo>,
 }
 
 impl Latencies {
@@ -176,12 +188,11 @@ impl Latencies {
         Latencies {
             control: Control::new(InfoPriv::new(), op),
             span_grouper,
-            info: Arc::new(Info::new()),
+            info: BTreeMap::new(),
         }
     }
 
-    pub fn with<V>(&self, f: impl FnOnce(&Info) -> V) -> V {
-        // self.control.with_acc(f).unwrap()
+    pub fn with<V>(&self, f: impl FnOnce(&InfoMap) -> V) -> V {
         f(&self.info)
     }
 
@@ -192,7 +203,11 @@ impl Latencies {
         todo!()
     }
 
-    fn update_callsites(&self, callsite_id: Identifier, callsite_priv: CallsitePriv) {
+    fn ensure_callsites_updated(
+        &self,
+        callsite_id: Identifier,
+        callsite_priv_fn: impl FnOnce() -> CallsitePriv,
+    ) {
         log::trace!(
             "entered `update_callsites`for {:?} on {:?}",
             callsite_id,
@@ -207,32 +222,94 @@ impl Latencies {
 
             // Update local callsites
             {
-                callsites.insert(callsite_id, callsite_priv);
+                callsites.insert(callsite_id, callsite_priv_fn());
             }
         });
     }
 
-    fn update_timings(&self, span_group_priv: SpanGroupPriv, f: impl Fn(&mut Timing)) {
-        self.control.with_tl_mut(&LOCAL_INFO,|info| {
-            let  timings = &mut info.timings;
-            let mut timing = timings
-                .entry(span_group_priv)
-                .or_insert_with(|| {
+    fn update_timings(&self, span_group_priv: &SpanGroupPriv, f: impl Fn(&mut Timing)) {
+        self.control.with_tl_mut(&LOCAL_INFO, |info| {
+            let timings = &mut info.timings;
+            let mut timing = {
+                if let Some(timing) = timings.get_mut(span_group_priv) {
+                    timing
+                } else {
                     log::trace!(
-                        "***** thread-loacal LocalCallsiteTiming created for callsite={:?} on thread={:?}",
+                        "***** thread-loacal Timing created for {:?} on {:?}",
                         span_group_priv,
                         thread::current().id()
                     );
-                    Timing::new()
-                });
+                    timings.insert(span_group_priv.clone(), Timing::new());
+                    timings.get_mut(span_group_priv).unwrap()
+                }
+            };
 
             f(&mut timing);
+
             log::trace!(
-                "***** exiting with_local_callsite_info for callsite={:?} on thread={:?}",
+                "***** exiting `update_timings` for {:?} on {:?}",
                 span_group_priv,
                 thread::current().id()
             );
         });
+    }
+
+    /// Helper to `generate_info`.
+    fn to_span_group_info_pair(
+        info_priv: &InfoPriv,
+        sg_priv: &SpanGroupPriv,
+    ) -> (SpanGroup, SpanGroupInfo) {
+        let callsite_id = &sg_priv.callsite_id;
+        let callsite_priv = info_priv.callsites.get(callsite_id).unwrap();
+        let props = sg_priv.props.clone();
+        let span_group = SpanGroup {
+            callsite: Callsite {
+                name: callsite_priv.name,
+                code_line: callsite_priv.code_line.clone(),
+            },
+            props: props.clone(),
+        };
+        let timing = info_priv.timings.get(sg_priv).unwrap().clone();
+
+        let parent_id = callsite_priv.parent_callsite_id.as_ref();
+        let parent = match parent_id {
+            None => None,
+            Some(parent_id) => {
+                let parent_callsite_priv = info_priv.callsites.get(parent_id).unwrap();
+                let parent_callsite = Callsite {
+                    name: parent_callsite_priv.name,
+                    code_line: parent_callsite_priv.code_line.clone(),
+                };
+                let parent_props = Vec::from(&props[1..]);
+
+                Some(SpanGroup {
+                    callsite: parent_callsite,
+                    props: parent_props,
+                })
+            }
+        };
+
+        let info = SpanGroupInfo { parent, timing };
+
+        (span_group, info)
+    }
+
+    /// Generates the publicly accessible info fiels as a post-processing step after all thrread-local
+    /// data has been accumulated.
+    fn generate_info(&self) -> InfoMap {
+        self.control
+            .with_acc(|info_priv| {
+                let sg_privs = info_priv.timings.keys();
+                let pairs =
+                    sg_privs.map(|sg_priv| Self::to_span_group_info_pair(info_priv, sg_priv));
+                pairs.collect::<InfoMap>()
+            })
+            .unwrap()
+    }
+
+    /// Uses `generate_info` to update the info field.
+    pub(crate) fn update_info(&mut self) {
+        self.info = self.generate_info();
     }
 }
 
@@ -244,26 +321,18 @@ where
     fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
         log::trace!("entered `on_new_span`");
         let span = ctx.span(id).unwrap();
-        // let meta = span.metadata();
-        // let name = meta.name();
-        // let callsite_id = meta.callsite();
 
         let parent_span = span.parent();
-        let parent_span_timing = parent_span.map(|ps| ps.extensions().get::<SpanTiming>().unwrap());
+        let parent_span_props =
+            parent_span.map(|ps| ps.extensions().get::<SpanTiming>().unwrap().props.clone());
 
-        // let mut parent_callsite_id = None;
         let mut props = vec![(self.span_grouper)(attrs)];
-        if let Some(parent_span_timing) = parent_span_timing {
-            // parent_callsite_id = Some(parent_span_timing.callsite_id);
-            props.append(&mut parent_span_timing.props);
+        if let Some(mut x) = parent_span_props {
+            props.append(&mut x);
         }
 
         span.extensions_mut().insert(SpanTiming {
-            // callsite_id,
-            // name,
-            // code_line: format!("{}:{}", meta.module_path().unwrap(), meta.line().unwrap()),
             props,
-            // parent_callsite_id,
             created_at: Instant::now(),
             entered_at: Instant::now(),
             acc_active_time: 0,
@@ -295,21 +364,18 @@ where
 
         let span = ctx.span(&id).unwrap();
         let meta = span.metadata();
-        let name = meta.name();
         let callsite_id = meta.callsite();
         let code_line = format!("{}:{}", meta.module_path().unwrap(), meta.line().unwrap());
-
-        let parent_span = span.parent();
-        let parent_callsite_id = parent_span.map(|ps| ps.metadata().callsite());
 
         let ext = span.extensions();
         let span_timing = ext.get::<SpanTiming>().unwrap();
 
         let span_group_priv = SpanGroupPriv {
-            callsite_id,
-            props: span_timing.props,
+            callsite_id: callsite_id.clone(),
+            props: span_timing.props.clone(),
         };
-        self.update_timings(span_group_priv, |timing| {
+
+        self.update_timings(&span_group_priv, |timing| {
             timing
                 .total_time
                 .record((Instant::now() - span_timing.created_at).as_micros() as u64)
@@ -325,13 +391,19 @@ where
             id
         );
 
-        let callsite_priv = CallsitePriv {
-            parent_callsite_id,
-            name,
-            code_line,
+        let callsite_priv_fn = || {
+            let name = meta.name();
+            let parent_span = span.parent();
+            let parent_callsite_id = parent_span.map(|ps| ps.metadata().callsite());
+
+            CallsitePriv {
+                parent_callsite_id,
+                name,
+                code_line,
+            }
         };
 
-        self.update_callsites(callsite_id, callsite_priv);
+        self.ensure_callsites_updated(callsite_id, callsite_priv_fn);
 
         log::trace!("`on_close` executed for span id {:?}", id);
     }

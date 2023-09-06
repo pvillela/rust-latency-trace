@@ -79,11 +79,8 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
     let mut remaining_props =
         BTreeMapExt(&span_name_test_specs).map_values(|v| v.expected_props.clone());
 
-    latencies.priv_with(|info| {
-        let parents = &info.callsites;
-        let timings = &info.timings;
-
-        assert_eq!(timings.len(), *span_group_count, "Number of span groups");
+    latencies.with(|info| {
+        assert_eq!(info.len(), *span_group_count, "Number of span groups");
 
         // Force tests to proceed aphabetically by span name.
         for (name, spec) in span_name_test_specs {
@@ -103,8 +100,8 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
                 expected_active_time_count,
             } = spec;
 
-            for (span_group, timing) in timings.iter().filter(|(k, _)| k.name() == name) {
-                let parent = parents.get(span_group).unwrap().as_ref();
+            for (span_group, sg_info) in info.iter().filter(|(k, _)| k.name() == name) {
+                let parent = info.get(span_group).unwrap().parent.as_ref();
                 let parent_name = parent.map(|p| p.name());
 
                 let props = span_group
@@ -117,10 +114,10 @@ pub fn run_test(latencies: &Latencies, test_spec: &TestSpec) {
                     })
                     .collect::<Vec<Vec<(&str, &str)>>>();
 
-                let total_time_mean = timing.total_time.mean();
-                let total_time_count = timing.total_time.len();
-                let active_time_mean = timing.active_time.mean();
-                let active_time_count = timing.active_time.len();
+                let total_time_mean = sg_info.total_time.mean();
+                let total_time_count = sg_info.total_time.len();
+                let active_time_mean = sg_info.active_time.mean();
+                let active_time_count = sg_info.active_time.len();
 
                 {
                     assert_eq!(parent_name, *expected_parent_name, "{name} parent");
