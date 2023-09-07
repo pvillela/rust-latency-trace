@@ -66,6 +66,17 @@ impl SpanGroup {
     pub fn code_line(&self) -> &str {
         &self.callsite_path[0].code_line()
     }
+
+    pub fn parent(&self) -> Option<SpanGroup> {
+        if self.callsite_path.len() == 1 {
+            return None;
+        }
+
+        Some(SpanGroup {
+            callsite_path: Vec::from(&self.callsite_path[1..]),
+            props_path: Vec::from(&self.props_path[1..]),
+        })
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -110,31 +121,7 @@ impl Timing {
 //=================
 // Info
 
-pub type Latencies = BTreeMap<SpanGroup, SpanGroupInfo>;
-
-#[derive(Clone)]
-pub struct SpanGroupInfo {
-    parent: Option<SpanGroup>,
-    timing: Timing,
-}
-
-impl SpanGroupInfo {
-    pub fn parent(&self) -> Option<&SpanGroup> {
-        self.parent.as_ref()
-    }
-
-    pub fn timing(&self) -> &Timing {
-        &self.timing
-    }
-
-    pub fn total_time(&self) -> &Histogram<u64> {
-        &self.timing.total_time
-    }
-
-    pub fn active_time(&self) -> &Histogram<u64> {
-        &self.timing.active_time
-    }
-}
+pub type Latencies = BTreeMap<SpanGroup, Timing>;
 
 pub(crate) struct InfoPriv {
     callsites: HashMap<Identifier, Callsite>,
@@ -235,10 +222,10 @@ impl LatencyTrace {
     }
 
     /// Helper to `generate_latencies`.
-    fn to_span_group_info_pair(
+    fn to_span_group_timing_pair(
         info_priv: &InfoPriv,
         sg_priv: &SpanGroupPriv,
-    ) -> (SpanGroup, SpanGroupInfo) {
+    ) -> (SpanGroup, Timing) {
         let props_path = &sg_priv.props_path;
         let callsite_path: Vec<Callsite> = sg_priv
             .callsite_id_path
@@ -247,26 +234,12 @@ impl LatencyTrace {
             .collect();
         let timing = info_priv.timings.get(sg_priv).unwrap();
 
-        let parent = if sg_priv.callsite_id_path.len() == 1 {
-            None
-        } else {
-            Some(SpanGroup {
-                callsite_path: Vec::from(&callsite_path[1..]),
-                props_path: Vec::from(&props_path[1..]),
-            })
-        };
-
         let span_group = SpanGroup {
             callsite_path,
             props_path: props_path.clone(),
         };
 
-        let info = SpanGroupInfo {
-            parent,
-            timing: timing.clone(),
-        };
-
-        (span_group, info)
+        (span_group, timing.clone())
     }
 
     /// Generates the publicly accessible [`Latencies`] as a post-processing step after all thread-local
@@ -276,7 +249,7 @@ impl LatencyTrace {
             .with_acc(|info_priv| {
                 let sg_privs = info_priv.timings.keys();
                 let pairs =
-                    sg_privs.map(|sg_priv| Self::to_span_group_info_pair(info_priv, sg_priv));
+                    sg_privs.map(|sg_priv| Self::to_span_group_timing_pair(info_priv, sg_priv));
                 pairs.collect::<Latencies>()
             })
             .unwrap()

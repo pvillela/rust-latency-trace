@@ -6,7 +6,7 @@ use latency_trace::{group_by_given_fields, measure_latencies_with_custom_groupin
 use std::env::set_var;
 
 mod examples_support;
-use examples_support::{print_mean_timings, print_median_timings};
+use examples_support::print_parents_means_medians;
 
 fn main() {
     // Set below value to "trace" to enable full library tracing.
@@ -21,7 +21,5 @@ fn main() {
             target_fn().await;
         });
 
-    print_mean_timings(&latencies);
-
-    print_median_timings(&latencies);
+    print_parents_means_medians(&latencies);
 }
