@@ -42,7 +42,9 @@ impl Callsite {
 //=================
 // SpanGroup
 
-pub type Props = Vec<Vec<(String, String)>>;
+type CallsiteIdPath = Vec<Identifier>;
+type CallsitePath = Vec<Callsite>;
+type PropsPath = Vec<Vec<(String, String)>>;
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
@@ -81,10 +83,17 @@ impl SpanGroup {
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct SpanGroupPriv {
     /// callsite ID of the span group followed by the callsite IDs of its ancestors.
-    callsite_id_path: Vec<Identifier>,
+    callsite_id_path: CallsiteIdPath,
 
     /// Properties of the span group followed by the properties of its ancestors.
-    props_path: Props,
+    props_path: PropsPath,
+}
+
+/// Intermediate form of SpanGroup that is sortable
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+struct SpanGroupTemp {
+    callsite_path: CallsitePath,
+    props_path: PropsPath,
 }
 
 //=================
@@ -145,8 +154,8 @@ impl LatenciesPriv {
 /// Information about a span stored in the registry.
 #[derive(Debug)]
 struct SpanTiming {
-    callsite_id_path: Vec<Identifier>,
-    props_path: Vec<Vec<(String, String)>>,
+    callsite_id_path: CallsiteIdPath,
+    props_path: PropsPath,
     created_at: Instant,
     entered_at: Instant,
     acc_active_time: u64,
@@ -229,8 +238,12 @@ impl LatencyTrace {
             .keys()
             .map(|sgp| {
                 let sg = SpanGroup {
-                    callsite: lp.callsites.get(&sgp.callsite_id_path[0]).unwrap().clone(),
-                    props: sgp.props_path[0].clone(),
+                    callsite: lp
+                        .callsites
+                        .get(&sgp.callsite_id_path.last().unwrap().clone())
+                        .unwrap()
+                        .clone(),
+                    props: sgp.props_path.last().unwrap().clone(),
                     idx,
                     parent_idx: usize::MAX,
                 };
@@ -243,12 +256,13 @@ impl LatencyTrace {
     fn to_latencies_2(
         sgp_to_sg: HashMap<SpanGroupPriv, SpanGroup>,
     ) -> Vec<Option<(SpanGroupPriv, SpanGroup)>> {
-        let mut spg_sg_pairs = vec![None; sgp_to_sg.len()];
+        let len = sgp_to_sg.len();
+        let mut spg_sg_pairs = vec![None; len];
 
         sgp_to_sg.iter().for_each(|(sgp, sg)| {
             let sgp_parent = SpanGroupPriv {
-                callsite_id_path: Vec::from(&sgp.callsite_id_path[1..]),
-                props_path: Vec::from(&sgp.props_path[1..]),
+                callsite_id_path: Vec::from(&sgp.callsite_id_path[..len - 1]),
+                props_path: Vec::from(&sgp.props_path[..len - 1]),
             };
             let parent_idx = sgp_to_sg.get(&sgp_parent).unwrap().idx;
             let mut sg = sg.clone();
@@ -280,27 +294,6 @@ impl LatencyTrace {
         }
     }
 
-    // /// Helper to `generate_latencies`.
-    // fn to_span_group_timing_pair(
-    //     info_priv: &LatenciesPriv,
-    //     sg_priv: &SpanGroupPriv,
-    // ) -> (SpanGroup, Timing) {
-    //     let props_path = &sg_priv.props_path;
-    //     let callsite_path: Vec<Callsite> = sg_priv
-    //         .callsite_id_path
-    //         .iter()
-    //         .map(|id| info_priv.callsites.get(id).unwrap().clone())
-    //         .collect();
-    //     let timing = info_priv.timings.get(sg_priv).unwrap();
-
-    //     let span_group = SpanGroup {
-    //         callsite_path,
-    //         props_path: props_path.clone(),
-    //     };
-
-    //     (span_group, timing.clone())
-    // }
-
     /// Generates the publicly accessible [`Latencies`] as a post-processing step after all thread-local
     /// data has been accumulated.
     pub(crate) fn generate_latencies(&self) -> Latencies {
@@ -327,14 +320,20 @@ where
         let span = ctx.span(id).unwrap();
         let parent_span = span.parent();
 
-        let mut callsite_id_path = vec![span.metadata().callsite()];
-        let mut props_path = vec![(self.span_grouper)(attrs)];
-        if let Some(parent_span) = parent_span {
-            let ext = parent_span.extensions();
-            let pst = ext.get::<SpanTiming>().unwrap();
-            callsite_id_path.append(&mut pst.callsite_id_path.clone());
-            props_path.append(&mut pst.props_path.clone());
-        }
+        let callsite_id = span.metadata().callsite();
+        let props = (self.span_grouper)(attrs);
+        let (callsite_id_path, props_path) = match parent_span {
+            None => (vec![callsite_id], vec![props]),
+            Some(parent_span) => {
+                let ext = parent_span.extensions();
+                let pst = ext.get::<SpanTiming>().unwrap();
+                let mut callsite_id_path = pst.callsite_id_path.clone();
+                callsite_id_path.push(callsite_id);
+                let mut props_path = pst.props_path.clone();
+                props_path.push(props);
+                (callsite_id_path, props_path)
+            }
+        };
 
         span.extensions_mut().insert(SpanTiming {
             callsite_id_path,
