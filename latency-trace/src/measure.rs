@@ -77,7 +77,7 @@ where
     G: Ord + Clone,
 {
     let mut res: BTreeMap<G, Timing> = BTreeMap::new();
-    for (k, v) in latencies {
+    for (k, v) in &latencies.timings {
         let g = f(k);
         let timing = match res.get_mut(&g) {
             Some(timing) => timing,

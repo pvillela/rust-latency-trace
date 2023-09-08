@@ -125,7 +125,7 @@ pub struct Latencies {
     pub timings: BTreeMap<SpanGroup, Timing>,
 }
 
-struct LatenciesPriv {
+pub(crate) struct LatenciesPriv {
     callsites: HashMap<Identifier, Callsite>,
     timings: HashMap<SpanGroupPriv, Timing>,
 }
@@ -230,7 +230,7 @@ impl LatencyTrace {
             .map(|sgp| {
                 let sg = SpanGroup {
                     callsite: lp.callsites.get(&sgp.callsite_id_path[0]).unwrap().clone(),
-                    props: sgp.props_path[0],
+                    props: sgp.props_path[0].clone(),
                     idx,
                     parent_idx: usize::MAX,
                 };
@@ -241,20 +241,20 @@ impl LatencyTrace {
     }
 
     fn to_latencies_2(
-        lp: &LatenciesPriv,
         sgp_to_sg: HashMap<SpanGroupPriv, SpanGroup>,
     ) -> Vec<Option<(SpanGroupPriv, SpanGroup)>> {
         let mut spg_sg_pairs = vec![None; sgp_to_sg.len()];
 
-        sgp_to_sg.into_iter().for_each(|(sgp, sg)| {
+        sgp_to_sg.iter().for_each(|(sgp, sg)| {
             let sgp_parent = SpanGroupPriv {
                 callsite_id_path: Vec::from(&sgp.callsite_id_path[1..]),
                 props_path: Vec::from(&sgp.props_path[1..]),
             };
             let parent_idx = sgp_to_sg.get(&sgp_parent).unwrap().idx;
-            let mut sg = sg;
+            let mut sg = sg.clone();
+            let idx = sg.idx;
             sg.parent_idx = parent_idx;
-            spg_sg_pairs[sg.idx] = Some((sgp, sg));
+            spg_sg_pairs[idx] = Some((sgp.clone(), sg));
         });
 
         spg_sg_pairs
@@ -310,7 +310,7 @@ impl LatencyTrace {
                 // let pairs = sg_privs.map(|sg_priv| Self::to_span_group_timing_pair(lp, sg_priv));
                 // pairs.collect::<Latencies>()
                 let sgp_to_sg = Self::to_latencies_1(lp);
-                let spg_sg_pairs = Self::to_latencies_2(lp, sgp_to_sg);
+                let spg_sg_pairs = Self::to_latencies_2(sgp_to_sg);
                 Self::to_latencies_3(lp, spg_sg_pairs)
             })
             .unwrap()
@@ -417,17 +417,16 @@ thread_local! {
 // Functions
 
 /// Used to accumulate results on [`Control`].
-fn op(data: &LatenciesPriv, acc: &mut LatenciesPriv, tid: &ThreadId) {
+fn op(data: LatenciesPriv, acc: &mut LatenciesPriv, tid: &ThreadId) {
     log::debug!("executing `op` for {:?}", tid);
-    for (k, v) in data.callsites.iter() {
-        acc.callsites.entry(k.clone()).or_insert_with(|| v.clone());
+    let callsites = data.callsites;
+    let timings = data.timings;
+    for (k, v) in callsites.into_iter() {
+        acc.callsites.entry(k).or_insert_with(|| v);
     }
-    for (k, v) in data.timings.iter() {
-        let timing = acc
-            .timings
-            .entry(k.clone())
-            .or_insert_with(|| Timing::new());
-        timing.total_time.add(v.total_time.clone()).unwrap();
-        timing.active_time.add(v.active_time.clone()).unwrap();
+    for (k, v) in timings.into_iter() {
+        let timing = acc.timings.entry(k).or_insert_with(|| Timing::new());
+        timing.total_time.add(v.total_time).unwrap();
+        timing.active_time.add(v.active_time).unwrap();
     }
 }
