@@ -11,6 +11,7 @@ use log;
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
+    rc::Rc,
     sync::Arc,
     thread::{self, ThreadId},
     time::Instant,
@@ -43,8 +44,8 @@ impl Callsite {
 // SpanGroup
 
 type CallsiteIdPath = Vec<Identifier>;
-type CallsitePath = Vec<Callsite>;
-type PropsPath = Vec<Vec<(String, String)>>;
+type CallsitePath = Vec<Rc<Callsite>>;
+type PropsPath = Vec<Arc<Vec<(String, String)>>>;
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
@@ -243,7 +244,7 @@ impl LatencyTrace {
                         .get(&sgp.callsite_id_path.last().unwrap().clone())
                         .unwrap()
                         .clone(),
-                    props: sgp.props_path.last().unwrap().clone(),
+                    props: sgp.props_path.last().unwrap().as_ref().clone(),
                     idx,
                     parent_idx: usize::MAX,
                 };
@@ -323,14 +324,14 @@ where
         let callsite_id = span.metadata().callsite();
         let props = (self.span_grouper)(attrs);
         let (callsite_id_path, props_path) = match parent_span {
-            None => (vec![callsite_id], vec![props]),
+            None => (vec![callsite_id], vec![Arc::new(props)]),
             Some(parent_span) => {
                 let ext = parent_span.extensions();
                 let pst = ext.get::<SpanTiming>().unwrap();
                 let mut callsite_id_path = pst.callsite_id_path.clone();
                 callsite_id_path.push(callsite_id);
                 let mut props_path = pst.props_path.clone();
-                props_path.push(props);
+                props_path.push(Arc::new(props));
                 (callsite_id_path, props_path)
             }
         };
