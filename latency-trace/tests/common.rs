@@ -110,6 +110,15 @@ pub fn run_test(latencies: &Latencies, test_spec: TestSpec) {
             let props: Vec<(String, String)> = span_group.props().clone();
             props_set.insert(props);
 
+            let parent_idx = span_group.parent_idx();
+            parent_idx.map(|parent_idx| {
+                let idx = span_group.idx();
+                assert!(
+                    parent_idx < idx,
+                    "parent_idx {parent_idx} must be less than span_group.idx {idx}; name={name}",
+                );
+            });
+
             let parent = span_group
                 .parent_idx()
                 .map(|parent_idx| latencies.span_groups()[parent_idx].clone());
