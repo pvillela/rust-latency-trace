@@ -2,7 +2,7 @@ use std::{thread, time::Duration};
 use tracing::{instrument, trace_span, Instrument};
 
 #[instrument(level = "trace")]
-pub async fn f() {
+async fn f() {
     let mut foo: u64 = 1;
 
     for i in 0..8 {

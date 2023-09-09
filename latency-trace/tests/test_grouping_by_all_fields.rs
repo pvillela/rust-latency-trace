@@ -15,7 +15,7 @@ fn test_grouping_by_all_fields() {
             (
                 "root_async_1",
                 SpanNameTestSpec {
-                    expected_parent_name: None,
+                    expected_parent_names: None,
                     expected_props: vec![vec![E]],
                     expected_total_time_mean: 150.0 * 8.0 * 1000.0,
                     expected_active_time_mean: 25.0 * 8.0 * 1000.0,
@@ -27,7 +27,7 @@ fn test_grouping_by_all_fields() {
             (
                 "root_async_2",
                 SpanNameTestSpec {
-                    expected_parent_name: None,
+                    expected_parent_names: None,
                     expected_props: vec![vec![E]],
                     expected_total_time_mean: 150.0 * 8.0 * 1000.0,
                     expected_active_time_mean: 25.0 * 8.0 * 1000.0,
@@ -39,7 +39,7 @@ fn test_grouping_by_all_fields() {
             (
                 "f",
                 SpanNameTestSpec {
-                    expected_parent_name: None,
+                    expected_parent_names: None,
                     expected_props: vec![vec![E, E]],
                     expected_total_time_mean: 150.0 * 8.0 * 1000.0,
                     expected_active_time_mean: 25.0 * 8.0 * 1000.0,
@@ -51,7 +51,7 @@ fn test_grouping_by_all_fields() {
             (
                 "outer_async_span",
                 SpanNameTestSpec {
-                    expected_parent_name: Some("f"),
+                    expected_parent_names: Some("f"),
                     expected_props: vec![
                         vec![vec![("bar", "0"), ("foo", "0")], E, E],
                         vec![vec![("bar", "1"), ("foo", "1")], E, E],
@@ -68,7 +68,7 @@ fn test_grouping_by_all_fields() {
             (
                 "inner_async_span",
                 SpanNameTestSpec {
-                    expected_parent_name: Some("outer_async_span"),
+                    expected_parent_names: Some("outer_async_span"),
                     expected_props: vec![
                         vec![vec![("foo", "0")], vec![("bar", "0"), ("foo", "0")], E, E],
                         vec![vec![("foo", "1")], vec![("bar", "1"), ("foo", "1")], E, E],
@@ -85,7 +85,7 @@ fn test_grouping_by_all_fields() {
             (
                 "sync_span_1",
                 SpanNameTestSpec {
-                    expected_parent_name: Some("outer_async_span"),
+                    expected_parent_names: Some("outer_async_span"),
                     expected_props: vec![
                         vec![E, vec![("bar", "0"), ("foo", "0")], E, E],
                         vec![E, vec![("bar", "1"), ("foo", "1")], E, E],
@@ -102,7 +102,7 @@ fn test_grouping_by_all_fields() {
             (
                 "sync_span_2",
                 SpanNameTestSpec {
-                    expected_parent_name: Some("inner_async_span"),
+                    expected_parent_names: Some("inner_async_span"),
                     expected_props: vec![
                         vec![
                             E,

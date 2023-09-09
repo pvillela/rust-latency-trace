@@ -10,13 +10,14 @@ fn test_default_grouping() {
     let latencies = measure_latencies_tokio(target_fn);
 
     let test_spec = TestSpec {
-        span_group_count: 10,
+        span_group_count: 12,
         span_name_test_specs: BTreeMap::from([
             (
                 "root_async_1",
                 SpanNameTestSpec {
-                    expected_parent_name: None,
-                    expected_props: vec![vec![E]],
+                    expected_props: vec![E],
+                    expected_parent_names: vec![],
+                    expected_parent_props: vec![],
                     expected_total_time_mean: 150.0 * 8.0 * 1000.0,
                     expected_active_time_mean: 25.0 * 8.0 * 1000.0,
                     expected_total_time_count: 1,
@@ -27,8 +28,9 @@ fn test_default_grouping() {
             (
                 "root_async_2",
                 SpanNameTestSpec {
-                    expected_parent_name: None,
-                    expected_props: vec![vec![E]],
+                    expected_props: vec![E],
+                    expected_parent_names: vec![],
+                    expected_parent_props: vec![],
                     expected_total_time_mean: 150.0 * 8.0 * 1000.0,
                     expected_active_time_mean: 25.0 * 8.0 * 1000.0,
                     expected_total_time_count: 1,
@@ -39,8 +41,9 @@ fn test_default_grouping() {
             (
                 "f",
                 SpanNameTestSpec {
-                    expected_parent_name: None,
-                    expected_props: vec![vec![E, E]],
+                    expected_props: vec![E],
+                    expected_parent_names: vec!["root_async_1", "root_async_2"],
+                    expected_parent_props: vec![E],
                     expected_total_time_mean: 150.0 * 8.0 * 1000.0,
                     expected_active_time_mean: 25.0 * 8.0 * 1000.0,
                     expected_total_time_count: 1,
@@ -51,8 +54,9 @@ fn test_default_grouping() {
             (
                 "outer_async_span",
                 SpanNameTestSpec {
-                    expected_parent_name: Some("f"),
-                    expected_props: vec![vec![E, E, E]],
+                    expected_props: vec![E],
+                    expected_parent_names: vec!["f"],
+                    expected_parent_props: vec![E],
                     expected_total_time_mean: 150.0 * 1000.0,
                     expected_active_time_mean: 25.0 * 1000.0,
                     expected_total_time_count: 8,
@@ -63,8 +67,9 @@ fn test_default_grouping() {
             (
                 "inner_async_span",
                 SpanNameTestSpec {
-                    expected_parent_name: Some("outer_async_span"),
-                    expected_props: vec![vec![E, E, E, E]],
+                    expected_props: vec![E],
+                    expected_parent_names: vec!["outer_async_span"],
+                    expected_parent_props: vec![E],
                     expected_total_time_mean: 37.0 * 1000.0,
                     expected_active_time_mean: 12.0 * 1000.0,
                     expected_total_time_count: 8,
@@ -75,8 +80,9 @@ fn test_default_grouping() {
             (
                 "sync_span_1",
                 SpanNameTestSpec {
-                    expected_parent_name: Some("outer_async_span"),
-                    expected_props: vec![vec![E, E, E, E]],
+                    expected_props: vec![E],
+                    expected_parent_names: vec!["outer_async_span"],
+                    expected_parent_props: vec![E],
                     expected_total_time_mean: 13.0 * 1000.0,
                     expected_active_time_mean: 13.0 * 1000.0,
                     expected_total_time_count: 8,
@@ -87,8 +93,9 @@ fn test_default_grouping() {
             (
                 "sync_span_2",
                 SpanNameTestSpec {
-                    expected_parent_name: Some("inner_async_span"),
-                    expected_props: vec![vec![E, E, E, E, E]],
+                    expected_props: vec![E],
+                    expected_parent_names: vec!["inner_async_span"],
+                    expected_parent_props: vec![E],
                     expected_total_time_mean: 12.0 * 1000.0,
                     expected_active_time_mean: 12.0 * 1000.0,
                     expected_total_time_count: 8,
@@ -99,5 +106,5 @@ fn test_default_grouping() {
         ]),
     };
 
-    run_test(&latencies, &test_spec);
+    run_test(&latencies, test_spec);
 }
