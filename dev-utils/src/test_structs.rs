@@ -33,7 +33,7 @@ pub struct NExec {
 }
 
 /// Number of executions of each span group name
-pub static N_EXEC: NExec = NExec {
+pub const N_EXEC: NExec = NExec {
     e_root_async_1: 1,
     e_root_async_2: 1,
     e_f: 2,
