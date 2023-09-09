@@ -133,8 +133,18 @@ impl Timing {
 // Latencies
 
 pub struct Latencies {
-    pub span_groups: Vec<SpanGroup>,
-    pub timings: BTreeMap<SpanGroup, Timing>,
+    pub(crate) span_groups: Vec<SpanGroup>,
+    pub(crate) timings: BTreeMap<SpanGroup, Timing>,
+}
+
+impl Latencies {
+    pub fn span_groups(&self) -> &Vec<SpanGroup> {
+        &self.span_groups
+    }
+
+    pub fn timings(&self) -> &BTreeMap<SpanGroup, Timing> {
+        &self.timings
+    }
 }
 
 pub(crate) struct LatenciesPriv {

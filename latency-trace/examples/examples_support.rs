@@ -3,14 +3,16 @@ use latency_trace::Latencies;
 pub fn print_parents_means_medians(latencies: &Latencies) {
     println!("\nSpan group parents:");
 
-    for (span_group, _) in latencies {
-        let parent = span_group.parent();
+    for span_group in latencies.span_groups() {
+        let parent = span_group
+            .parent_idx()
+            .map(|pidx| &latencies.span_groups()[pidx]);
         println!("  * {:?} -> {:?}", span_group, parent);
     }
 
     println!("\nMean timing values by span group:");
 
-    for (span_group, v) in latencies {
+    for (span_group, v) in latencies.timings() {
         let mean_total_time = v.total_time().mean();
         let mean_active_time = v.active_time().mean();
         let total_time_count = v.total_time().len();
@@ -23,7 +25,7 @@ pub fn print_parents_means_medians(latencies: &Latencies) {
 
     println!("\nMedian timings by span group:");
 
-    for (span_group, v) in latencies {
+    for (span_group, v) in latencies.timings() {
         let median_total_time = v.total_time().value_at_percentile(50.0);
         let median_active_time = v.active_time().value_at_percentile(50.0);
         let total_time_count = v.total_time().len();
