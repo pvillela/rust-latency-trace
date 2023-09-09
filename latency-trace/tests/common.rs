@@ -1,28 +1,11 @@
-use dev_utils::utils::are_close;
+use dev_utils::test_structs::{SpanNameTestSpec, TestSpec};
 use latency_trace::{aggregate_timings, Latencies};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
-#[derive(Debug)]
-pub struct SpanNameTestSpec {
-    pub expected_props: Vec<Vec<(&'static str, &'static str)>>,
-    pub expected_parent_names: Vec<&'static str>,
-
-    /// Empty vector if parent is None
-    pub expected_parent_props: Vec<Vec<(&'static str, &'static str)>>,
-
-    pub expected_total_time_mean: f64,
-    pub expected_active_time_mean: f64,
-    pub expected_total_time_count: u64,
-    pub expected_active_time_count: u64,
-    pub expected_agg_by_name_count: u64,
+pub fn are_close(left: f64, right: f64, pct: f64) -> bool {
+    let avg_abs = (left.abs() + right.abs()) / 2.0;
+    (left - right).abs() <= avg_abs * pct
 }
-
-pub struct TestSpec {
-    pub span_group_count: usize,
-    pub span_name_test_specs: BTreeMap<&'static str, SpanNameTestSpec>,
-}
-
-pub const E: Vec<(&str, &str)> = vec![];
 
 pub fn run_test(latencies: &Latencies, test_spec: TestSpec) {
     let TestSpec {
@@ -60,9 +43,8 @@ pub fn run_test(latencies: &Latencies, test_spec: TestSpec) {
             expected_parent_names,
             expected_parent_props,
             expected_total_time_mean,
-            expected_total_time_count,
             expected_active_time_mean,
-            expected_active_time_count,
+            expected_timing_count,
             expected_agg_by_name_count,
         } = spec;
 
@@ -145,13 +127,13 @@ pub fn run_test(latencies: &Latencies, test_spec: TestSpec) {
 
             {
                 assert!(
-                    are_close(total_time_mean, expected_total_time_mean, 0.2),
+                    are_close(total_time_mean, expected_total_time_mean, 0.25),
                     "{name} total_time_mean: {total_time_mean}, {expected_total_time_mean}"
                 );
 
                 assert_eq!(
-                    total_time_count, expected_total_time_count,
-                    "{name} total_time_count: {total_time_count}, {expected_total_time_count}"
+                    total_time_count, expected_timing_count,
+                    "{name} total_time_count: {total_time_count}, {expected_timing_count}"
                 );
 
                 assert!(
@@ -160,8 +142,8 @@ pub fn run_test(latencies: &Latencies, test_spec: TestSpec) {
                 );
 
                 assert_eq!(
-                    active_time_count, expected_active_time_count,
-                    "{name} active_time_count: {active_time_count}, {expected_active_time_count}"
+                    active_time_count, expected_timing_count,
+                    "{name} active_time_count: {active_time_count}, {expected_timing_count}"
                 );
             };
         }

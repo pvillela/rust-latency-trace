@@ -32,8 +32,8 @@ async fn f() {
 }
 
 pub async fn target_fn() {
-    let h1 = tokio::spawn(async { f().await }.instrument(trace_span!("root_async_1")));
-    let h2 = tokio::spawn(async { f().await }.instrument(trace_span!("root_async_2")));
-    _ = h1.await;
-    _ = h2.await;
+    let h1 = tokio::spawn(async { f().await }.instrument(trace_span!("root_async_1", foo = 1)));
+    let h2 = tokio::spawn(async { f().await }.instrument(trace_span!("root_async_2", bar = 2)));
+    h1.await.unwrap();
+    h2.await.unwrap();
 }

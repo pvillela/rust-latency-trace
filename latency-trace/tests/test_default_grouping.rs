@@ -1,7 +1,15 @@
 mod common;
 
-use common::{run_test, SpanNameTestSpec, TestSpec, E};
-use dev_utils::target_fns::target_fn;
+use common::run_test;
+use dev_utils::{
+    target_fns::target_fn,
+    test_structs::{
+        span_name_test_spec_f, span_name_test_spec_inner_async_span,
+        span_name_test_spec_outer_async_span, span_name_test_spec_root_async_1,
+        span_name_test_spec_root_async_2, span_name_test_spec_sync_span_1,
+        span_name_test_spec_sync_span_2, TestSpec, E,
+    },
+};
 use latency_trace::measure_latencies_tokio;
 use std::collections::BTreeMap;
 
@@ -9,99 +17,49 @@ use std::collections::BTreeMap;
 fn test_default_grouping() {
     let latencies = measure_latencies_tokio(target_fn);
 
+    // Number of span groups by name
+    let n_root_async_1: u64 = 1;
+    let n_root_async_2: u64 = 1;
+    let n_f: u64 = (n_root_async_1 + n_root_async_2) * 1;
+    let n_outer_async_span: u64 = n_f * 1;
+    let n_inner_async_span: u64 = n_outer_async_span * 1;
+    let n_sync_span_1: u64 = n_outer_async_span * 1;
+    let n_sync_span_2: u64 = n_inner_async_span * 1;
+
     let test_spec = TestSpec {
-        span_group_count: 12,
+        span_group_count: (n_root_async_1
+            + n_root_async_2
+            + n_f
+            + n_outer_async_span
+            + n_inner_async_span
+            + n_sync_span_1
+            + n_sync_span_2) as usize,
+
         span_name_test_specs: BTreeMap::from([
             (
                 "root_async_1",
-                SpanNameTestSpec {
-                    expected_props: vec![E],
-                    expected_parent_names: vec![],
-                    expected_parent_props: vec![],
-                    expected_total_time_mean: 150.0 * 8.0 * 1000.0,
-                    expected_active_time_mean: 25.0 * 8.0 * 1000.0,
-                    expected_total_time_count: 1,
-                    expected_active_time_count: 1,
-                    expected_agg_by_name_count: 1,
-                },
+                span_name_test_spec_root_async_1(vec![E], vec![], n_root_async_1),
             ),
             (
                 "root_async_2",
-                SpanNameTestSpec {
-                    expected_props: vec![E],
-                    expected_parent_names: vec![],
-                    expected_parent_props: vec![],
-                    expected_total_time_mean: 150.0 * 8.0 * 1000.0,
-                    expected_active_time_mean: 25.0 * 8.0 * 1000.0,
-                    expected_total_time_count: 1,
-                    expected_active_time_count: 1,
-                    expected_agg_by_name_count: 1,
-                },
+                span_name_test_spec_root_async_2(vec![E], vec![], n_root_async_2),
             ),
-            (
-                "f",
-                SpanNameTestSpec {
-                    expected_props: vec![E],
-                    expected_parent_names: vec!["root_async_1", "root_async_2"],
-                    expected_parent_props: vec![E],
-                    expected_total_time_mean: 150.0 * 8.0 * 1000.0,
-                    expected_active_time_mean: 25.0 * 8.0 * 1000.0,
-                    expected_total_time_count: 1,
-                    expected_active_time_count: 1,
-                    expected_agg_by_name_count: 2,
-                },
-            ),
+            ("f", span_name_test_spec_f(vec![E], vec![E], n_f)),
             (
                 "outer_async_span",
-                SpanNameTestSpec {
-                    expected_props: vec![E],
-                    expected_parent_names: vec!["f"],
-                    expected_parent_props: vec![E],
-                    expected_total_time_mean: 150.0 * 1000.0,
-                    expected_active_time_mean: 25.0 * 1000.0,
-                    expected_total_time_count: 8,
-                    expected_active_time_count: 8,
-                    expected_agg_by_name_count: 16,
-                },
+                span_name_test_spec_outer_async_span(vec![E], vec![E], n_outer_async_span),
             ),
             (
                 "inner_async_span",
-                SpanNameTestSpec {
-                    expected_props: vec![E],
-                    expected_parent_names: vec!["outer_async_span"],
-                    expected_parent_props: vec![E],
-                    expected_total_time_mean: 37.0 * 1000.0,
-                    expected_active_time_mean: 12.0 * 1000.0,
-                    expected_total_time_count: 8,
-                    expected_active_time_count: 8,
-                    expected_agg_by_name_count: 16,
-                },
+                span_name_test_spec_inner_async_span(vec![E], vec![E], n_inner_async_span),
             ),
             (
                 "sync_span_1",
-                SpanNameTestSpec {
-                    expected_props: vec![E],
-                    expected_parent_names: vec!["outer_async_span"],
-                    expected_parent_props: vec![E],
-                    expected_total_time_mean: 13.0 * 1000.0,
-                    expected_active_time_mean: 13.0 * 1000.0,
-                    expected_total_time_count: 8,
-                    expected_active_time_count: 8,
-                    expected_agg_by_name_count: 16,
-                },
+                span_name_test_spec_sync_span_1(vec![E], vec![E], n_sync_span_1),
             ),
             (
                 "sync_span_2",
-                SpanNameTestSpec {
-                    expected_props: vec![E],
-                    expected_parent_names: vec!["inner_async_span"],
-                    expected_parent_props: vec![E],
-                    expected_total_time_mean: 12.0 * 1000.0,
-                    expected_active_time_mean: 12.0 * 1000.0,
-                    expected_total_time_count: 8,
-                    expected_active_time_count: 8,
-                    expected_agg_by_name_count: 16,
-                },
+                span_name_test_spec_sync_span_2(vec![E], vec![E], n_sync_span_2),
             ),
         ]),
     };
