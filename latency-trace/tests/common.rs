@@ -107,12 +107,19 @@ pub fn run_test(latencies: &Latencies, test_spec: TestSpec) {
 
         // Assertions by SpanGroup
         for (span_group, timing) in latencies.timings().iter().filter(|(k, _)| k.name() == name) {
+            let idx = span_group.idx();
+            assert_eq!(
+                span_group,
+                latencies.span_groups().get(idx).unwrap(),
+                "the span_group must be found in span_groups vector at position `idx`: {:?}",
+                span_group
+            );
+
             let props: Vec<(String, String)> = span_group.props().clone();
             props_set.insert(props);
 
             let parent_idx = span_group.parent_idx();
             parent_idx.map(|parent_idx| {
-                let idx = span_group.idx();
                 assert!(
                     parent_idx < idx,
                     "parent_idx {parent_idx} must be less than span_group.idx {idx}; name={name}",
