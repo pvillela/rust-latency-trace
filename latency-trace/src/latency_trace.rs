@@ -49,8 +49,8 @@ type PropsPath = Vec<Arc<Vec<(String, String)>>>;
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
     pub(crate) idx: usize,
-    pub(crate) callsite: Callsite,
-    pub(crate) props: Vec<(String, String)>,
+    pub(crate) callsite: Arc<Callsite>,
+    pub(crate) props: Arc<Vec<(String, String)>>,
     pub(crate) parent_idx: Option<usize>,
 }
 
@@ -280,8 +280,8 @@ impl LatencyTrace {
         let mut span_groups: Vec<SpanGroup> = Vec::with_capacity(sgt_to_sgp.len());
         sgt_to_sgp.into_iter().for_each(|(sgt, sgp)| {
             let sg = SpanGroup {
-                callsite: sgt.callsite_path.last().unwrap().as_ref().clone(),
-                props: sgp.props_path.last().unwrap().as_ref().clone(),
+                callsite: sgt.callsite_path.last().unwrap().clone(),
+                props: sgp.props_path.last().unwrap().clone(),
                 idx,
                 parent_idx: None,
             };
