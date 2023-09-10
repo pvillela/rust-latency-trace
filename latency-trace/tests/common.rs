@@ -7,7 +7,17 @@ pub fn are_close(left: f64, right: f64, pct: f64) -> bool {
     (left - right).abs() <= avg_abs * pct
 }
 
-pub fn run_test(latencies: &Latencies, test_spec: TestSpec) {
+pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
+    let span_groups_and_keys_are_same = ltcs
+        .span_groups()
+        .iter()
+        .zip(ltcs.timings().keys())
+        .all(|(left, right)| left == right);
+    assert!(
+        span_groups_and_keys_are_same,
+        "span_groups_and_keys_are_same"
+    );
+
     let TestSpec {
         span_group_count,
         span_name_test_specs,
@@ -18,12 +28,12 @@ pub fn run_test(latencies: &Latencies, test_spec: TestSpec) {
     let mut name_set: HashSet<&'static str> = HashSet::new();
 
     assert_eq!(
-        latencies.span_groups().len(),
+        ltcs.span_groups().len(),
         span_group_count,
         "Number of span groups"
     );
 
-    let agg_timings = aggregate_timings(latencies, |sg| sg.name());
+    let agg_timings = aggregate_timings(ltcs, |sg| sg.name());
     assert_eq!(
         agg_timings.len(),
         span_name_test_specs.len(),
@@ -106,11 +116,11 @@ pub fn run_test(latencies: &Latencies, test_spec: TestSpec) {
         }
 
         // Assertions by SpanGroup
-        for (span_group, timing) in latencies.timings().iter().filter(|(k, _)| k.name() == name) {
+        for (span_group, timing) in ltcs.timings().iter().filter(|(k, _)| k.name() == name) {
             let idx = span_group.idx();
             assert_eq!(
                 span_group,
-                latencies.span_groups().get(idx).unwrap(),
+                ltcs.span_groups().get(idx).unwrap(),
                 "the span_group must be found in span_groups vector at position `idx`: {:?}",
                 span_group
             );
@@ -128,7 +138,7 @@ pub fn run_test(latencies: &Latencies, test_spec: TestSpec) {
 
             let parent = span_group
                 .parent_idx()
-                .map(|parent_idx| latencies.span_groups()[parent_idx].clone());
+                .map(|parent_idx| ltcs.span_groups()[parent_idx].clone());
             let parent_name = parent.as_ref().map(|p| p.name());
             let parent_props = parent.map(|p| p.props().clone());
 
