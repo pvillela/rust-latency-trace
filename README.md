@@ -9,5 +9,4 @@ Given code instrumented wth the Rust [tracing](https://crates.io/crates/tracing)
 
 ## TODOs
 
-- Support aggregation of timings by using a function that groups span groups.
 - Support filtering of spans
