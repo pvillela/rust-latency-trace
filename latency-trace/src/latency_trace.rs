@@ -16,20 +16,19 @@ use std::{
     time::Instant,
 };
 use thread_local_drop::{self, Control, Holder};
-use tracing::{callsite::Identifier, Id, Subscriber};
-use tracing_core::span::Attributes;
+use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
 //=================
 // Callsite
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
-pub struct Callsite {
+pub struct CallsiteInfo {
     name: &'static str,
     code_line: String,
 }
 
-impl Callsite {
+impl CallsiteInfo {
     pub fn name(&self) -> &'static str {
         self.name
     }
@@ -39,23 +38,27 @@ impl Callsite {
     }
 }
 
+fn callsite_id_to_usize(id: &Identifier) -> usize {
+    let y = id.0 as *const dyn tracing::Callsite;
+    y as *const () as usize
+}
+
 //=================
 // SpanGroup
 
 type CallsiteIdPath = Vec<Identifier>;
-type CallsitePath = Vec<Arc<Callsite>>;
 type PropsPath = Vec<Arc<Vec<(String, String)>>>;
 
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
     pub(crate) idx: usize,
-    pub(crate) callsite: Arc<Callsite>,
+    pub(crate) callsite: Arc<CallsiteInfo>,
     pub(crate) props: Arc<Vec<(String, String)>>,
     pub(crate) parent_idx: Option<usize>,
 }
 
 impl SpanGroup {
-    pub fn callsite(&self) -> &Callsite {
+    pub fn callsite(&self) -> &CallsiteInfo {
         &self.callsite
     }
 
@@ -95,7 +98,7 @@ struct SpanGroupPriv {
 /// children in sort order.
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 struct SpanGroupTemp {
-    callsite_path: CallsitePath,
+    callsite_uid_path: Vec<usize>,
     props_path: PropsPath,
 }
 
@@ -148,7 +151,7 @@ impl Latencies {
 }
 
 pub(crate) struct LatenciesPriv {
-    callsites: HashMap<Identifier, Arc<Callsite>>,
+    callsites: HashMap<Identifier, Arc<CallsiteInfo>>,
     timings: HashMap<SpanGroupPriv, Timing>,
 }
 
@@ -197,7 +200,7 @@ impl LatencyTrace {
     fn ensure_callsites_updated(
         &self,
         callsite_id: Identifier,
-        callsite_fn: impl FnOnce() -> Arc<Callsite>,
+        callsite_fn: impl FnOnce() -> Arc<CallsiteInfo>,
     ) {
         log::trace!(
             "entered `ensure_callsites_updated`for {:?} on {:?}",
@@ -252,13 +255,13 @@ impl LatencyTrace {
         lp.timings
             .keys()
             .map(|sgp| {
-                let callsite_path = sgp
+                let callsite_uid_path = sgp
                     .callsite_id_path
                     .iter()
-                    .map(|cid| lp.callsites.get(cid).unwrap().clone())
-                    .collect::<CallsitePath>();
+                    .map(|cid| callsite_id_to_usize(cid))
+                    .collect::<Vec<usize>>();
                 let sgt = SpanGroupTemp {
-                    callsite_path,
+                    callsite_uid_path,
                     props_path: sgp.props_path.clone(),
                 };
                 (sgt, sgp.clone())
@@ -273,14 +276,16 @@ impl LatencyTrace {
     /// [`SpanGroup`] instances have the same ordering, which is reflected by their `idx` field and
     /// corresopnds to their position in the output vector.
     fn to_latencies_2(
+        lp: &LatenciesPriv,
         sgt_to_sgp: BTreeMap<SpanGroupTemp, SpanGroupPriv>,
     ) -> (Vec<SpanGroup>, HashMap<SpanGroupPriv, usize>) {
         let mut idx = 0;
         let mut sgp_to_idx: HashMap<SpanGroupPriv, usize> = HashMap::new();
         let mut span_groups: Vec<SpanGroup> = Vec::with_capacity(sgt_to_sgp.len());
-        sgt_to_sgp.into_iter().for_each(|(sgt, sgp)| {
+        sgt_to_sgp.into_iter().for_each(|(_, sgp)| {
+            let cid = sgp.callsite_id_path.last().unwrap();
             let sg = SpanGroup {
-                callsite: sgt.callsite_path.last().unwrap().clone(),
+                callsite: lp.callsites.get(cid).unwrap().clone(),
                 props: sgp.props_path.last().unwrap().clone(),
                 idx,
                 parent_idx: None,
@@ -338,7 +343,7 @@ impl LatencyTrace {
         self.control
             .with_acc(|lp| {
                 let sgt_to_sgp = Self::to_latencies_1(lp);
-                let (span_groups, sgp_to_idx) = Self::to_latencies_2(sgt_to_sgp);
+                let (span_groups, sgp_to_idx) = Self::to_latencies_2(lp, sgt_to_sgp);
                 Self::to_latencies_3(lp, span_groups, sgp_to_idx)
             })
             .unwrap()
@@ -433,7 +438,7 @@ where
         self.ensure_callsites_updated(callsite_id, || {
             let name = meta.name();
             let code_line = format!("{}:{}", meta.file().unwrap(), meta.line().unwrap());
-            Arc::new(Callsite { name, code_line })
+            Arc::new(CallsiteInfo { name, code_line })
         });
 
         log::trace!("`on_close` executed for span id {:?}", id);
