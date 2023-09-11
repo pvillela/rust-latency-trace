@@ -8,3 +8,6 @@ pub mod map;
 
 mod measure;
 pub use measure::*;
+
+mod histogram_summary;
+pub use histogram_summary::*;

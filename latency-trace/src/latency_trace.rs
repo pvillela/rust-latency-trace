@@ -106,9 +106,28 @@ struct SpanGroupTemp {
 // Timing
 
 #[derive(Clone, Debug)]
-pub struct Timing {
-    pub(crate) total_time: Histogram<u64>,
-    pub(crate) active_time: Histogram<u64>,
+pub struct TimingView<T> {
+    pub(crate) total_time: T,
+    pub(crate) active_time: T,
+}
+
+pub type Timing = TimingView<Histogram<u64>>;
+
+impl<T> TimingView<T> {
+    pub fn total_time(&self) -> &T {
+        &self.total_time
+    }
+
+    pub fn active_time(&self) -> &T {
+        &self.active_time
+    }
+
+    pub fn map<U>(&self, f: impl Fn(&T) -> U) -> TimingView<U> {
+        TimingView {
+            total_time: f(&self.total_time),
+            active_time: f(&self.active_time),
+        }
+    }
 }
 
 impl Timing {
@@ -121,14 +140,6 @@ impl Timing {
             total_time: hist,
             active_time: hist2,
         }
-    }
-
-    pub fn total_time(&self) -> &Histogram<u64> {
-        &self.total_time
-    }
-
-    pub fn active_time(&self) -> &Histogram<u64> {
-        &self.active_time
     }
 }
 
