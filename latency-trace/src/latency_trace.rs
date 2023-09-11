@@ -11,13 +11,37 @@ use log;
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, AtomicU8},
+        Arc,
+    },
     thread::{self, ThreadId},
     time::Instant,
 };
 use thread_local_drop::{self, Control, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
+
+//=================
+// Static configuration
+
+/// Histogram maximum value, defaulting to 20*1000*1000 microseconds.
+static HIST_HIGH: AtomicU64 = AtomicU64::new(20 * 1000 * 1000);
+
+/// Histogram significant decimal digits value, defaulting to 1.
+static HIST_SIGFIG: AtomicU8 = AtomicU8::new(1);
+
+/// Overrides default Histogram maximum value (default=20*1000*1000 microseconds).
+/// If used, Should only be called before invoking the [crate::measure]ment function.
+pub fn set_hist_high(high: u64) {
+    HIST_HIGH.store(high, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Overrides default Histogram significant decimal digits value (default=1).
+/// If used, should only be called before invoking the [crate::measure] function.
+pub fn set_hist_sigfig(sigfig: u8) {
+    HIST_SIGFIG.store(sigfig, std::sync::atomic::Ordering::Relaxed);
+}
 
 //=================
 // Callsite
@@ -132,7 +156,12 @@ impl<T> TimingView<T> {
 
 impl Timing {
     pub fn new() -> Self {
-        let mut hist = Histogram::<u64>::new_with_bounds(1, 20 * 1000 * 1000, 1).unwrap();
+        let mut hist = Histogram::<u64>::new_with_bounds(
+            1,
+            HIST_HIGH.load(std::sync::atomic::Ordering::Relaxed),
+            HIST_SIGFIG.load(std::sync::atomic::Ordering::Relaxed),
+        )
+        .unwrap();
         hist.auto(true);
         let hist2 = hist.clone();
 

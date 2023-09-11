@@ -6,7 +6,7 @@ pub use span_groupers::*;
 
 pub mod map;
 
-mod measure;
+pub mod measure;
 pub use measure::*;
 
 mod histogram_summary;
