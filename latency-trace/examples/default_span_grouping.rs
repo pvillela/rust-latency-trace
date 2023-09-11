@@ -4,7 +4,7 @@
 
 use dev_utils::target_fns::target_fn;
 use env_logger;
-use latency_trace::measure_latencies_tokio;
+use latency_trace::LatencyTrace;
 use std::env::set_var;
 
 mod examples_support;
@@ -14,7 +14,7 @@ fn main() {
     // Set below value to "trace" to enable full library tracing.
     set_var("RUST_LOG", "info");
 
-    let latencies = measure_latencies_tokio(|| async {
+    let latencies = LatencyTrace::new().measure_latencies_tokio(|| async {
         // Set env_logger only if `tracing_subsriber` hasn't pulled in `tracing_log` and already set a logger.
         // Otherwise, setting a second logger would panic.
         _ = env_logger::try_init();

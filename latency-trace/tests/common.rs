@@ -1,5 +1,5 @@
 use dev_utils::test_structs::{SpanNameTestSpec, TestSpec};
-use latency_trace::{aggregate_timings, Latencies};
+use latency_trace::Latencies;
 use std::collections::HashSet;
 
 pub fn are_close(left: f64, right: f64, pct: f64) -> bool {
@@ -33,7 +33,7 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
         "Number of span groups"
     );
 
-    let agg_timings = aggregate_timings(ltcs, |sg| sg.name());
+    let agg_timings = ltcs.aggregate_timings(|sg| sg.name());
     assert_eq!(
         agg_timings.len(),
         span_name_test_specs.len(),

@@ -11,37 +11,13 @@ use log;
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
-    sync::{
-        atomic::{AtomicU64, AtomicU8},
-        Arc,
-    },
+    sync::Arc,
     thread::{self, ThreadId},
     time::Instant,
 };
 use thread_local_drop::{self, Control, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
-
-//=================
-// Static configuration
-
-/// Histogram maximum value, defaulting to 20*1000*1000 microseconds.
-static HIST_HIGH: AtomicU64 = AtomicU64::new(20 * 1000 * 1000);
-
-/// Histogram significant decimal digits value, defaulting to 1.
-static HIST_SIGFIG: AtomicU8 = AtomicU8::new(1);
-
-/// Overrides default Histogram maximum value (default=20*1000*1000 microseconds).
-/// If used, Should only be called before invoking the [crate::measure]ment function.
-pub fn set_hist_high(high: u64) {
-    HIST_HIGH.store(high, std::sync::atomic::Ordering::Relaxed);
-}
-
-/// Overrides default Histogram significant decimal digits value (default=1).
-/// If used, should only be called before invoking the [crate::measure] function.
-pub fn set_hist_sigfig(sigfig: u8) {
-    HIST_SIGFIG.store(sigfig, std::sync::atomic::Ordering::Relaxed);
-}
 
 //=================
 // Callsite
@@ -155,13 +131,8 @@ impl<T> TimingView<T> {
 }
 
 impl Timing {
-    pub fn new() -> Self {
-        let mut hist = Histogram::<u64>::new_with_bounds(
-            1,
-            HIST_HIGH.load(std::sync::atomic::Ordering::Relaxed),
-            HIST_SIGFIG.load(std::sync::atomic::Ordering::Relaxed),
-        )
-        .unwrap();
+    pub fn new(hist_high: u64, hist_sigfig: u8) -> Self {
+        let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
         hist.auto(true);
         let hist2 = hist.clone();
 
@@ -178,16 +149,8 @@ impl Timing {
 pub struct Latencies {
     pub(crate) span_groups: Vec<SpanGroup>,
     pub(crate) timings: BTreeMap<SpanGroup, Timing>,
-}
-
-impl Latencies {
-    pub fn span_groups(&self) -> &Vec<SpanGroup> {
-        &self.span_groups
-    }
-
-    pub fn timings(&self) -> &BTreeMap<SpanGroup, Timing> {
-        &self.timings
-    }
+    pub(crate) hist_high: u64,
+    pub(crate) hist_sigfig: u8,
 }
 
 pub(crate) struct LatenciesPriv {
@@ -220,20 +183,55 @@ struct SpanTiming {
 //=================
 // LatencyTrace
 
-type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>;
-
-/// Provides access a [Timings] containing the latencies collected for different span callsites.
-#[derive(Clone)]
-pub(crate) struct LatencyTrace {
-    pub(crate) control: Control<LatenciesPriv, LatenciesPriv>,
-    span_grouper: SpanGrouper,
+pub struct LatencyTrace {
+    pub(crate) span_grouper:
+        Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>,
+    pub(crate) hist_high: u64,
+    pub(crate) hist_sigfig: u8,
 }
 
 impl LatencyTrace {
-    pub(crate) fn new(span_grouper: SpanGrouper) -> LatencyTrace {
-        LatencyTrace {
-            control: Control::new(LatenciesPriv::new(), op),
-            span_grouper,
+    /// Used to accumulate results on [`Control`].
+    fn op(&self) -> impl Fn(LatenciesPriv, &mut LatenciesPriv, &ThreadId) + Send + Sync + 'static {
+        let hist_high = self.hist_high;
+        let hist_sigfig = self.hist_sigfig;
+        move |data: LatenciesPriv, acc: &mut LatenciesPriv, tid: &ThreadId| {
+            log::debug!("executing `op` for {:?}", tid);
+            let callsites = data.callsites;
+            let timings = data.timings;
+            for (k, v) in callsites {
+                acc.callsites.entry(k).or_insert_with(|| v);
+            }
+            for (k, v) in timings {
+                let timing = acc
+                    .timings
+                    .entry(k)
+                    .or_insert_with(|| Timing::new(hist_high, hist_sigfig));
+                timing.total_time.add(v.total_time).unwrap();
+                timing.active_time.add(v.active_time).unwrap();
+            }
+        }
+    }
+}
+
+type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>;
+
+/// Provides access to [Timings] containing the latencies collected for different span groups.
+#[derive(Clone)]
+pub(crate) struct LatencyTracePriv {
+    pub(crate) control: Control<LatenciesPriv, LatenciesPriv>,
+    span_grouper: SpanGrouper,
+    hist_high: u64,
+    hist_sigfig: u8,
+}
+
+impl LatencyTracePriv {
+    pub(crate) fn new(config: LatencyTrace) -> LatencyTracePriv {
+        LatencyTracePriv {
+            control: Control::new(LatenciesPriv::new(), config.op()),
+            span_grouper: config.span_grouper,
+            hist_high: config.hist_high,
+            hist_sigfig: config.hist_sigfig,
         }
     }
 
@@ -262,8 +260,8 @@ impl LatencyTrace {
     }
 
     fn update_timings(&self, span_group_priv: &SpanGroupPriv, f: impl Fn(&mut Timing)) {
-        self.control.with_tl_mut(&LOCAL_INFO, |info| {
-            let timings = &mut info.timings;
+        self.control.with_tl_mut(&LOCAL_INFO, |lp| {
+            let timings = &mut lp.timings;
             let mut timing = {
                 if let Some(timing) = timings.get_mut(span_group_priv) {
                     timing
@@ -273,7 +271,10 @@ impl LatencyTrace {
                         span_group_priv,
                         thread::current().id()
                     );
-                    timings.insert(span_group_priv.clone(), Timing::new());
+                    timings.insert(
+                        span_group_priv.clone(),
+                        Timing::new(self.hist_high, self.hist_sigfig),
+                    );
                     timings.get_mut(span_group_priv).unwrap()
                 }
             };
@@ -287,6 +288,9 @@ impl LatencyTrace {
             );
         });
     }
+
+    //=================
+    // Functions
 
     /// Step in transforming the accumulated data in Control into the [`Latencies`] output.
     /// Due to their structure, SpanGroupTemp is sortable and ensures that parents always appear before
@@ -340,6 +344,7 @@ impl LatencyTrace {
     /// Step in transforming the accumulated data in Control into the [`Latencies`] output.
     /// Adds the `parent_idx`to each [SpanGroup] in `span_groups` and produces the [Latencies] output.
     fn to_latencies_3(
+        &self,
         lp: &LatenciesPriv,
         mut span_groups: Vec<SpanGroup>,
         sgp_to_idx: HashMap<SpanGroupPriv, usize>,
@@ -374,6 +379,8 @@ impl LatencyTrace {
         Latencies {
             span_groups,
             timings,
+            hist_high: self.hist_high,
+            hist_sigfig: self.hist_sigfig,
         }
     }
 
@@ -384,13 +391,13 @@ impl LatencyTrace {
             .with_acc(|lp| {
                 let sgt_to_sgp = Self::to_latencies_1(lp);
                 let (span_groups, sgp_to_idx) = Self::to_latencies_2(lp, sgt_to_sgp);
-                Self::to_latencies_3(lp, span_groups, sgp_to_idx)
+                self.to_latencies_3(lp, span_groups, sgp_to_idx)
             })
             .unwrap()
     }
 }
 
-impl<S> Layer<S> for LatencyTrace
+impl<S> Layer<S> for LatencyTracePriv
 where
     S: Subscriber,
     S: for<'lookup> LookupSpan<'lookup>,
@@ -490,22 +497,4 @@ where
 
 thread_local! {
     static LOCAL_INFO: Holder<LatenciesPriv, LatenciesPriv> = Holder::new(|| LatenciesPriv::new());
-}
-
-//=================
-// Functions
-
-/// Used to accumulate results on [`Control`].
-fn op(data: LatenciesPriv, acc: &mut LatenciesPriv, tid: &ThreadId) {
-    log::debug!("executing `op` for {:?}", tid);
-    let callsites = data.callsites;
-    let timings = data.timings;
-    for (k, v) in callsites {
-        acc.callsites.entry(k).or_insert_with(|| v);
-    }
-    for (k, v) in timings {
-        let timing = acc.timings.entry(k).or_insert_with(|| Timing::new());
-        timing.total_time.add(v.total_time).unwrap();
-        timing.active_time.add(v.active_time).unwrap();
-    }
 }

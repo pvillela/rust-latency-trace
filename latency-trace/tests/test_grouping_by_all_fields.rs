@@ -10,12 +10,14 @@ use dev_utils::{
         span_name_test_spec_sync_span_2, TestSpec, E,
     },
 };
-use latency_trace::{group_by_all_fields, measure_latencies_with_custom_grouping_tokio};
+use latency_trace::{group_by_all_fields, LatencyTrace};
 use std::collections::BTreeMap;
 
 #[test]
 fn test_grouping_by_all_fields() {
-    let latencies = measure_latencies_with_custom_grouping_tokio(group_by_all_fields, target_fn);
+    let latencies = LatencyTrace::new()
+        .with_span_grouper(group_by_all_fields)
+        .measure_latencies_tokio(target_fn);
 
     // Number of span groups by name
     let n_root_async_1: u64 = 1;
