@@ -132,7 +132,7 @@ impl<T> TimingView<T> {
 
 impl Timing {
     pub fn new() -> Self {
-        let mut hist = Histogram::<u64>::new_with_bounds(1, 60 * 1000, 1).unwrap();
+        let mut hist = Histogram::<u64>::new_with_bounds(1, 20 * 1000 * 1000, 1).unwrap();
         hist.auto(true);
         let hist2 = hist.clone();
 

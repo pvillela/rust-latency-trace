@@ -24,7 +24,7 @@ impl HistogramSummary {
             count: hist.len(),
             mean: hist.mean(),
             stdev: hist.stdev(),
-            min: hist.value_at_quantile(0.0),
+            min: hist.min(),
             p1: hist.value_at_quantile(0.01),
             p5: hist.value_at_quantile(0.05),
             p10: hist.value_at_quantile(0.10),
@@ -34,7 +34,7 @@ impl HistogramSummary {
             p90: hist.value_at_quantile(0.90),
             p95: hist.value_at_quantile(0.95),
             p99: hist.value_at_quantile(0.99),
-            max: hist.value_at_quantile(1.0),
+            max: hist.max(),
         }
     }
 }
