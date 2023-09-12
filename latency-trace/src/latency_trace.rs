@@ -1,10 +1,4 @@
-//! supports latency measurement for functions and code blocks, both sync and async.
-//!
-//! Given code instrumented wth the Rust [tracing](https://crates.io/crates/tracing) library, this library
-//! uses the [hdrhistogram](https://crates.io/crates/hdrhistogram) library to capture both total and active
-//! span timings, where:
-//! - total timings include suspend time and are based on span creation and closing;
-//! - active timings exclude suspend time and are based on span entry and exit.
+//! Core library implementation.
 
 use hdrhistogram::Histogram;
 use log;
@@ -153,6 +147,37 @@ pub struct Latencies {
     pub(crate) hist_sigfig: u8,
 }
 
+impl Latencies {
+    pub fn span_groups(&self) -> &Vec<SpanGroup> {
+        &self.span_groups
+    }
+
+    pub fn timings(&self) -> &BTreeMap<SpanGroup, Timing> {
+        &self.timings
+    }
+
+    /// Aggregate timings by sets of [`crate::SpanGroup`]s that have the same value when `f` is applied.
+    pub fn aggregate_timings<G>(&self, f: impl Fn(&SpanGroup) -> G) -> BTreeMap<G, Timing>
+    where
+        G: Ord + Clone,
+    {
+        let mut res: BTreeMap<G, Timing> = BTreeMap::new();
+        for (k, v) in &self.timings {
+            let g = f(k);
+            let timing = match res.get_mut(&g) {
+                Some(timing) => timing,
+                None => {
+                    res.insert(g.clone(), Timing::new(self.hist_high, self.hist_sigfig));
+                    res.get_mut(&g).unwrap()
+                }
+            };
+            timing.total_time.add(v.total_time()).unwrap();
+            timing.active_time.add(v.active_time()).unwrap();
+        }
+        res
+    }
+}
+
 pub(crate) struct LatenciesPriv {
     callsites: HashMap<Identifier, Arc<CallsiteInfo>>,
     timings: HashMap<SpanGroupPriv, Timing>,
@@ -181,16 +206,16 @@ struct SpanTiming {
 }
 
 //=================
-// LatencyTrace
+// LatencyTraceCfg
 
-pub struct LatencyTrace {
+pub struct LatencyTraceCfg {
     pub(crate) span_grouper:
         Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>,
     pub(crate) hist_high: u64,
     pub(crate) hist_sigfig: u8,
 }
 
-impl LatencyTrace {
+impl LatencyTraceCfg {
     /// Used to accumulate results on [`Control`].
     fn op(&self) -> impl Fn(LatenciesPriv, &mut LatenciesPriv, &ThreadId) + Send + Sync + 'static {
         let hist_high = self.hist_high;
@@ -214,19 +239,20 @@ impl LatencyTrace {
     }
 }
 
-type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>;
+//=================
+// LatencyTracePriv
 
 /// Provides access to [Timings] containing the latencies collected for different span groups.
 #[derive(Clone)]
 pub(crate) struct LatencyTracePriv {
     pub(crate) control: Control<LatenciesPriv, LatenciesPriv>,
-    span_grouper: SpanGrouper,
+    span_grouper: Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>,
     hist_high: u64,
     hist_sigfig: u8,
 }
 
 impl LatencyTracePriv {
-    pub(crate) fn new(config: LatencyTrace) -> LatencyTracePriv {
+    pub(crate) fn new(config: LatencyTraceCfg) -> LatencyTracePriv {
         LatencyTracePriv {
             control: Control::new(LatenciesPriv::new(), config.op()),
             span_grouper: config.span_grouper,
@@ -288,9 +314,6 @@ impl LatencyTracePriv {
             );
         });
     }
-
-    //=================
-    // Functions
 
     /// Step in transforming the accumulated data in Control into the [`Latencies`] output.
     /// Due to their structure, SpanGroupTemp is sortable and ensures that parents always appear before
