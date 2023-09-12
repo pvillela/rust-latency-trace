@@ -1,7 +1,8 @@
 use hdrhistogram::Histogram;
 
+/// Common summary statistics useful in latency testing/benchmarking.
 #[derive(Debug, Clone)]
-pub struct HistogramSummary {
+pub struct SummaryStats {
     pub count: u64,
     pub mean: f64,
     pub stdev: f64,
@@ -18,7 +19,7 @@ pub struct HistogramSummary {
     pub max: u64,
 }
 
-impl HistogramSummary {
+impl SummaryStats {
     pub fn new(hist: &Histogram<u64>) -> Self {
         Self {
             count: hist.len(),
@@ -39,6 +40,6 @@ impl HistogramSummary {
     }
 }
 
-pub fn histogram_summary(hist: &Histogram<u64>) -> HistogramSummary {
-    HistogramSummary::new(hist)
+pub fn histogram_summary(hist: &Histogram<u64>) -> SummaryStats {
+    SummaryStats::new(hist)
 }

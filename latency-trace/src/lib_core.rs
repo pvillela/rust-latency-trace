@@ -16,6 +16,7 @@ use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 //=================
 // Callsite
 
+/// Provides name and code line information about where the tracing span was defined.
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct CallsiteInfo {
     name: &'static str,
@@ -23,10 +24,12 @@ pub struct CallsiteInfo {
 }
 
 impl CallsiteInfo {
+    /// Name of the tracing span.
     pub fn name(&self) -> &'static str {
         self.name
     }
 
+    /// Line of code where the tracing span was defined.
     pub fn code_line(&self) -> &str {
         &self.code_line
     }
@@ -140,6 +143,10 @@ impl Timing {
 //=================
 // Latencies
 
+/// Provides the list of [`SpanGroup`]s and  a mapping from the span groups to the [`Timing`] information
+/// collected for them.
+///
+/// The span groups are ordered such that parent span groups appear before their children.
 pub struct Latencies {
     pub(crate) span_groups: Vec<SpanGroup>,
     pub(crate) timings: BTreeMap<SpanGroup, Timing>,
@@ -148,15 +155,18 @@ pub struct Latencies {
 }
 
 impl Latencies {
+    /// Returns the list of [`SpanGroup`]s, ordered such that parent span groups appear before their children.
     pub fn span_groups(&self) -> &Vec<SpanGroup> {
         &self.span_groups
     }
 
+    /// Returns a mapping from the span groups to the [`Timing`] information
+    /// collected for them. The span groups are ordered such that parent span groups appear before their children.
     pub fn timings(&self) -> &BTreeMap<SpanGroup, Timing> {
         &self.timings
     }
 
-    /// Aggregate timings by sets of [`crate::SpanGroup`]s that have the same value when `f` is applied.
+    /// Aggregates span group [`Timing`]s by sets of span groups that have the same value when `f` is applied.
     pub fn aggregate_timings<G>(&self, f: impl Fn(&SpanGroup) -> G) -> BTreeMap<G, Timing>
     where
         G: Ord + Clone,
@@ -208,7 +218,7 @@ struct SpanTiming {
 //=================
 // LatencyTraceCfg
 
-pub struct LatencyTraceCfg {
+pub(crate) struct LatencyTraceCfg {
     pub(crate) span_grouper:
         Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>,
     pub(crate) hist_high: u64,
