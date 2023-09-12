@@ -6,16 +6,16 @@
 //! - total timings include suspend time and are based on span creation and closing;
 //! - active timings exclude suspend time and are based on span entry and exit.
 
-mod latency_trace;
-pub use latency_trace::*;
+mod lib_core;
+pub use lib_core::*;
 
 mod span_groupers;
 pub use span_groupers::*;
 
 pub mod map;
 
-pub mod measure;
-pub use measure::*;
+pub mod pub_itf_ext;
+pub use pub_itf_ext::*;
 
 mod histogram_summary;
 pub use histogram_summary::*;
