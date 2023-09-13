@@ -4,7 +4,7 @@ use tracing::{
     span::Attributes,
 };
 
-/// Default span grouper. Groups spans by callsite.
+/// Default span grouper. Used to group spans by callsite, ignoring any span attributes.
 pub fn default_span_grouper(_attrs: &Attributes) -> Vec<(String, String)> {
     vec![]
 }
@@ -23,7 +23,7 @@ impl Visit for FieldReader {
     }
 }
 
-/// Custom span grouper that groups by all fields and their values.
+/// Custom span grouper used to group spans by callsite and all span fields and their values.
 pub fn group_by_all_fields(attrs: &Attributes) -> Vec<(String, String)> {
     let reader = &mut FieldReader::new();
     attrs.values().record(reader);
@@ -34,7 +34,7 @@ pub fn group_by_all_fields(attrs: &Attributes) -> Vec<(String, String)> {
         .collect()
 }
 
-/// Custom span grouper that groups by given fields and their values.
+/// Custom span grouper used to group spans by callsite and a given list of fields and their values.
 pub fn group_by_given_fields<'a>(
     given_names: &'a [&'a str],
 ) -> impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'a {

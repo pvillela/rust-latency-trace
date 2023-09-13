@@ -9,4 +9,5 @@ Given code instrumented wth the Rust [tracing](https://crates.io/crates/tracing)
 
 ## TODOs
 
+- Add core concepts and examples to lib docs.
 - Support filtering of spans

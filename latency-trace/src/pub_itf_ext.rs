@@ -47,7 +47,8 @@ impl LatencyTrace {
         Self(cfg)
     }
 
-    /// Creates a new [`LatencyTrace`] configured the same as `self` but with the given `hist_high`.
+    /// Creates a new [`LatencyTrace`] configured the same as `self` but with the given `hist_high`
+    /// (see [hdrhistogram::Histogram::high]).
     pub fn with_hist_high(&self, hist_high: u64) -> Self {
         let cfg = LatencyTraceCfg {
             span_grouper: self.0.span_grouper.clone(),
@@ -57,7 +58,8 @@ impl LatencyTrace {
         Self(cfg)
     }
 
-    /// Creates a new [`LatencyTrace`] configured the same as `self` but with the given `hist_sigfig`.
+    /// Creates a new [`LatencyTrace`] configured the same as `self` but with the given `hist_sigfig`
+    /// (see [hdrhistogram::Histogram::sigfig]).
     pub fn with_hist_sigfig(&self, hist_sigfig: u8) -> Self {
         let cfg = LatencyTraceCfg {
             span_grouper: self.0.span_grouper.clone(),

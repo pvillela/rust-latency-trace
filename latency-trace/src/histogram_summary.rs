@@ -40,6 +40,7 @@ impl SummaryStats {
     }
 }
 
+/// Computes [`SummaryStats`] from a [`Histogram`].
 pub fn histogram_summary(hist: &Histogram<u64>) -> SummaryStats {
     SummaryStats::new(hist)
 }

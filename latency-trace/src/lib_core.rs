@@ -16,7 +16,7 @@ use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 //=================
 // Callsite
 
-/// Provides name and code line information about where the tracing span was defined.
+/// Provides [name](Self::name) and [code line](Self::code_line) information about where the tracing span was defined.
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct CallsiteInfo {
     name: &'static str,
@@ -46,6 +46,25 @@ fn callsite_id_to_usize(id: &Identifier) -> usize {
 type CallsiteIdPath = Vec<Identifier>;
 type PropsPath = Vec<Arc<Vec<(String, String)>>>;
 
+/// Represents a set of [tracing::Span]s for which latency information should be collected as a group.
+///
+/// The coarsest-grained grouping of spans is characterized by a callsite (see [tracing::Callsite]), but
+/// finer-grained groupings can be defined by adding a list of name-value pairs to the definition of a group.
+/// Such a properties list can be computed from the span's [tracing::span::Attributes].
+/// (Latency information can be aggregated across groupings of span groups by using
+/// [Latencies::aggregate_timings].)
+///
+/// Span groups form a forest of trees where some pairs of span groups have a parent-child relationship.
+/// This means that if SpanGroup A is the parent of SpanGroup B then, for each span that was assigned to group B,
+/// its parent span
+/// (see [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships))
+/// was assigned to group A.
+///
+/// This struct holds the following information:
+/// - [`callsite`](Self::callsite) information
+/// - a [`props`](Self::props) field that contains the span group's list of name-value pairs (which may be empty)
+/// - an [`idx`](Self::idx) field that uniquely characterizes the span group
+/// - a [`parent_idx`](Self::parent_idx) field that is the `idx` field of the parent span group, if any.
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
     pub(crate) idx: usize,
@@ -55,26 +74,34 @@ pub struct SpanGroup {
 }
 
 impl SpanGroup {
+    /// Returns the span group's [CallsiteInfo].
     pub fn callsite(&self) -> &CallsiteInfo {
         &self.callsite
     }
 
+    /// Returns the span group's properties list.
+    ///
+    /// This list can be empty as is the case with the default span grouper.
     pub fn props(&self) -> &Vec<(String, String)> {
         &self.props
     }
 
+    /// Returns the callsite's name.
     pub fn name(&self) -> &'static str {
         self.callsite.name
     }
 
+    /// Returns the callsite's file name and code line.
     pub fn code_line(&self) -> &str {
         &self.callsite.code_line()
     }
 
+    /// Returns the span group's index in the list of all span groups.
     pub fn idx(&self) -> usize {
         self.idx
     }
 
+    /// Returns the index of the span group's parent in the list of all span groups.
     pub fn parent_idx(&self) -> Option<usize> {
         self.parent_idx
     }
@@ -102,23 +129,35 @@ struct SpanGroupTemp {
 //=================
 // Timing
 
+/// Holds latency timing information for a given item, e.g., a span group or a group of span groups.
+///
+/// Information is held in two fields of type `T`:
+/// - [`total_time`](Self::total_time), with latency information including async waits
+/// - [`active_time`](Self::active_time), with latency information excluding async waits
 #[derive(Clone, Debug)]
 pub struct TimingView<T> {
     pub(crate) total_time: T,
     pub(crate) active_time: T,
 }
 
+/// This is the default `TimingView` used to capture the collected latency information.
+///
+/// It can be transformed into other timing views by using the [TimingView::map] method.
 pub type Timing = TimingView<Histogram<u64>>;
 
 impl<T> TimingView<T> {
+    /// Returns latency info including async waits.
     pub fn total_time(&self) -> &T {
         &self.total_time
     }
 
+    /// Returns latency info excluding async waits.
     pub fn active_time(&self) -> &T {
         &self.active_time
     }
 
+    /// Transforms the [`total_time`](Self::total_time) and [`active_time`](Self::active_time)
+    /// latency info into a target [`TimingView<U>`].
     pub fn map<U>(&self, f: impl Fn(&T) -> U) -> TimingView<U> {
         TimingView {
             total_time: f(&self.total_time),
@@ -128,7 +167,8 @@ impl<T> TimingView<T> {
 }
 
 impl Timing {
-    pub fn new(hist_high: u64, hist_sigfig: u8) -> Self {
+    /// Constructs a [`Timing`].
+    fn new(hist_high: u64, hist_sigfig: u8) -> Self {
         let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
         hist.auto(true);
         let hist2 = hist.clone();
