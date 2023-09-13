@@ -134,13 +134,15 @@ struct SpanGroupTemp {
 /// Information is held in two fields of type `T`:
 /// - [`total_time`](Self::total_time), with latency information including async waits
 /// - [`active_time`](Self::active_time), with latency information excluding async waits
+///
+/// The default type parameterization is the [`Timing`] type.
 #[derive(Clone, Debug)]
 pub struct TimingView<T> {
     pub(crate) total_time: T,
     pub(crate) active_time: T,
 }
 
-/// This is the default `TimingView` used to capture the collected latency information.
+/// This is the default [`TimingView`] used to capture the collected latency information in **microseconds**.
 ///
 /// It can be transformed into other timing views by using the [TimingView::map] method.
 pub type Timing = TimingView<Histogram<u64>>;
@@ -187,6 +189,8 @@ impl Timing {
 /// collected for them.
 ///
 /// The span groups are ordered such that parent span groups appear before their children.
+
+#[derive(Debug)]
 pub struct Latencies {
     pub(crate) span_groups: Vec<SpanGroup>,
     pub(crate) timings: BTreeMap<SpanGroup, Timing>,

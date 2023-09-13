@@ -1,4 +1,5 @@
-//! Example using custom grouping by given fields.
+//! Example showing latency measurement of [dev_utils::target_fns::target_fn] using the span grouper
+//! [latency_trace::group_by_given_fields].
 
 use dev_utils::target_fns::target_fn;
 use env_logger;

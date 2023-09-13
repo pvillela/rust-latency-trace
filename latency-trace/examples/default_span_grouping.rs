@@ -1,6 +1,4 @@
-//! This captures both total and sync timings:
-//! - total timings include suspend time and are based on span creation and closing;
-//! - active timings exclude suspend time and are based on span entry and exit.
+//! Example showing latency measurement of [dev_utils::target_fns::target_fn] with default span grouping.
 
 use dev_utils::target_fns::target_fn;
 use env_logger;

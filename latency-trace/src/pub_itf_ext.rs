@@ -18,7 +18,7 @@ impl LatencyTrace {
     /// Instantiates a [LatencyTrace] with default configuration. The defaults are:
     /// - Grouping of spans using the [`default_span_grouper`], which simply groups by the span's
     /// callsite information (see [`CallsiteInfo`](crate::CallsiteInfo), which distills [tracing::Callsite]).
-    /// - Histograms use a `hist_high` of `20,000,000` (20 seconds) and a `hist_sig` of 1.
+    /// - Histograms use a `hist_high` of `20,000,000` (20 seconds) and a `hist_sigfig` of 2.
     ///
     /// See [hdrhistogram::Histogram::high] and [hdrhistogram::Histogram::sigfig] for an explanation of these
     /// histogram configuration parameters.
@@ -29,7 +29,7 @@ impl LatencyTrace {
         let cfg = LatencyTraceCfg {
             span_grouper: Arc::new(default_span_grouper),
             hist_high: 20 * 1000 * 1000,
-            hist_sigfig: 1,
+            hist_sigfig: 2,
         };
         Self(cfg)
     }

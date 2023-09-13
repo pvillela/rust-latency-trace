@@ -24,7 +24,8 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 
 hdrhistogram = "7.5"
 log = "0.4"
-env_logger = "0.10"
 
 [dev-dependencies]
 dev-utils = { path = "../dev-utils" }
+env_logger = "0.10"
+rand = "0.8"

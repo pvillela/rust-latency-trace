@@ -5,6 +5,8 @@
 //! span timings, where:
 //! - total timings include suspend time and are based on span creation and closing;
 //! - active timings exclude suspend time and are based on span entry and exit.
+//!
+//! Latencies are collected in **microseconds** for all spans with level `trace` or higher.
 
 mod lib_core;
 pub use lib_core::*;
