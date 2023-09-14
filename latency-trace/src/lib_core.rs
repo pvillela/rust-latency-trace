@@ -347,7 +347,7 @@ impl LatencyTracePriv {
                     timing
                 } else {
                     log::trace!(
-                        "***** thread-loacal Timing created for {:?} on {:?}",
+                        "thread-loacal Timing created for {:?} on {:?}",
                         span_group_priv,
                         thread::current().id()
                     );
@@ -362,7 +362,7 @@ impl LatencyTracePriv {
             f(&mut timing);
 
             log::trace!(
-                "***** exiting `update_timings` for {:?} on {:?}",
+                "exiting `update_timings` for {:?} on {:?}",
                 span_group_priv,
                 thread::current().id()
             );
@@ -480,8 +480,8 @@ where
     S: for<'lookup> LookupSpan<'lookup>,
 {
     fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
-        log::trace!("entered `on_new_span`");
         let span = ctx.span(id).unwrap();
+        log::trace!("`on_new_span` start: name={}, id={:?}", span.name(), id);
         let parent_span = span.parent();
 
         let callsite_id = span.metadata().callsite();
@@ -507,31 +507,30 @@ where
             acc_active_time: 0,
         });
 
-        log::trace!("`on_new_span` executed with id={:?}", id);
+        log::trace!("`on_new_span` end: name={}, id={:?}", span.name(), id);
     }
 
     fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
-        log::trace!("entered `on_enter` wth span Id {:?}", id);
         let span = ctx.span(id).unwrap();
+        log::trace!("`on_enter` start: name={}, id={:?}", span.name(), id);
         let mut ext = span.extensions_mut();
         let span_timing = ext.get_mut::<SpanTiming>().unwrap();
         span_timing.entered_at = Instant::now();
-        log::trace!("`on_enter` executed with id={:?}", id);
+        log::trace!("`on_enter` end: name={}, id={:?}", span.name(), id);
     }
 
     fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
-        log::trace!("entered `on_exit` wth span Id {:?}", id);
         let span = ctx.span(id).unwrap();
+        log::trace!("`on_exit` start: name={}, id={:?}", span.name(), id);
         let mut ext = span.extensions_mut();
         let span_timing = ext.get_mut::<SpanTiming>().unwrap();
         span_timing.acc_active_time += (Instant::now() - span_timing.entered_at).as_micros() as u64;
-        log::trace!("`on_exit` executed for span id {:?}", id);
+        log::trace!("`on_exit` end: name={}, id={:?}", span.name(), id);
     }
 
     fn on_close(&self, id: Id, ctx: Context<'_, S>) {
-        log::trace!("entered `on_close` wth span Id {:?}", id);
-
         let span = ctx.span(&id).unwrap();
+        log::trace!("`on_close` start: name={}, id={:?}", span.name(), id);
         let meta = span.metadata();
         let callsite_id = meta.callsite();
 
@@ -555,7 +554,8 @@ where
         });
 
         log::trace!(
-            "`on_close` completed call to update_timings for span id {:?}",
+            "`on_close` completed call to update_timings: name={}, id={:?}",
+            span.name(),
             id
         );
 
@@ -565,7 +565,7 @@ where
             Arc::new(CallsiteInfo { name, code_line })
         });
 
-        log::trace!("`on_close` executed for span id {:?}", id);
+        log::trace!("`on_close` end: name={}, id={:?}", span.name(), id);
     }
 }
 
