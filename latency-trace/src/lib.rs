@@ -1,10 +1,8 @@
 //! This library supports latency measurement for functions and code blocks, both sync and async.
 //!
-//! Given code instrumented with the Rust [`tracing`](https://crates.io/crates/tracing) library, this library
-//! uses histograms from the [`hdrhistogram`](https://crates.io/crates/hdrhistogram) library to capture both total and active
-//! span timings, where:
-//! - total timings include suspend time and are based on span creation and closing;
-//! - active timings exclude suspend time and are based on span entry and exit.
+//! Given code instrumented with the Rust [tracing](https://crates.io/crates/tracing) library, this library
+//! uses histograms from the [hdrhistogram](https://crates.io/crates/hdrhistogram) library to capture span
+//! latency timings.
 //!
 //! Latencies are collected in **microseconds** for all spans with level `trace` or higher.
 

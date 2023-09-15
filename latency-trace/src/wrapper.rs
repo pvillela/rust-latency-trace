@@ -42,6 +42,7 @@ impl<T, P> Deref for Wrapper<T, P> {
 //=================
 // Mappable
 
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MappablePhantom;
 
@@ -49,7 +50,8 @@ pub struct MappablePhantom;
 pub type Mappable<T> = Wrapper<T, MappablePhantom>;
 
 impl<T> Mappable<T> {
-    /// Transforms `self` into a target [`Mappable<U>`].
+    /// Transforms `self` into a target [`Mappable<U>`] whose wrapped value is the result of applying `f` to
+    /// `self`'s wrapped value.
     pub fn map<U>(&self, mut f: impl FnMut(&T) -> U) -> Mappable<U> {
         Wrapper::wrap(f(&self.0))
     }

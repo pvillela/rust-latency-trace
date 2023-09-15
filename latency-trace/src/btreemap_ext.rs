@@ -38,7 +38,7 @@ impl<'a, K, V> IntoIterator for &'a mut BTreeMapExt<K, V> {
 }
 
 impl<K, V> BTreeMapExt<K, V> {
-    /// Returns a new [BTreeMapExt] with the same keys as `self` but with values corresponding to the
+    /// Returns a new [BTreeMapExt] with the same keys as `self` and values corresponding to the
     /// invocation of function `f` on the original values.
     pub fn map_values<V1>(&self, mut f: impl FnMut(&V) -> V1) -> BTreeMapExt<K, V1>
     where

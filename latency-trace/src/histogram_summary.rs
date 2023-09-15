@@ -20,6 +20,7 @@ pub struct SummaryStats {
 }
 
 impl SummaryStats {
+    /// Computes summary statistics from the given histogram.
     pub fn new(hist: &Histogram<u64>) -> Self {
         Self {
             count: hist.len(),
@@ -40,7 +41,7 @@ impl SummaryStats {
     }
 }
 
-/// Computes [`SummaryStats`] from a [`Histogram`].
+/// Computes a [`SummaryStats`] from a [`Histogram`].
 pub fn histogram_summary(hist: &Histogram<u64>) -> SummaryStats {
     SummaryStats::new(hist)
 }

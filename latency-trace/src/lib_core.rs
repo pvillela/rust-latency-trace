@@ -135,11 +135,12 @@ struct SpanGroupTemp {
 //=================
 // Timing
 
-/// Holds latency information **microseconds**, wrapping a [Histogram].
+/// Wraps an auto-resizable [`Histogram<u64>`].
 pub type Timing = Mappable<Histogram<u64>>;
 
 impl Timing {
-    /// Constructs a [`Timing`].
+    /// Constructs a [`Timing`]. The arguments correspond to [hdrhistogram::Histogram::high] and
+    ///  [hdrhistogram::Histogram::sigfig].
     fn new(hist_high: u64, hist_sigfig: u8) -> Self {
         let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
         hist.auto(true);
@@ -226,7 +227,7 @@ impl Latencies {
 
     /// Returns a mapping from the span groups to the [`Timing`] information
     /// collected for them. The span groups are ordered such that parent span groups appear before their children.
-    pub fn timings(&self) -> &BTreeMap<SpanGroup, Timing> {
+    pub fn timings(&self) -> &BTreeMapExt<SpanGroup, Timing> {
         &self.timings
     }
 }

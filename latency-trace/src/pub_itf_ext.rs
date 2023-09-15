@@ -6,7 +6,7 @@ use tracing::span::Attributes;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry};
 
 /// Provides the ability to measure latencies for code (both sync and async) instrumented with the
-/// [`tracing`](https://crates.io/crates/tracing) library.
+/// [tracing](https://crates.io/crates/tracing) library.
 ///
 /// Its configuration encapsulates a span grouper function
 /// (`impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static`)
@@ -17,7 +17,9 @@ pub struct LatencyTrace(LatencyTraceCfg);
 impl LatencyTrace {
     /// Instantiates a [LatencyTrace] with default configuration. The defaults are:
     /// - Grouping of spans using the [`default_span_grouper`], which simply groups by the span's
-    /// callsite information (see [`CallsiteInfo`](crate::CallsiteInfo), which distills [tracing::Callsite]).
+    /// callsite information (see [`CallsiteInfo`](crate::CallsiteInfo), which distills the
+    /// *tracing* framework's Callsite concept
+    /// (see [Metadata and Callsite](https://docs.rs/tracing-core/0.1.31/tracing_core/)).
     /// - Histograms use a `hist_high` of `20,000,000` (20 seconds) and a `hist_sigfig` of 2.
     ///
     /// See [hdrhistogram::Histogram::high] and [hdrhistogram::Histogram::sigfig] for an explanation of these
@@ -78,7 +80,7 @@ impl LatencyTrace {
         ltp.generate_latencies()
     }
 
-    /// Measures latencies of spans in async function `f` running on the [tokio] runtime.
+    /// Measures latencies of spans in async function `f` running on the *tokio* runtime.
     /// Will panic if this function or [Self::measure_latencies] have been previously called in the same process.
     pub fn measure_latencies_tokio<F>(self, f: impl FnOnce() -> F + Send + 'static) -> Latencies
     where
