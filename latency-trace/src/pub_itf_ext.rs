@@ -41,8 +41,7 @@ impl LatencyTrace {
     ) -> Self {
         let cfg = LatencyTraceCfg {
             span_grouper: Arc::new(span_grouper),
-            hist_high: self.0.hist_high,
-            hist_sigfig: self.0.hist_sigfig,
+            ..self.0
         };
         Self(cfg)
     }
