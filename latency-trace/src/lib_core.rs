@@ -173,7 +173,7 @@ impl Timing {
     fn new(hist_high: u64, hist_sigfig: u8) -> Self {
         let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
         hist.auto(true);
-        let hist2 = hist.clone();
+        let hist2 = Histogram::new_from(&hist);
 
         Self {
             total_time: hist,

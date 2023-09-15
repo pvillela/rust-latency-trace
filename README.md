@@ -6,8 +6,3 @@ Given code instrumented wth the Rust [tracing](https://crates.io/crates/tracing)
 
 - total timings include suspend time and are based on span creation and closing;
 - active timings exclude suspend time and are based on span entry and exit.
-
-## TODOs
-
-- Add core concepts and examples to lib docs.
-- Support filtering of spans
