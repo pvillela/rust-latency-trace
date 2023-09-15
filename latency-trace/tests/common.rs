@@ -146,8 +146,8 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
             parent_name.map(|parent_name| parent_name_set.insert(parent_name));
             parent_props.map(|parent_props| parent_props_set.insert(parent_props));
 
-            let total_time_mean = timing.total_time().mean();
-            let total_time_count = timing.total_time().len();
+            let total_time_mean = timing.value().mean();
+            let total_time_count = timing.value().len();
             let active_time_mean = timing.active_time().mean();
             let active_time_count = timing.active_time().len();
 

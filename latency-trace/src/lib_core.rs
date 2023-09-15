@@ -13,6 +13,8 @@ use thread_local_drop::{self, Control, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
+use crate::{BTreeMapExt, Mappable};
+
 //=================
 // Callsite
 
@@ -48,17 +50,21 @@ type PropsPath = Vec<Arc<Vec<(String, String)>>>;
 
 /// Represents a set of [tracing::Span]s for which latency information should be collected as a group.
 ///
-/// The coarsest-grained grouping of spans is characterized by a callsite (see [tracing::Callsite]), but
-/// finer-grained groupings can be defined by adding a list of name-value pairs to the definition of a group.
-/// Such a properties list can be computed from the span's [tracing::span::Attributes].
-/// (Latency information can be aggregated across groupings of span groups by using
-/// [Latencies::aggregate_timings].)
+/// The coarsest-grained grouping of spans is characterized by a callsite and its ancestors
+/// (see [callsite](https://docs.rs/tracing/0.1.37/tracing/struct.Metadata.html#method.callsite)
+/// and [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships)).
+/// Finer-grained groupings can be defined by adding a list of name-value pairs to the definition of a group.
+/// Such a properties list can be computed from the span's
+/// [Attributes](https://docs.rs/tracing/0.1.37/tracing/span/struct.Attributes.html).
+/// While the preceding sentences describe the granularity of latency information collection, the collected
+/// latency information can be subsequently aggregated further by grouping span groups using
+/// [Timings::aggregate].)
 ///
-/// Span groups form a forest of trees where some pairs of span groups have a parent-child relationship.
+/// Span groups form a forest of trees where some pairs of span groups have a parent-child relationship,
+/// corresponding to the parent-child relationships of the spans associated with the span groups
+/// (see [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships)).
 /// This means that if SpanGroup A is the parent of SpanGroup B then, for each span that was assigned to group B,
-/// its parent span
-/// (see [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships))
-/// was assigned to group A.
+/// its parent span was assigned to group A.
 ///
 /// This struct holds the following information:
 /// - [`callsite`](Self::callsite) information
@@ -129,56 +135,72 @@ struct SpanGroupTemp {
 //=================
 // Timing
 
-/// Holds latency timing information for a given item, e.g., a span group or a group of span groups.
-///
-/// Information is held in two fields of type `T`:
-/// - [`total_time`](Self::total_time), with latency information including async waits
-/// - [`active_time`](Self::active_time), with latency information excluding async waits
-///
-/// The default type parameterization is the [`Timing`] type.
-#[derive(Clone, Debug)]
-pub struct TimingView<T> {
-    pub(crate) total_time: T,
-    pub(crate) active_time: T,
-}
-
-/// This is the default [`TimingView`] used to capture the collected latency information in **microseconds**.
-///
-/// It can be transformed into other timing views by using the [TimingView::map] method.
-pub type Timing = TimingView<Histogram<u64>>;
-
-impl<T> TimingView<T> {
-    /// Returns latency info including async waits.
-    pub fn total_time(&self) -> &T {
-        &self.total_time
-    }
-
-    /// Returns latency info excluding async waits.
-    pub fn active_time(&self) -> &T {
-        &self.active_time
-    }
-
-    /// Transforms the [`total_time`](Self::total_time) and [`active_time`](Self::active_time)
-    /// latency info into a target [`TimingView<U>`].
-    pub fn map<U>(&self, f: impl Fn(&T) -> U) -> TimingView<U> {
-        TimingView {
-            total_time: f(&self.total_time),
-            active_time: f(&self.active_time),
-        }
-    }
-}
+/// Holds latency information **microseconds**, wrapping a [Histogram].
+pub type Timing = Mappable<Histogram<u64>>;
 
 impl Timing {
     /// Constructs a [`Timing`].
     fn new(hist_high: u64, hist_sigfig: u8) -> Self {
         let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
         hist.auto(true);
-        let hist2 = Histogram::new_from(&hist);
 
-        Self {
-            total_time: hist,
-            active_time: hist2,
+        Self::wrap(hist)
+    }
+}
+
+//=================
+// Timings
+
+/// Type of timing information recorded for span groups.
+pub type Timings = BTreeMapExt<SpanGroup, Timing>;
+
+impl Timings {
+    /// Combines histograms of span group according to sets of span groups that yield the same value when `f`
+    /// is applied. The values resulting from applying `f` to span groups are called ***aggregate key***s and
+    /// the sets of span groups corresponding to each *aggregate key* are called ***aggregates***.
+    ///
+    /// An aggregation is consistent if and only if, for each *aggregate*, all the span groups in the *aggregate*
+    /// have the same callsite.
+    ///
+    /// This function returns a pair with the following components:
+    /// - a [BTreeMapExt] that associates each *aggregate key* to its aggregated histogram;
+    /// - a boolean that is `true` if the aggregation is consistent, `false` otherwise.
+    pub fn aggregate<G>(
+        &self,
+        f: impl Fn(&SpanGroup) -> G,
+    ) -> (BTreeMapExt<G, Histogram<u64>>, bool)
+    where
+        G: Ord + Clone,
+    {
+        let mut res: BTreeMap<G, Histogram<u64>> = BTreeMap::new();
+        let mut aggregates: BTreeMap<G, Arc<CallsiteInfo>> = BTreeMap::new();
+        let mut aggregates_are_consistent = true;
+        for (k, v) in self {
+            // Construct aggregation map.
+            let g = f(k);
+            let hist = match res.get_mut(&g) {
+                Some(hist) => hist,
+                None => {
+                    res.insert(g.clone(), Histogram::new_from(&v.0));
+                    res.get_mut(&g).unwrap()
+                }
+            };
+            hist.add(&v.0).unwrap();
+
+            // Check aggregation consistency.
+            if aggregates_are_consistent {
+                let callsite = match aggregates.get(&g) {
+                    Some(callsite) => callsite,
+                    None => {
+                        aggregates.insert(g.clone(), k.callsite.clone());
+                        aggregates.get(&g).unwrap()
+                    }
+                };
+                aggregates_are_consistent = callsite.as_ref() == k.callsite();
+            }
         }
+
+        (res.into(), aggregates_are_consistent)
     }
 }
 
@@ -193,9 +215,7 @@ impl Timing {
 #[derive(Debug)]
 pub struct Latencies {
     pub(crate) span_groups: Vec<SpanGroup>,
-    pub(crate) timings: BTreeMap<SpanGroup, Timing>,
-    pub(crate) hist_high: u64,
-    pub(crate) hist_sigfig: u8,
+    pub(crate) timings: BTreeMapExt<SpanGroup, Timing>,
 }
 
 impl Latencies {
@@ -208,27 +228,6 @@ impl Latencies {
     /// collected for them. The span groups are ordered such that parent span groups appear before their children.
     pub fn timings(&self) -> &BTreeMap<SpanGroup, Timing> {
         &self.timings
-    }
-
-    /// Aggregates span group [`Timing`]s by sets of span groups that have the same value when `f` is applied.
-    pub fn aggregate_timings<G>(&self, f: impl Fn(&SpanGroup) -> G) -> BTreeMap<G, Timing>
-    where
-        G: Ord + Clone,
-    {
-        let mut res: BTreeMap<G, Timing> = BTreeMap::new();
-        for (k, v) in &self.timings {
-            let g = f(k);
-            let timing = match res.get_mut(&g) {
-                Some(timing) => timing,
-                None => {
-                    res.insert(g.clone(), Timing::new(self.hist_high, self.hist_sigfig));
-                    res.get_mut(&g).unwrap()
-                }
-            };
-            timing.total_time.add(v.total_time()).unwrap();
-            timing.active_time.add(v.active_time()).unwrap();
-        }
-        res
     }
 }
 
@@ -286,8 +285,7 @@ impl LatencyTraceCfg {
                     .timings
                     .entry(k)
                     .or_insert_with(|| Timing::new(hist_high, hist_sigfig));
-                timing.total_time.add(v.total_time).unwrap();
-                timing.active_time.add(v.active_time).unwrap();
+                timing.0.add(v.0).unwrap();
             }
         }
     }
@@ -455,9 +453,7 @@ impl LatencyTracePriv {
 
         Latencies {
             span_groups,
-            timings,
-            hist_high: self.hist_high,
-            hist_sigfig: self.hist_sigfig,
+            timings: timings.into(),
         }
     }
 
@@ -544,12 +540,8 @@ where
 
         self.update_timings(&span_group_priv, |timing| {
             timing
-                .total_time
+                .0
                 .record((Instant::now() - span_timing.created_at).as_micros() as u64)
-                .unwrap();
-            timing
-                .active_time
-                .record(span_timing.acc_active_time)
                 .unwrap();
         });
 

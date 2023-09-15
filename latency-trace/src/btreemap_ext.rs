@@ -1,25 +1,14 @@
-//! Wrapper for [`BTreeMap`] that provides additional methods.
+use std::collections::BTreeMap;
 
-use std::{collections::BTreeMap, ops::Deref};
+use crate::Wrapper;
+
+//=================
+// BTreeMapExt
 
 /// Wrapper of [BTreeMap] that provides an additional [`map_values`](Self::map_values) method.
-/// As this type [Deref]s to [BTreeMap] and implements [IntoIterator]s with the same results as
+/// As this type [Deref](std::ops::Deref)s to [BTreeMap] and implements [IntoIterator]s with the same results as
 /// those of [BTreeMap], it supports `for` loops and all immutable [BTreeMap] methods.
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct BTreeMapExt<K, V>(pub BTreeMap<K, V>);
-
-impl<K, V> From<BTreeMap<K, V>> for BTreeMapExt<K, V> {
-    fn from(value: BTreeMap<K, V>) -> Self {
-        Self(value)
-    }
-}
-
-impl<K, V> Deref for BTreeMapExt<K, V> {
-    type Target = BTreeMap<K, V>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+pub type BTreeMapExt<K, V> = Wrapper<BTreeMap<K, V>>;
 
 impl<K, V> IntoIterator for BTreeMapExt<K, V> {
     type Item = (K, V);

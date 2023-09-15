@@ -20,8 +20,8 @@ pub use pub_itf_ext::*;
 mod histogram_summary;
 pub use histogram_summary::*;
 
-mod map_ext;
-pub use map_ext::*;
+mod wrapper;
+pub use wrapper::*;
 
-mod timings;
-pub use timings::*;
+mod btreemap_ext;
+pub use btreemap_ext::*;
