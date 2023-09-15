@@ -33,7 +33,8 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
         "Number of span groups"
     );
 
-    let agg_timings = ltcs.aggregate_timings(|sg| sg.name());
+    let (agg_timings, consistent_timings) = ltcs.timings().aggregate(|sg| sg.name());
+    assert!(consistent_timings, "consistent_timings");
     assert_eq!(
         agg_timings.len(),
         span_name_test_specs.len(),
@@ -52,8 +53,7 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
             expected_props,
             expected_parent_names,
             expected_parent_props,
-            expected_total_time_mean,
-            expected_active_time_mean,
+            expected_mean: expected_total_time_mean,
             expected_timing_count,
             expected_agg_by_name_count,
         } = spec;
@@ -88,10 +88,8 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
         {
             let agg_timing = agg_timings.get(name).unwrap();
 
-            let total_time_mean = agg_timing.total_time().mean();
-            let total_time_count = agg_timing.total_time().len();
-            let active_time_mean = agg_timing.active_time().mean();
-            let active_time_count = agg_timing.active_time().len();
+            let total_time_mean = agg_timing.mean();
+            let total_time_count = agg_timing.len();
 
             assert!(
                 are_close(total_time_mean, expected_total_time_mean, 0.2),
@@ -102,16 +100,6 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
             assert_eq!(
                 total_time_count, expected_agg_by_name_count,
                 "{name} aggregate total_time_count: {total_time_count}, {expected_agg_by_name_count}"
-            );
-
-            assert!(
-                are_close(active_time_mean, expected_active_time_mean, 0.2),
-                "{name} aggregate active_time_mean: {active_time_mean}, {expected_active_time_mean}"
-            );
-
-            assert_eq!(
-                active_time_count, expected_agg_by_name_count,
-                "{name} aggregate active_time_count: {active_time_count}, {expected_agg_by_name_count}"
             );
         }
 
@@ -148,8 +136,6 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
 
             let total_time_mean = timing.value().mean();
             let total_time_count = timing.value().len();
-            let active_time_mean = timing.active_time().mean();
-            let active_time_count = timing.active_time().len();
 
             {
                 assert!(
@@ -160,16 +146,6 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
                 assert_eq!(
                     total_time_count, expected_timing_count,
                     "{name} total_time_count: {total_time_count}, {expected_timing_count}"
-                );
-
-                assert!(
-                    are_close(active_time_mean, expected_active_time_mean, 0.2),
-                    "{name} active_time_mean: {active_time_mean}, {expected_active_time_mean}"
-                );
-
-                assert_eq!(
-                    active_time_count, expected_timing_count,
-                    "{name} active_time_count: {active_time_count}, {expected_timing_count}"
                 );
             };
         }

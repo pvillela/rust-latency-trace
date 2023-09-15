@@ -8,8 +8,7 @@ pub struct SpanNameTestSpec {
     /// Empty vector if parent is None
     pub expected_parent_props: Vec<Vec<(&'static str, &'static str)>>,
 
-    pub expected_total_time_mean: f64,
-    pub expected_active_time_mean: f64,
+    pub expected_mean: f64,
     pub expected_timing_count: u64,
     pub expected_agg_by_name_count: u64,
 }
@@ -54,8 +53,7 @@ pub fn span_name_test_spec_root_async_1(
         expected_props,
         expected_parent_names: vec![],
         expected_parent_props,
-        expected_total_time_mean: 150.0 * 8.0 * 1000.0,
-        expected_active_time_mean: 25.0 * 8.0 * 1000.0,
+        expected_mean: 150.0 * 8.0 * 1000.0,
         expected_timing_count: N_EXEC.e_root_async_1 / n_root_async_1,
         expected_agg_by_name_count: N_EXEC.e_root_async_1,
     }
@@ -70,8 +68,7 @@ pub fn span_name_test_spec_root_async_2(
         expected_props,
         expected_parent_names: vec![],
         expected_parent_props,
-        expected_total_time_mean: 150.0 * 8.0 * 1000.0,
-        expected_active_time_mean: 25.0 * 8.0 * 1000.0,
+        expected_mean: 150.0 * 8.0 * 1000.0,
         expected_timing_count: N_EXEC.e_root_async_2 / n_root_async_2,
         expected_agg_by_name_count: N_EXEC.e_root_async_2,
     }
@@ -86,8 +83,7 @@ pub fn span_name_test_spec_f(
         expected_props,
         expected_parent_names: vec!["root_async_1", "root_async_2"],
         expected_parent_props,
-        expected_total_time_mean: 150.0 * 8.0 * 1000.0,
-        expected_active_time_mean: 25.0 * 8.0 * 1000.0,
+        expected_mean: 150.0 * 8.0 * 1000.0,
         expected_timing_count: N_EXEC.e_f / n_f,
         expected_agg_by_name_count: N_EXEC.e_f,
     }
@@ -102,8 +98,7 @@ pub fn span_name_test_spec_outer_async_span(
         expected_props,
         expected_parent_names: vec!["f"],
         expected_parent_props,
-        expected_total_time_mean: 150.0 * 1000.0,
-        expected_active_time_mean: 25.0 * 1000.0,
+        expected_mean: 150.0 * 1000.0,
         expected_timing_count: N_EXEC.e_outer_async_span / n_outer_async_span,
         expected_agg_by_name_count: N_EXEC.e_outer_async_span,
     }
@@ -118,8 +113,7 @@ pub fn span_name_test_spec_inner_async_span(
         expected_props,
         expected_parent_names: vec!["outer_async_span"],
         expected_parent_props,
-        expected_total_time_mean: 37.0 * 1000.0,
-        expected_active_time_mean: 12.0 * 1000.0,
+        expected_mean: 37.0 * 1000.0,
         expected_timing_count: N_EXEC.e_inner_async_span / n_inner_async_span,
         expected_agg_by_name_count: N_EXEC.e_inner_async_span,
     }
@@ -134,8 +128,7 @@ pub fn span_name_test_spec_sync_span_1(
         expected_props,
         expected_parent_names: vec!["outer_async_span"],
         expected_parent_props,
-        expected_total_time_mean: 13.0 * 1000.0,
-        expected_active_time_mean: 13.0 * 1000.0,
+        expected_mean: 13.0 * 1000.0,
         expected_timing_count: N_EXEC.e_sync_span_1 / n_sync_span_1,
         expected_agg_by_name_count: N_EXEC.e_sync_span_1,
     }
@@ -150,8 +143,7 @@ pub fn span_name_test_spec_sync_span_2(
         expected_props,
         expected_parent_names: vec!["inner_async_span"],
         expected_parent_props,
-        expected_total_time_mean: 12.0 * 1000.0,
-        expected_active_time_mean: 12.0 * 1000.0,
+        expected_mean: 12.0 * 1000.0,
         expected_timing_count: N_EXEC.e_sync_span_2 / n_sync_span_2,
         expected_agg_by_name_count: N_EXEC.e_sync_span_2,
     }
