@@ -1,39 +1,35 @@
 //! Example of latency measurement for a simple sync function.
 
 use latency_trace::{histogram_summary, LatencyTrace};
-use rand::Rng;
-use std::{thread, time::Duration};
+use std::{hint::black_box, thread, time::Duration};
 use tracing::{instrument, trace_span};
-
-fn gen_random_to(max: u64) -> u64 {
-    let mut rng = rand::thread_rng();
-    rng.gen_range(0..=max)
-}
 
 #[instrument(level = "trace")]
 fn f() {
-    for _ in 0..100 {
-        trace_span!("empty").in_scope(|| {
-            // Empty span used to measure tracing overhead.
+    for i in 0..1000 {
+        trace_span!("loop_body").in_scope(|| {
+            trace_span!("empty").in_scope(|| {
+                // Empty span used to measure tracing overhead.
+                black_box(i);
+            });
+
+            // Simulated work
+            thread::sleep(Duration::from_millis(6));
+
+            black_box(g(i));
         });
-
-        // Simulated work
-        thread::sleep(Duration::from_millis(gen_random_to(12)));
-
-        g();
     }
 }
 
 #[instrument(level = "trace")]
-fn g() {
+fn g(i: i32) -> i32 {
     // Simulated work
-    thread::sleep(Duration::from_millis(gen_random_to(8)));
+    black_box(i);
+    thread::sleep(Duration::from_millis(4));
+    black_box(i)
 }
 
 fn main() {
-    // set_var("RUST_LOG", "latency_trace=trace");
-    // _ = env_logger::try_init();
-
     let latencies = LatencyTrace::new().measure_latencies(f);
     println!("Latency stats below are in microseconds");
     for (span_group, v) in latencies.timings() {
