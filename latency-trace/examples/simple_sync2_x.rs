@@ -1,24 +1,19 @@
 //! Example of latency measurement for a simple sync function tha does nothing,
 //! to demonstrate the overhead associated with tracing and the framework.
+//!
+//! This example has the same structure as `simple_sync2.rs` but without tracing.
+//! It runs in ~0.5 microseconds on my 2022 Dell Inspiron 16.
 
 use std::{hint::black_box, time::Instant};
-use tracing::{instrument, trace_span};
 
-#[instrument(level = "trace")]
 fn f() {
     for i in 0..1000 {
-        trace_span!("loop_body").in_scope(|| {
-            trace_span!("empty").in_scope(|| {
-                // Empty span used to measure tracing overhead.
-                black_box(i);
-            });
+        black_box(i);
 
-            black_box(g(i));
-        });
+        black_box(g(i));
     }
 }
 
-#[instrument(level = "trace")]
 fn g(x: i32) -> i32 {
     black_box(x)
 }

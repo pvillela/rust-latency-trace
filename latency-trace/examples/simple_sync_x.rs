@@ -1,4 +1,4 @@
-//! Example of latency measurement without tracing, for comparison purposes.
+//! Example of latency measurement without tracing, for comparison with `simple_sync.rs`.
 
 use std::{
     hint::black_box,
