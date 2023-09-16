@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData, ops::Deref};
+use std::{borrow::Borrow, fmt::Debug, marker::PhantomData, ops::Deref};
 
 //=================
 // Wrapper
@@ -35,6 +35,18 @@ impl<T, P> From<T> for Wrapper<T, P> {
 impl<T, P> Deref for Wrapper<T, P> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T, P> AsRef<T> for Wrapper<T, P> {
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T, P> Borrow<T> for Wrapper<T, P> {
+    fn borrow(&self) -> &T {
         &self.0
     }
 }

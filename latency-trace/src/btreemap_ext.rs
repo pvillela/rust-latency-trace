@@ -1,6 +1,6 @@
-use std::{collections::BTreeMap, ops::Deref};
-
-use crate::Wrapper;
+use crate::{histogram_summary, SpanGroup, Wrapper};
+use hdrhistogram::Histogram;
+use std::{borrow::Borrow, collections::BTreeMap};
 
 //=================
 // BTreeMapExt
@@ -40,15 +40,20 @@ impl<'a, K, V> IntoIterator for &'a mut BTreeMapExt<K, V> {
 impl<K, V> BTreeMapExt<K, V> {
     /// Returns a new [BTreeMapExt] with the same keys as `self` and values corresponding to the
     /// invocation of function `f` on the original values.
-    pub fn map_values<V1, RV>(&self, mut f: impl FnMut(&RV) -> V1) -> BTreeMapExt<K, V1>
+    pub fn map_values<'a, V1, RV>(&'a self, f: impl Fn(&RV) -> V1) -> BTreeMapExt<K, V1>
     where
         K: Ord + Clone,
-        V: Deref<Target = RV>,
+        V: 'static,
+        V: Borrow<RV>,
     {
         self.0
             .iter()
-            .map(|(k, v)| (k.clone(), f(v)))
+            .map(|(k, v)| (k.clone(), f(v.borrow())))
             .collect::<BTreeMap<_, _>>()
             .into()
     }
+}
+
+fn _type_check(b: BTreeMapExt<SpanGroup, Histogram<u64>>) {
+    _ = b.map_values(histogram_summary);
 }
