@@ -190,14 +190,13 @@ impl Timings {
 
             // Check aggregation consistency.
             if aggregates_are_consistent {
-                let callsite = match aggregates.get(&g) {
-                    Some(callsite) => callsite,
+                aggregates_are_consistent = match aggregates.get(&g) {
+                    Some(callsite) => callsite.as_ref() == k.callsite(),
                     None => {
                         aggregates.insert(g.clone(), k.callsite.clone());
-                        aggregates.get(&g).unwrap()
+                        true
                     }
                 };
-                aggregates_are_consistent = callsite.as_ref() == k.callsite();
             }
         }
 
@@ -254,9 +253,7 @@ impl LatenciesPriv {
 struct SpanTiming {
     callsite_id_path: CallsiteIdPath,
     props_path: PropsPath,
-    created_at: Instant,
-    entered_at: Instant,
-    acc_active_time: u64,
+    first_entered_at: Option<Instant>,
 }
 
 //=================
@@ -499,9 +496,7 @@ where
         span.extensions_mut().insert(SpanTiming {
             callsite_id_path,
             props_path,
-            created_at: Instant::now(),
-            entered_at: Instant::now(),
-            acc_active_time: 0,
+            first_entered_at: None,
         });
 
         log::trace!("`on_new_span` end: name={}, id={:?}", span.name(), id);
@@ -512,18 +507,13 @@ where
         log::trace!("`on_enter` start: name={}, id={:?}", span.name(), id);
         let mut ext = span.extensions_mut();
         let span_timing = ext.get_mut::<SpanTiming>().unwrap();
-        span_timing.entered_at = Instant::now();
+        if span_timing.first_entered_at.is_none() {
+            span_timing.first_entered_at = Some(Instant::now());
+        }
         log::trace!("`on_enter` end: name={}, id={:?}", span.name(), id);
     }
 
-    fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
-        let span = ctx.span(id).unwrap();
-        log::trace!("`on_exit` start: name={}, id={:?}", span.name(), id);
-        let mut ext = span.extensions_mut();
-        let span_timing = ext.get_mut::<SpanTiming>().unwrap();
-        span_timing.acc_active_time += (Instant::now() - span_timing.entered_at).as_micros() as u64;
-        log::trace!("`on_exit` end: name={}, id={:?}", span.name(), id);
-    }
+    // No need for fn on_exit(&self, id: &Id, ctx: Context<'_, S>)
 
     fn on_close(&self, id: Id, ctx: Context<'_, S>) {
         let span = ctx.span(&id).unwrap();
@@ -542,7 +532,7 @@ where
         self.update_timings(&span_group_priv, |timing| {
             timing
                 .0
-                .record((Instant::now() - span_timing.created_at).as_micros() as u64)
+                .record((Instant::now() - span_timing.first_entered_at.unwrap()).as_micros() as u64)
                 .unwrap();
         });
 

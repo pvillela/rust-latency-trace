@@ -1,52 +1,38 @@
-//! Example of latency measurement for a simple sync function.
+//! Example of latency measurement for a simple async function.
 
 use latency_trace::{histogram_summary, LatencyTrace};
 use rand::Rng;
-use std::{env::set_var, thread, time::Duration};
-use tracing::{instrument, trace_span, Instrument};
+use std::time::Duration;
+use tracing::{instrument, trace_span};
 
 fn gen_random_to(max: u64) -> u64 {
-    // let mut rng = rand::thread_rng();
-    // rng.gen_range(0..=max)
-    max
+    let mut rng = rand::thread_rng();
+    rng.gen_range(0..=max)
 }
 
 #[instrument(level = "trace")]
 async fn f() {
-    for _ in 0..1 {
+    for _ in 0..100 {
         trace_span!("empty").in_scope(|| {
             // Empty span used to measure tracing overhead.
         });
 
         // Simulated work
-        thread::sleep(Duration::from_millis(gen_random_to(12)));
+        tokio::time::sleep(Duration::from_millis(gen_random_to(12))).await;
 
-        // let h = tokio::spawn(g()).instrument(trace_span!("spawn_g_1"));
-        // h.await.unwrap();
-
-        // g().await;
-        // g().await;
-
-        let h = tokio::spawn(g()).instrument(trace_span!("spawn_g_2"));
         g().await;
-        h.await.unwrap();
-
-        // g().await;
     }
 }
 
 #[instrument(level = "trace")]
 async fn g() {
-    println!("g before tokio sleep");
-    tokio::time::sleep(Duration::from_millis(gen_random_to(4))).await;
-    println!("g after tokio sleep");
     // Simulated work
-    thread::sleep(Duration::from_millis(gen_random_to(4)));
+    tokio::time::sleep(Duration::from_millis(gen_random_to(8))).await;
 }
 
 fn main() {
-    set_var("RUST_LOG", "latency_trace=trace");
-    _ = env_logger::try_init();
+    // set_var("RUST_LOG", "latency_trace=trace");
+    // _ = env_logger::try_init();
 
     let latencies = LatencyTrace::new().measure_latencies_tokio(f);
     println!("Latency stats below are in microseconds");

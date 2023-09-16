@@ -1,4 +1,4 @@
-//! Example of latency measurement for a simple sync function.
+//! Example of latency measurement for a simple async function.
 
 use latency_trace::{histogram_summary, LatencyTrace};
 use rand::Rng;
@@ -11,7 +11,7 @@ fn gen_random_to(max: u64) -> u64 {
 }
 
 #[instrument(level = "trace")]
-fn f() {
+async fn f() {
     for _ in 0..100 {
         trace_span!("empty").in_scope(|| {
             // Empty span used to measure tracing overhead.
@@ -20,12 +20,12 @@ fn f() {
         // Simulated work
         thread::sleep(Duration::from_millis(gen_random_to(12)));
 
-        g();
+        g().await;
     }
 }
 
 #[instrument(level = "trace")]
-fn g() {
+async fn g() {
     // Simulated work
     thread::sleep(Duration::from_millis(gen_random_to(8)));
 }
@@ -34,7 +34,7 @@ fn main() {
     // set_var("RUST_LOG", "latency_trace=trace");
     // _ = env_logger::try_init();
 
-    let latencies = LatencyTrace::new().measure_latencies(f);
+    let latencies = LatencyTrace::new().measure_latencies_tokio(f);
     println!("Latency stats below are in microseconds");
     for (span_group, v) in latencies.timings() {
         let summary = v.map(histogram_summary);
