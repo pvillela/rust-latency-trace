@@ -6,17 +6,17 @@
 //!
 //! Latencies are collected in **microseconds** for all spans with level `trace` or higher.
 
-mod lib_core;
-pub use lib_core::*;
+mod core_internals;
+pub use core_internals::*;
 
 mod span_groupers;
 pub use span_groupers::*;
 
-mod pub_itf_ext;
-pub use pub_itf_ext::*;
+mod latency_trace;
+pub use latency_trace::*;
 
-mod histogram_summary;
-pub use histogram_summary::*;
+mod summary_stats;
+pub use summary_stats::*;
 
 mod wrapper;
 pub use wrapper::*;
