@@ -13,7 +13,7 @@ use thread_local_drop::{self, Control, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
-use crate::{BTreeMapExt, Mappable};
+use crate::{histogram_summary, BTreeMapExt, Mappable, SummaryStats};
 
 //=================
 // Callsite
@@ -228,6 +228,10 @@ impl Latencies {
     /// collected for them. The span groups are ordered such that parent span groups appear before their children.
     pub fn timings(&self) -> &BTreeMapExt<SpanGroup, Timing> {
         &self.timings
+    }
+
+    pub fn summary_stats(&self) -> BTreeMapExt<SpanGroup, SummaryStats> {
+        self.timings.map_values(histogram_summary)
     }
 }
 

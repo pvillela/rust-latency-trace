@@ -1,6 +1,6 @@
 //! Example of latency measurement for a simple sync function.
 
-use latency_trace::{histogram_summary, LatencyTrace};
+use latency_trace::LatencyTrace;
 use std::{
     thread,
     time::{Duration, Instant},
@@ -43,12 +43,11 @@ fn main() {
     );
 
     println!("\nLatency stats below are in microseconds");
-    for (span_group, v) in latencies.timings() {
-        let summary = v.map(histogram_summary);
-        println!("  * {:?}, {:?}", span_group, summary);
+    for (span_group, stats) in latencies.summary_stats() {
+        println!("  * {:?}, {:?}", span_group, stats);
     }
 
     // A shorter way to print the summary stats, with uglier formatting.
-    println!("\nSummary stats in microseconds mapped directly from `latencies.timings():`");
-    println!("{:?}", latencies.timings().map_values(histogram_summary));
+    println!("\nDebug print of `latencies.summary_stats()`:");
+    println!("{:?}", latencies.summary_stats());
 }
