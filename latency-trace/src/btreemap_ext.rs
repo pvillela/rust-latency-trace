@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::Deref};
 
 use crate::Wrapper;
 
@@ -40,9 +40,10 @@ impl<'a, K, V> IntoIterator for &'a mut BTreeMapExt<K, V> {
 impl<K, V> BTreeMapExt<K, V> {
     /// Returns a new [BTreeMapExt] with the same keys as `self` and values corresponding to the
     /// invocation of function `f` on the original values.
-    pub fn map_values<V1>(&self, mut f: impl FnMut(&V) -> V1) -> BTreeMapExt<K, V1>
+    pub fn map_values<V1, RV>(&self, mut f: impl FnMut(&RV) -> V1) -> BTreeMapExt<K, V1>
     where
         K: Ord + Clone,
+        V: Deref<Target = RV>,
     {
         self.0
             .iter()

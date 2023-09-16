@@ -41,7 +41,7 @@ fn main() {
         Instant::now().duration_since(start)
     );
 
-    println!("Latency stats below are in microseconds");
+    println!("\nLatency stats below are in microseconds");
     for (span_group, v) in latencies.timings() {
         let summary = v.map(histogram_summary);
         println!("  * {:?}, {:?}", span_group, summary);
