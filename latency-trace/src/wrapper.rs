@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, fmt::Debug, marker::PhantomData, ops::Deref};
+use std::{borrow::Borrow, fmt::Debug, marker::PhantomData, ops::Deref, rc::Rc, sync::Arc};
 
 //=================
 // Wrapper
@@ -48,6 +48,24 @@ impl<T, P> AsRef<T> for Wrapper<T, P> {
 impl<T, P> Borrow<T> for Wrapper<T, P> {
     fn borrow(&self) -> &T {
         &self.0
+    }
+}
+
+impl<T, P> Borrow<T> for Wrapper<Box<T>, P> {
+    fn borrow(&self) -> &T {
+        &self.0.borrow()
+    }
+}
+
+impl<T, P> Borrow<T> for Wrapper<Arc<T>, P> {
+    fn borrow(&self) -> &T {
+        &self.0.borrow()
+    }
+}
+
+impl<T, P> Borrow<T> for Wrapper<Rc<T>, P> {
+    fn borrow(&self) -> &T {
+        &self.0.borrow()
     }
 }
 

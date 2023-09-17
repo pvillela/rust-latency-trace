@@ -113,8 +113,8 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
                 span_group
             );
 
-            let props: Vec<(String, String)> = span_group.props().clone();
-            props_set.insert(props);
+            let props = span_group.props();
+            props_set.insert(props.into());
 
             let parent_idx = span_group.parent_idx();
             parent_idx.map(|parent_idx| {
@@ -128,7 +128,7 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
                 .parent_idx()
                 .map(|parent_idx| ltcs.span_groups()[parent_idx].clone());
             let parent_name = parent.as_ref().map(|p| p.name());
-            let parent_props = parent.map(|p| p.props().clone());
+            let parent_props: Option<Vec<(String, String)>> = parent.map(|p| p.props().into());
 
             // Insert parent_name and parent_props into corresponding sets
             parent_name.map(|parent_name| parent_name_set.insert(parent_name));
