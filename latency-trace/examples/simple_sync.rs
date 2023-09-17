@@ -7,6 +7,14 @@ use std::{
 };
 use tracing::{instrument, trace_span};
 
+/// Returns command line argument or default
+fn arg() -> u64 {
+    match std::env::args().nth(1) {
+        Some(v) => u64::from_str_radix(&v, 10).expect("argument must be integer"),
+        None => 2000,
+    }
+}
+
 #[instrument(level = "trace")]
 fn f() {
     for _ in 0..1000 {
@@ -16,7 +24,7 @@ fn f() {
             });
 
             // Simulated work
-            thread::sleep(Duration::from_millis(6));
+            thread::sleep(Duration::from_micros(arg() * 3));
 
             g();
         });
@@ -26,7 +34,7 @@ fn f() {
 #[instrument(level = "trace")]
 fn g() {
     // Simulated work
-    thread::sleep(Duration::from_millis(4));
+    thread::sleep(Duration::from_micros(arg() * 2));
 }
 
 fn main() {
@@ -37,10 +45,12 @@ fn main() {
 
     let latencies = LatencyTrace::new().measure_latencies(f);
 
-    println!(
-        "*** Elapsed time: {:?}",
-        Instant::now().duration_since(start)
+    print!(
+        "\n=== {} {} ===========================================================",
+        std::env::args().nth(0).unwrap(),
+        arg()
     );
+    println!("\nElapsed time: {:?}", Instant::now().duration_since(start));
 
     println!("\nLatency stats below are in microseconds");
     for (span_group, stats) in latencies.summary_stats() {
