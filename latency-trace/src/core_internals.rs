@@ -45,8 +45,9 @@ fn callsite_id_to_usize(id: &Identifier) -> usize {
 //=================
 // SpanGroup
 
-type CallsiteIdPath = Vec<Identifier>;
-type PropsPath = Vec<Arc<Vec<(String, String)>>>;
+type CallsiteIdPath = Arc<[Identifier]>;
+type Props = Arc<[(String, String)]>;
+type PropsPath = Arc<[Props]>;
 
 /// Represents a set of [tracing::Span]s for which latency information should be collected as a group.
 ///
@@ -75,7 +76,7 @@ type PropsPath = Vec<Arc<Vec<(String, String)>>>;
 pub struct SpanGroup {
     pub(crate) idx: usize,
     pub(crate) callsite: Arc<CallsiteInfo>,
-    pub(crate) props: Arc<Vec<(String, String)>>,
+    pub(crate) props: Arc<[(String, String)]>,
     pub(crate) parent_idx: Option<usize>,
 }
 
@@ -88,7 +89,7 @@ impl SpanGroup {
     /// Returns the span group's properties list.
     ///
     /// This list can be empty as is the case with the default span grouper.
-    pub fn props(&self) -> &Vec<(String, String)> {
+    pub fn props(&self) -> &[(String, String)] {
         &self.props
     }
 
@@ -220,7 +221,7 @@ pub struct Latencies {
 
 impl Latencies {
     /// Returns the list of [`SpanGroup`]s, ordered such that parent span groups appear before their children.
-    pub fn span_groups(&self) -> &Vec<SpanGroup> {
+    pub fn span_groups(&self) -> &[SpanGroup] {
         &self.span_groups
     }
 
@@ -433,8 +434,8 @@ impl LatencyTracePriv {
                 None
             } else {
                 Some(SpanGroupPriv {
-                    callsite_id_path: Vec::from(&sgp.callsite_id_path[..path_len - 1]),
-                    props_path: Vec::from(&sgp.props_path[..path_len - 1]),
+                    callsite_id_path: Vec::from(&sgp.callsite_id_path[..path_len - 1]).into(),
+                    props_path: Vec::from(&sgp.props_path[..path_len - 1]).into(),
                 })
             };
             let parent_idx = parent_sgp.map(|psgp| *sgp_to_idx.get(&psgp).unwrap());
@@ -485,21 +486,21 @@ where
         let callsite_id = span.metadata().callsite();
         let props = (self.span_grouper)(attrs);
         let (callsite_id_path, props_path) = match parent_span {
-            None => (vec![callsite_id], vec![Arc::new(props)]),
+            None => (vec![callsite_id], vec![props.into()]),
             Some(parent_span) => {
                 let ext = parent_span.extensions();
                 let pst = ext.get::<SpanTiming>().unwrap();
-                let mut callsite_id_path = pst.callsite_id_path.clone();
+                let mut callsite_id_path = Vec::from(pst.callsite_id_path.as_ref());
                 callsite_id_path.push(callsite_id);
-                let mut props_path = pst.props_path.clone();
-                props_path.push(Arc::new(props));
+                let mut props_path = Vec::from(pst.props_path.as_ref());
+                props_path.push(props.into());
                 (callsite_id_path, props_path)
             }
         };
 
         span.extensions_mut().insert(SpanTiming {
-            callsite_id_path,
-            props_path,
+            callsite_id_path: callsite_id_path.into(),
+            props_path: props_path.into(),
             first_entered_at: None,
         });
 
