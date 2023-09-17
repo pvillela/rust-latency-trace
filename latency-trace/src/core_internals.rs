@@ -129,7 +129,7 @@ struct SpanGroupPriv {
 /// children in sort order.
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 struct SpanGroupTemp {
-    callsite_uid_path: Vec<usize>,
+    callsite_uid_path: Box<[usize]>,
     props_path: PropsPath,
 }
 
@@ -215,7 +215,7 @@ impl Timings {
 
 #[derive(Debug)]
 pub struct Latencies {
-    pub(crate) span_groups: Vec<SpanGroup>,
+    pub(crate) span_groups: Box<[SpanGroup]>,
     pub(crate) timings: BTreeMapExt<SpanGroup, Timing>,
 }
 
@@ -266,7 +266,7 @@ struct SpanTiming {
 
 pub(crate) struct LatencyTraceCfg {
     pub(crate) span_grouper:
-        Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>,
+        Arc<dyn Fn(&Attributes) -> Box<[(String, String)]> + Send + Sync + 'static>,
     pub(crate) hist_high: u64,
     pub(crate) hist_sigfig: u8,
 }
@@ -301,7 +301,7 @@ impl LatencyTraceCfg {
 #[derive(Clone)]
 pub(crate) struct LatencyTracePriv {
     pub(crate) control: Control<LatenciesPriv, LatenciesPriv>,
-    span_grouper: Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>,
+    span_grouper: Arc<dyn Fn(&Attributes) -> Box<[(String, String)]> + Send + Sync + 'static>,
     hist_high: u64,
     hist_sigfig: u8,
 }
@@ -381,7 +381,7 @@ impl LatencyTracePriv {
                     .callsite_id_path
                     .iter()
                     .map(|cid| callsite_id_to_usize(cid))
-                    .collect::<Vec<usize>>();
+                    .collect::<Box<[usize]>>();
                 let sgt = SpanGroupTemp {
                     callsite_uid_path,
                     props_path: sgp.props_path.clone(),
@@ -400,7 +400,7 @@ impl LatencyTracePriv {
     fn to_latencies_2(
         lp: &LatenciesPriv,
         sgt_to_sgp: BTreeMap<SpanGroupTemp, SpanGroupPriv>,
-    ) -> (Vec<SpanGroup>, HashMap<SpanGroupPriv, usize>) {
+    ) -> (Box<[SpanGroup]>, HashMap<SpanGroupPriv, usize>) {
         let mut idx = 0;
         let mut sgp_to_idx: HashMap<SpanGroupPriv, usize> = HashMap::new();
         let mut span_groups: Vec<SpanGroup> = Vec::with_capacity(sgt_to_sgp.len());
@@ -416,7 +416,7 @@ impl LatencyTracePriv {
             sgp_to_idx.insert(sgp, idx);
             idx += 1;
         });
-        (span_groups, sgp_to_idx)
+        (span_groups.into(), sgp_to_idx)
     }
 
     /// Step in transforming the accumulated data in Control into the [`Latencies`] output.
@@ -424,7 +424,7 @@ impl LatencyTracePriv {
     fn to_latencies_3(
         &self,
         lp: &LatenciesPriv,
-        mut span_groups: Vec<SpanGroup>,
+        mut span_groups: Box<[SpanGroup]>,
         sgp_to_idx: HashMap<SpanGroupPriv, usize>,
     ) -> Latencies {
         // Add parent_idx to items in `span_groups`

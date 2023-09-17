@@ -5,8 +5,8 @@ use tracing::{
 };
 
 /// Default span grouper. Used to group spans by callsite and ancestors, ignoring any span attributes.
-pub fn default_span_grouper(_attrs: &Attributes) -> Vec<(String, String)> {
-    vec![]
+pub fn default_span_grouper(_attrs: &Attributes) -> Box<[(String, String)]> {
+    vec![].into()
 }
 
 struct FieldReader(BTreeMap<&'static str, String>);
@@ -24,7 +24,7 @@ impl Visit for FieldReader {
 }
 
 /// Custom span grouper used to group spans by callsite, ancestors, and all span fields and their values.
-pub fn group_by_all_fields(attrs: &Attributes) -> Vec<(String, String)> {
+pub fn group_by_all_fields(attrs: &Attributes) -> Box<[(String, String)]> {
     let reader = &mut FieldReader::new();
     attrs.values().record(reader);
     reader
@@ -37,7 +37,7 @@ pub fn group_by_all_fields(attrs: &Attributes) -> Vec<(String, String)> {
 /// Custom span grouper used to group spans by callsite, ancestors, and a given list of span fields and their values.
 pub fn group_by_given_fields<'a>(
     given_names: &'a [&'a str],
-) -> impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'a {
+) -> impl Fn(&Attributes) -> Box<[(String, String)]> + Send + Sync + 'a {
     move |attrs: &Attributes| {
         let reader = &mut FieldReader::new();
         attrs.values().record(reader);

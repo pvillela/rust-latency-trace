@@ -39,7 +39,7 @@ impl LatencyTrace {
     /// Creates a new [`LatencyTrace`] configured the same as `self` but with the given `span_grouper`.
     pub fn with_span_grouper(
         &self,
-        span_grouper: impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static,
+        span_grouper: impl Fn(&Attributes) -> Box<[(String, String)]> + Send + Sync + 'static,
     ) -> Self {
         let cfg = LatencyTraceCfg {
             span_grouper: Arc::new(span_grouper),
