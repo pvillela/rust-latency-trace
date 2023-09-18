@@ -423,7 +423,7 @@ impl LatencyTracePriv {
     /// Adds the `parent_idx`to each [SpanGroup] in `span_groups` and produces the [Latencies] output.
     fn to_latencies_3(
         &self,
-        lp: &LatenciesPriv,
+        lp: LatenciesPriv,
         mut span_groups: Vec<SpanGroup>,
         sgp_to_idx: HashMap<SpanGroupPriv, usize>,
     ) -> Latencies {
@@ -446,11 +446,11 @@ impl LatencyTracePriv {
 
         let timings: BTreeMap<SpanGroup, Timing> = lp
             .timings
-            .iter()
+            .into_iter()
             .map(|(sgp, timing)| {
-                let idx = *sgp_to_idx.get(sgp).unwrap();
-                let sg = &span_groups[idx];
-                (sg.clone(), timing.clone())
+                let idx = *sgp_to_idx.get(&sgp).unwrap();
+                let sg = span_groups[idx].clone();
+                (sg, timing)
             })
             .collect();
 
@@ -463,13 +463,11 @@ impl LatencyTracePriv {
     /// Generates the publicly accessible [`Latencies`] in post-processing after all thread-local
     /// data has been accumulated.
     pub(crate) fn generate_latencies(&self) -> Latencies {
-        self.control
-            .with_acc(|lp| {
-                let sgt_to_sgp = Self::to_latencies_1(lp);
-                let (span_groups, sgp_to_idx) = Self::to_latencies_2(lp, sgt_to_sgp);
-                self.to_latencies_3(lp, span_groups, sgp_to_idx)
-            })
-            .unwrap()
+        let lp = self.control.take_acc(LatenciesPriv::new())
+            .expect("Control::take_acc should always return Ok when called after Control::ensure_tls_dropped");
+        let sgt_to_sgp = Self::to_latencies_1(&lp);
+        let (span_groups, sgp_to_idx) = Self::to_latencies_2(&lp, sgt_to_sgp);
+        self.to_latencies_3(lp, span_groups, sgp_to_idx)
     }
 }
 
