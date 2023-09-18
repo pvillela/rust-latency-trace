@@ -9,6 +9,11 @@ do
     cargo run -r --example simple_sync $i >> $OUTPUT
     cargo run -r --example simple_sync $i >> $OUTPUT
     cargo run -r --example simple_sync $i >> $OUTPUT
+    cargo run -r --example simple_sync $i >> $OUTPUT
+    cargo run -r --example simple_sync $i >> $OUTPUT
+
+    cargo run -r --example simple_sync_x $i >> $OUTPUT
+    cargo run -r --example simple_sync_x $i >> $OUTPUT
     cargo run -r --example simple_sync_x $i >> $OUTPUT
     cargo run -r --example simple_sync_x $i >> $OUTPUT
     cargo run -r --example simple_sync_x $i >> $OUTPUT
