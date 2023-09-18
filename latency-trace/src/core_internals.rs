@@ -258,7 +258,7 @@ impl LatenciesPriv {
 struct SpanTiming {
     callsite_id_path: CallsiteIdPath,
     props_path: PropsPath,
-    first_entered_at: Option<Instant>,
+    created_at: Instant,
 }
 
 //=================
@@ -499,22 +499,13 @@ where
         span.extensions_mut().insert(SpanTiming {
             callsite_id_path: callsite_id_path.into(),
             props_path: props_path.into(),
-            first_entered_at: None,
+            created_at: Instant::now(),
         });
 
         log::trace!("`on_new_span` end: name={}, id={:?}", span.name(), id);
     }
 
-    fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
-        let span = ctx.span(id).unwrap();
-        log::trace!("`on_enter` start: name={}, id={:?}", span.name(), id);
-        let mut ext = span.extensions_mut();
-        let span_timing = ext.get_mut::<SpanTiming>().unwrap();
-        if span_timing.first_entered_at.is_none() {
-            span_timing.first_entered_at = Some(Instant::now());
-        }
-        log::trace!("`on_enter` end: name={}, id={:?}", span.name(), id);
-    }
+    // No need for fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
 
     // No need for fn on_exit(&self, id: &Id, ctx: Context<'_, S>)
 
@@ -535,7 +526,7 @@ where
         self.update_timings(&span_group_priv, |timing| {
             timing
                 .0
-                .record((Instant::now() - span_timing.first_entered_at.unwrap()).as_micros() as u64)
+                .record((Instant::now() - span_timing.created_at).as_micros() as u64)
                 .unwrap();
         });
 
