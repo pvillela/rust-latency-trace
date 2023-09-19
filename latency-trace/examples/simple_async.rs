@@ -42,10 +42,10 @@ fn main() {
 
     let start = Instant::now();
 
-    let latencies = LatencyTrace::new().measure_latencies_tokio(f);
+    let latencies = LatencyTrace::default().measure_latencies_tokio(f);
 
-    print!(
-        "\n=== {} {} ===========================================================",
+    println!(
+        "=== {} {} ===========================================================",
         std::env::args().nth(0).unwrap(),
         arg()
     );

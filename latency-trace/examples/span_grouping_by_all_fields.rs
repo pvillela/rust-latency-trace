@@ -13,7 +13,7 @@ fn main() {
     // Set below value to "trace" to enable full library tracing.
     set_var("RUST_LOG", "info");
 
-    let latencies = LatencyTrace::new()
+    let latencies = LatencyTrace::default()
         .with_span_grouper(group_by_all_fields)
         .measure_latencies_tokio(|| async {
             // Set env_logger only if `tracing_subsriber` hasn't pulled in `tracing_log` and already set a logger.

@@ -14,7 +14,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry
 /// [hdrhistogram::Histogram::high] and [hdrhistogram::Histogram::sigfig].
 pub struct LatencyTrace(LatencyTraceCfg);
 
-impl LatencyTrace {
+impl Default for LatencyTrace {
     /// Instantiates a [LatencyTrace] with default configuration. The defaults are:
     /// - Grouping of spans using the [`default_span_grouper`], which simply groups by the span's
     /// callsite information (see [`CallsiteInfo`](crate::CallsiteInfo), which distills the
@@ -27,7 +27,7 @@ impl LatencyTrace {
     ///
     /// Once an instance with the default configuration is created, it can be modified with other methods provided
     /// by this struct.
-    pub fn new() -> Self {
+    fn default() -> Self {
         let cfg = LatencyTraceCfg {
             span_grouper: Arc::new(default_span_grouper),
             hist_high: 20 * 1000 * 1000,
@@ -35,7 +35,9 @@ impl LatencyTrace {
         };
         Self(cfg)
     }
+}
 
+impl LatencyTrace {
     /// Creates a new [`LatencyTrace`] configured the same as `self` but with the given `span_grouper`.
     pub fn with_span_grouper(
         &self,

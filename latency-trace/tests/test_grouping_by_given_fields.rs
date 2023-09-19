@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 
 #[test]
 fn test_grouping_by_given_fields() {
-    let latencies = LatencyTrace::new()
+    let latencies = LatencyTrace::default()
         .with_span_grouper(group_by_given_fields(&["foo"]))
         .measure_latencies_tokio(target_fn);
 

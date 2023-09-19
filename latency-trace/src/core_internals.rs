@@ -1,7 +1,6 @@
 //! Core library implementation.
 
 use hdrhistogram::Histogram;
-use log;
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
@@ -100,7 +99,7 @@ impl SpanGroup {
 
     /// Returns the callsite's file name and code line.
     pub fn code_line(&self) -> &str {
-        &self.callsite.code_line()
+        self.callsite.code_line()
     }
 
     /// Returns the span group's index in the list of all span groups.
@@ -264,9 +263,11 @@ struct SpanTiming {
 //=================
 // LatencyTraceCfg
 
+pub(crate) type SpanGrouper =
+    Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>;
+
 pub(crate) struct LatencyTraceCfg {
-    pub(crate) span_grouper:
-        Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>,
+    pub(crate) span_grouper: SpanGrouper,
     pub(crate) hist_high: u64,
     pub(crate) hist_sigfig: u8,
 }
@@ -301,7 +302,7 @@ impl LatencyTraceCfg {
 #[derive(Clone)]
 pub(crate) struct LatencyTracePriv {
     pub(crate) control: Control<LatenciesPriv, LatenciesPriv>,
-    span_grouper: Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>,
+    span_grouper: SpanGrouper,
     hist_high: u64,
     hist_sigfig: u8,
 }
@@ -343,7 +344,7 @@ impl LatencyTracePriv {
     fn update_timings(&self, span_group_priv: &SpanGroupPriv, f: impl Fn(&mut Timing)) {
         self.control.with_tl_mut(&LOCAL_INFO, |lp| {
             let timings = &mut lp.timings;
-            let mut timing = {
+            let timing = {
                 if let Some(timing) = timings.get_mut(span_group_priv) {
                     timing
                 } else {
@@ -360,7 +361,7 @@ impl LatencyTracePriv {
                 }
             };
 
-            f(&mut timing);
+            f(timing);
 
             log::trace!(
                 "exiting `update_timings` for {:?} on {:?}",
@@ -380,7 +381,7 @@ impl LatencyTracePriv {
                 let callsite_uid_path = sgp
                     .callsite_id_path
                     .iter()
-                    .map(|cid| callsite_id_to_usize(cid))
+                    .map(callsite_id_to_usize)
                     .collect::<Vec<usize>>();
                 let sgt = SpanGroupTemp {
                     callsite_uid_path,
@@ -484,7 +485,7 @@ where
         let callsite_id = span.metadata().callsite();
         let props = (self.span_grouper)(attrs);
         let (callsite_id_path, props_path) = match parent_span {
-            None => (vec![callsite_id].into(), vec![Arc::new(props)].into()),
+            None => (vec![callsite_id], vec![Arc::new(props)]),
             Some(parent_span) => {
                 let ext = parent_span.extensions();
                 let pst = ext.get::<SpanTiming>().unwrap();
@@ -550,5 +551,5 @@ where
 // Thread-locals
 
 thread_local! {
-    static LOCAL_INFO: Holder<LatenciesPriv, LatenciesPriv> = Holder::new(|| LatenciesPriv::new());
+    static LOCAL_INFO: Holder<LatenciesPriv, LatenciesPriv> = Holder::new(LatenciesPriv::new);
 }

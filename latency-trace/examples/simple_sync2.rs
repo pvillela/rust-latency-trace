@@ -47,7 +47,7 @@ fn main() {
 
     let start = Instant::now();
 
-    let latencies = LatencyTrace::new().measure_latencies(f);
+    let latencies = LatencyTrace::default().measure_latencies(f);
 
     println!(
         "*** Elapsed time: {:?}",

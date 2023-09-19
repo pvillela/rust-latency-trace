@@ -53,19 +53,19 @@ impl<T, P> Borrow<T> for Wrapper<T, P> {
 
 impl<T, P> Borrow<T> for Wrapper<Box<T>, P> {
     fn borrow(&self) -> &T {
-        &self.0.borrow()
+        self.0.borrow()
     }
 }
 
 impl<T, P> Borrow<T> for Wrapper<Arc<T>, P> {
     fn borrow(&self) -> &T {
-        &self.0.borrow()
+        self.0.borrow()
     }
 }
 
 impl<T, P> Borrow<T> for Wrapper<Rc<T>, P> {
     fn borrow(&self) -> &T {
-        &self.0.borrow()
+        self.0.borrow()
     }
 }
 

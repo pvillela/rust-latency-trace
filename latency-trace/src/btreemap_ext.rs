@@ -23,7 +23,7 @@ impl<'a, K, V> IntoIterator for &'a BTreeMapExt<K, V> {
     type IntoIter = <&'a BTreeMap<K, V> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        (&self.0).into_iter()
+        self.0.iter()
     }
 }
 
@@ -32,7 +32,7 @@ impl<'a, K, V> IntoIterator for &'a mut BTreeMapExt<K, V> {
     type IntoIter = <&'a mut BTreeMap<K, V> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        (&mut self.0).into_iter()
+        self.0.iter_mut()
     }
 }
 
