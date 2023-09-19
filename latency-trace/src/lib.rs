@@ -1,25 +1,29 @@
 //! This library supports latency measurement for functions and code blocks, both sync and async.
 //!
-//! Given code instrumented with the Rust [tracing](https://crates.io/crates/tracing) library, this library
-//! uses histograms from the [hdrhistogram](https://crates.io/crates/hdrhistogram) library to capture span
-//! latency timings.
+//! Given code instrumented with the Rust [tracing](https://crates.io/crates/tracing) library, this library uses histograms from the [hdrhistogram](https://crates.io/crates/hdrhistogram) library to capture span latency timings.
 //!
 //! Latencies are collected in **microseconds** for all spans with level `trace` or higher.
 //!
 //! ## Core concepts
 //!
-//! **TODO:** discuss:
-//! - [SpanGroup]
-//! - [Latencies]
+//! This library collects latency information for [spans](https://docs.rs/tracing/0.1.37/tracing/#spans). Spans are defined in the code using macros and functions from the Rust [tracing](https://crates.io/crates/tracing) library which define span ***callsite***s, i.e., the places in the code where spans are defined. As the code is executed, a span definition in the code may be executed multiple times -- each such execution is a span instance. Span instances arising from the same span definition are grouped into [`SpanGroup`]s for latency information collection, which is done using [Histogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/struct.Histogram.html)s from the [hdrhistogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/) library.
+//!
+//! The grouping of spans for latency collection is not exactly based on the span definitions in the code. Spans at runtime are structured as a set of [span trees](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships) that correspond to the nesting of spans from code execution paths. The grouping of runtime spans for latency collection should respect the runtime parent-child relationships among spans.
+//!
+//! Thus, [`SpanGroup`]s form a forest of trees where some pairs of span groups have a parent-child relationship, corresponding to the parent-child relationships of the spans associated with the span groups. This means that if `SpanGroup A` is the parent of `SpanGroup B` then, for each span that was assigned to group `B`, its parent span was assigned to group `A`.
+//!
+//! The coarsest-grained grouping of spans is characterized by a ***callsite path*** -- a callsite and the (possibly empty) list of its ancestor callsites based on the different runtime execution paths (see [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships)). This is the default `SpanGroup` definition. Finer-grained groupings of spans can differentiate groups of spans with the same callsite path by taking into account values computed at runtime from the spans' runtime [Attributes](https://docs.rs/tracing/0.1.37/tracing/span/struct.Attributes.html).
+//!
+//! While the granularity of latency information collection cannot be finer than a [`SpanGroup`], the collected latency information can be subsequently aggregated further by grouping `SpanGroup`s as needed (see  [`Timings::aggregate`].)
 //!
 //! ## Design goals and approach
 //!
 //! **TODO:** discuss:
+//!
 //! - standalone
 //! - easy to use
 //! - work with both sync and async
-//! - low overhead (mention only one mutex lock request per thread for the entire duration of the measurement,
-//!   regardless of the number of spans executed).
+//! - low overhead (mention only one mutex lock request per thread for the entire duration of the measurement, regardless of the number of spans executed).
 //!
 //! ## Example usage
 //!
@@ -56,7 +60,7 @@
 //! }
 //!
 //! fn main() {
-//!     let latencies = LatencyTrace::new().measure_latencies(f);
+//!     let latencies = LatencyTrace::default().measure_latencies(f);
 //!
 //!     println!("\nLatency stats below are in microseconds");
 //!     for (span_group, stats) in latencies.summary_stats() {
@@ -101,7 +105,7 @@
 //! }
 //!
 //! fn main() {
-//!     let latencies = LatencyTrace::new().measure_latencies_tokio(f);
+//!     let latencies = LatencyTrace::default().measure_latencies_tokio(f);
 //!
 //!     println!("\nLatency stats below are in microseconds");
 //!     for (span_group, stats) in latencies.summary_stats() {
@@ -113,7 +117,6 @@
 //!     println!("{:?}", latencies.summary_stats());
 //! }
 //! ```
-
 mod core_internals;
 pub use core_internals::*;
 

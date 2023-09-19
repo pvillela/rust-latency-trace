@@ -48,23 +48,16 @@ type CallsiteIdPath = Arc<Vec<Identifier>>;
 type Props = Arc<Vec<(String, String)>>;
 type PropsPath = Arc<Vec<Props>>;
 
-/// Represents a set of [tracing::Span]s for which latency information should be collected as a group.
+/// Represents a set of [tracing::Span]s for which latency information should be collected as a group. It is
+/// the unit of latency information collection.
 ///
-/// The coarsest-grained grouping of spans is characterized by a callsite and its ancestors
-/// (see [callsite](https://docs.rs/tracing/0.1.37/tracing/struct.Metadata.html#method.callsite)
-/// and [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships)).
-/// Finer-grained groupings can be defined by adding a list of name-value pairs to the definition of a group.
-/// Such a properties list can be computed from the span's
-/// [Attributes](https://docs.rs/tracing/0.1.37/tracing/span/struct.Attributes.html).
-/// While the preceding sentences describe the granularity of latency information collection, the collected
-/// latency information can be subsequently aggregated further by grouping span groups using
-/// [Timings::aggregate].)
+/// Spans are defined in the code using macros and functions from the Rust [tracing](https://crates.io/crates/tracing) library which define span ***callsite***s, i.e., the places in the code where spans are defined. As the code is executed, a span definition in the code may be executed multiple times -- each such execution is a span instance. Span instances arising from the same span definition are grouped into [`SpanGroup`]s for latency information collection, which is done using [Histogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/struct.Histogram.html)s from the [hdrhistogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/) library.
 ///
-/// Span groups form a forest of trees where some pairs of span groups have a parent-child relationship,
-/// corresponding to the parent-child relationships of the spans associated with the span groups
-/// (see [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships)).
-/// This means that if SpanGroup A is the parent of SpanGroup B then, for each span that was assigned to group B,
-/// its parent span was assigned to group A.
+/// The grouping of spans for latency collection is not exactly based on the span definitions in the code. Spans at runtime are structured as a set of [span trees](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships) that correspond to the nesting of spans from code execution paths. The grouping of runtime spans for latency collection should respect the runtime parent-child relationships among spans.
+///
+/// Thus, [`SpanGroup`]s form a forest of trees where some pairs of span groups have a parent-child relationship, corresponding to the parent-child relationships of the spans associated with the span groups. This means that if `SpanGroup A` is the parent of `SpanGroup B` then, for each span that was assigned to group `B`, its parent span was assigned to group `A`.
+///
+/// The coarsest-grained grouping of spans is characterized by a ***callsite path*** -- a callsite and the (possibly empty) list of its ancestor callsites based on the different runtime execution paths (see [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships)). This is the default `SpanGroup` definition. Finer-grained groupings of spans can differentiate groups of spans with the same callsite path by taking into account values computed at runtime from the spans' runtime [Attributes](https://docs.rs/tracing/0.1.37/tracing/span/struct.Attributes.html).
 ///
 /// This struct holds the following information:
 /// - [`callsite`](Self::callsite) information
