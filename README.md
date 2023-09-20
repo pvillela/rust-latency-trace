@@ -6,6 +6,15 @@ Given code instrumented with the Rust [tracing](https://crates.io/crates/tracing
 
 Latencies are collected in **microseconds** for all spans with level `trace` or higher.
 
+## Design goals
+
+This framework should:
+
+- Be **easy to use**. Is should only require a handful of framework lines of code to provide default latency metrics for code instrumented with the Rust [tracing](https://crates.io/crates/tracing) library.
+- Be **self-contained**, i.e., should not depend on the use of external tools like OpenTelemetry collectors, Jaeger, Grafana, etc.
+- **Support** both **sync and async** code.
+- Have **low overhead**, i.e., the latency associated with the collection of latency information should be low.
+
 ## Core concepts
 
 This library collects latency information for [spans](https://docs.rs/tracing/0.1.37/tracing/#spans). Spans are defined in the code using macros and functions from the Rust [tracing](https://crates.io/crates/tracing) library which define span ***callsite***s, i.e., the places in the code where spans are defined. As the code is executed, a span definition in the code may be executed multiple times -- each such execution is a span instance. Span instances arising from the same span definition are grouped into [`SpanGroup`]s for latency information collection, which is done using [Histogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/struct.Histogram.html)s from the [hdrhistogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/) library.
@@ -18,14 +27,14 @@ The coarsest-grained grouping of spans is characterized by a ***callsite path***
 
 While the granularity of latency information collection cannot be finer than a [`SpanGroup`], the collected latency information can be subsequently aggregated further by grouping `SpanGroup`s as needed (see  [`Timings::aggregate`].)
 
-## Design goals and approach
+## Key design choices
 
-**TODO:** discuss:
+This framework uses [hdrhistogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/index.html)::[Histogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/struct.Histogram.html#) to collect latency information as it provides an efficient data structure for high-fidelity data collection across wide latency value ranges.
 
-- standalone
-- easy to use
-- work with both sync and async
-- low overhead (mention only one mutex lock request per thread for the entire duration of the measurement, regardless of the number of spans executed).
+Two other design choices support the low overhead goal. 
+
+- The *tracing* library's [Registry](https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/registry/struct.Registry.html#) is used to store temporary timing data at runtime. As noted in the documentation, "This registry is implemented using a [lock-free sharded slab](https://docs.rs/sharded-slab/0.1.4/x86_64-unknown-linux-gnu/sharded_slab/index.html), and is highly optimized for concurrent access."
+- Runtime data collection takes place independently on each thread, overwhelmingly without the need for inter-thread coordination. The only inter-thread coordination involved is one mutex lock request per thread for the entire duration of the measurement, regardless of the number of spans executed. *After* the test execution has completed, information is collated from the various threads, with zero impact on the latency measurements. The [thread-local-drop] framework is used to support this design approach.
 
 ## Example usage
 
@@ -62,7 +71,7 @@ fn g() {
 }
 
 fn main() {
-    let latencies = LatencyTrace::new().measure_latencies(f);
+    let latencies = LatencyTrace::default().measure_latencies(f);
 
     println!("\nLatency stats below are in microseconds");
     for (span_group, stats) in latencies.summary_stats() {
@@ -107,7 +116,7 @@ async fn g() {
 }
 
 fn main() {
-    let latencies = LatencyTrace::new().measure_latencies_tokio(f);
+    let latencies = LatencyTrace::default().measure_latencies_tokio(f);
 
     println!("\nLatency stats below are in microseconds");
     for (span_group, stats) in latencies.summary_stats() {
@@ -119,3 +128,9 @@ fn main() {
     println!("{:?}", latencies.summary_stats());
 }
 ```
+
+## Related work
+
+[tracing-timing](https://crates.io/crates/tracing-timing/0.2.8) also collects latency information for code instrumented with the  [tracing](https://crates.io/crates/tracing) library, using histograms from  [hdrhistogram](https://crates.io/crates/hdrhistogram). *tracing-timing* collects latencies for [events](https://docs.rs/tracing/0.1.37/tracing/#events) within [spans](https://docs.rs/tracing/0.1.37/tracing/#spans). This provides more flexibility but also requires events to be defined within spans in order to measure latencies. Interpreting the latency results associated with events can be challenging for async code. By contrast, this framework simply measures span latencies and ignores events. 
+
+I am grateful to the author of *tracing-timing* for creating a high-quality, well-documented library which introduced me to the *hdrhistogram* crate and provided key insights into latency tracing concepts and mechanisms.

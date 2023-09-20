@@ -117,6 +117,7 @@
 //!     println!("{:?}", latencies.summary_stats());
 //! }
 //! ```
+
 mod core_internals;
 pub use core_internals::*;
 
