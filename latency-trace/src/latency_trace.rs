@@ -1,7 +1,7 @@
 //! Main public interface extension to the core library, including latency measurement methods.
 
-use crate::{default_span_grouper, Latencies, LatencyTraceCfg, LatencyTracePriv};
-use std::{future::Future, sync::Arc};
+use crate::{default_span_grouper, Latencies, LatencyTraceCfg, LatencyTracePriv, PausableTrace};
+use std::{future::Future, sync::Arc, thread};
 use tracing::span::Attributes;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry};
 
@@ -89,6 +89,33 @@ impl LatencyTrace {
         F: Future<Output = ()> + Send,
     {
         self.measure_latencies(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async {
+                    f().await;
+                });
+        })
+    }
+
+    pub fn measure_latencies_pausable(self, f: impl FnOnce() + Send + 'static) -> PausableTrace {
+        let ltp = LatencyTracePriv::new(self.0);
+        let pt = PausableTrace::new(ltp);
+        Registry::default().with(pt.clone()).init();
+        let jh = thread::spawn(f);
+        pt.set_join_handle(jh);
+        pt
+    }
+
+    pub fn measure_latencies_pausable_tokio<F>(
+        self,
+        f: impl FnOnce() -> F + Send + 'static,
+    ) -> PausableTrace
+    where
+        F: Future<Output = ()> + Send,
+    {
+        self.measure_latencies_pausable(|| {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
