@@ -34,9 +34,9 @@ fn main() {
     let start = Instant::now();
     f();
     println!(
-        "=== {} {} ===========================================================",
+        "\n=== {} {} ===========================================================",
         std::env::args().nth(0).unwrap(),
         arg()
     );
-    println!("\nElapsed time: {:?}", Instant::now().duration_since(start));
+    println!("Elapsed time: {:?}", Instant::now().duration_since(start));
 }

@@ -432,7 +432,10 @@ impl LatencyTracePriv {
                     props_path: Vec::from(&sgp.props_path[..path_len - 1]).into(),
                 })
             };
-            let parent_idx = parent_sgp.map(|psgp| *sgp_to_idx.get(&psgp).unwrap());
+            let parent_idx = match parent_sgp {
+                None => None,
+                Some(psgp) => sgp_to_idx.get(&psgp).map(|idx| *idx),
+            };
 
             let sg = &mut span_groups[*idx];
             sg.parent_idx = parent_idx;

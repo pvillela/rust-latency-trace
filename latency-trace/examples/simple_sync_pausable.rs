@@ -1,8 +1,11 @@
-//! Example of latency measurement for a simple async function.
+//! Example of latency measurement for a simple sync function.
 
 use latency_trace::LatencyTrace;
-use std::time::{Duration, Instant};
-use tracing::{instrument, trace_span, Instrument};
+use std::{
+    thread,
+    time::{Duration, Instant},
+};
+use tracing::{instrument, trace_span};
 
 /// Returns command line argument or default
 fn arg() -> u64 {
@@ -13,27 +16,25 @@ fn arg() -> u64 {
 }
 
 #[instrument(level = "trace")]
-async fn f() {
+fn f() {
     for _ in 0..1000 {
-        async {
+        trace_span!("loop_body").in_scope(|| {
             trace_span!("empty").in_scope(|| {
                 // Empty span used to show some of the tracing overhead.
             });
 
             // Simulated work
-            tokio::time::sleep(Duration::from_micros(arg() * 3)).await;
+            thread::sleep(Duration::from_micros(arg() * 3));
 
-            g().await;
-        }
-        .instrument(trace_span!("loop_body"))
-        .await
+            g();
+        });
     }
 }
 
 #[instrument(level = "trace")]
-async fn g() {
+fn g() {
     // Simulated work
-    tokio::time::sleep(Duration::from_micros(arg() * 2)).await;
+    thread::sleep(Duration::from_micros(arg() * 2));
 }
 
 fn main() {
@@ -42,7 +43,10 @@ fn main() {
 
     let start = Instant::now();
 
-    let latencies = LatencyTrace::default().measure_latencies_tokio(f);
+    let pausable = LatencyTrace::default().measure_latencies_pausable(f);
+    thread::sleep(Duration::from_micros(arg() * 12));
+    let latencies1 = pausable.pause_and_collect();
+    let latencies2 = pausable.wait_and_collect();
 
     println!(
         "\n=== {} {} ===========================================================",
@@ -51,12 +55,13 @@ fn main() {
     );
     println!("Elapsed time: {:?}", Instant::now().duration_since(start));
 
-    println!("\nLatency stats below are in microseconds");
-    for (span_group, stats) in latencies.summary_stats() {
+    println!("\nlatencies1 in microseconds");
+    for (span_group, stats) in latencies1.summary_stats() {
         println!("  * {:?}, {:?}", span_group, stats);
     }
 
-    // A shorter way to print the summary stats, with uglier formatting.
-    println!("\nDebug print of `latencies.summary_stats()`:");
-    println!("{:?}", latencies.summary_stats());
+    println!("\nlatencies2 in microseconds");
+    for (span_group, stats) in latencies2.summary_stats() {
+        println!("  * {:?}, {:?}", span_group, stats);
+    }
 }

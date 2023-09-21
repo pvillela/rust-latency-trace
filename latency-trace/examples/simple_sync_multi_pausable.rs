@@ -43,7 +43,16 @@ fn main() {
 
     let start = Instant::now();
 
-    let latencies = LatencyTrace::default().measure_latencies(f);
+    let pausable = LatencyTrace::default().measure_latencies_pausable(|| {
+        thread::scope(|s| {
+            for _ in 0..5 {
+                s.spawn(f);
+            }
+        });
+    });
+    thread::sleep(Duration::from_micros(arg() * 12));
+    let latencies1 = pausable.pause_and_collect();
+    let latencies2 = pausable.wait_and_collect();
 
     println!(
         "\n=== {} {} ===========================================================",
@@ -52,12 +61,13 @@ fn main() {
     );
     println!("Elapsed time: {:?}", Instant::now().duration_since(start));
 
-    println!("\nLatency stats below are in microseconds");
-    for (span_group, stats) in latencies.summary_stats() {
+    println!("\nlatencies1 in microseconds");
+    for (span_group, stats) in latencies1.summary_stats() {
         println!("  * {:?}, {:?}", span_group, stats);
     }
 
-    // A shorter way to print the summary stats, with uglier formatting.
-    println!("\nDebug print of `latencies.summary_stats()`:");
-    println!("{:?}", latencies.summary_stats());
+    println!("\nlatencies2 in microseconds");
+    for (span_group, stats) in latencies2.summary_stats() {
+        println!("  * {:?}, {:?}", span_group, stats);
+    }
 }
