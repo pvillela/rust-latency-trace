@@ -1,6 +1,8 @@
 //! Main public interface extension to the core library, including latency measurement methods.
 
-use crate::{default_span_grouper, Latencies, LatencyTraceCfg, LatencyTracePriv, PausableTrace};
+use crate::{
+    default_span_grouper, Latencies, LatencyTraceCfg, LatencyTracePriv, PausableMode, PausableTrace,
+};
 use std::{future::Future, sync::Arc, thread};
 use tracing::span::Attributes;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry};
@@ -79,7 +81,8 @@ impl LatencyTrace {
         Registry::default().with(ltp.clone()).init();
         f();
         ltp.control.ensure_tls_dropped();
-        ltp.generate_latencies()
+        let lp = ltp.take_latencies_priv();
+        ltp.generate_latencies(lp)
     }
 
     /// Measures latencies of spans in async function `f` running on the *tokio* runtime.
@@ -99,9 +102,13 @@ impl LatencyTrace {
         })
     }
 
-    pub fn measure_latencies_pausable(self, f: impl FnOnce() + Send + 'static) -> PausableTrace {
+    pub fn measure_latencies_pausable(
+        self,
+        mode: PausableMode,
+        f: impl FnOnce() + Send + 'static,
+    ) -> PausableTrace {
         let ltp = LatencyTracePriv::new(self.0);
-        let pt = PausableTrace::new(ltp);
+        let pt = PausableTrace::new(ltp, mode);
         Registry::default().with(pt.clone()).init();
         let jh = thread::spawn(f);
         pt.set_join_handle(jh);
@@ -110,12 +117,13 @@ impl LatencyTrace {
 
     pub fn measure_latencies_pausable_tokio<F>(
         self,
+        mode: PausableMode,
         f: impl FnOnce() -> F + Send + 'static,
     ) -> PausableTrace
     where
         F: Future<Output = ()> + Send,
     {
-        self.measure_latencies_pausable(|| {
+        self.measure_latencies_pausable(mode, || {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()

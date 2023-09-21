@@ -457,11 +457,16 @@ impl LatencyTracePriv {
         }
     }
 
+    /// This is exposed separately from [Self::generate_latencies] to isolate the code that holds the control lock.
+    /// This is useful in the implementation of `PausableTrace` in the `latency-trace` crate.
+    pub(crate) fn take_latencies_priv(&self) -> LatenciesPriv {
+        self.control.take_acc(LatenciesPriv::new())
+            .expect("Control::take_acc should always return Ok when called after Control::ensure_tls_dropped")
+    }
+
     /// Generates the publicly accessible [`Latencies`] in post-processing after all thread-local
     /// data has been accumulated.
-    pub(crate) fn generate_latencies(&self) -> Latencies {
-        let lp = self.control.take_acc(LatenciesPriv::new())
-            .expect("Control::take_acc should always return Ok when called after Control::ensure_tls_dropped");
+    pub(crate) fn generate_latencies(&self, lp: LatenciesPriv) -> Latencies {
         let sgt_to_sgp = Self::to_latencies_1(&lp);
         let (span_groups, sgp_to_idx) = Self::to_latencies_2(&lp, sgt_to_sgp);
         self.to_latencies_3(lp, span_groups, sgp_to_idx)
