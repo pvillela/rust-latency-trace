@@ -39,7 +39,7 @@ impl PausableTrace {
         *jh = Some(join_handle);
     }
 
-    pub fn pause_and_collect(&self) -> Latencies {
+    pub fn pause_and_report(&self) -> Latencies {
         let lock = self.allow_updates.write().unwrap();
         self.ltp.control.ensure_tls_dropped();
         let lp = self.ltp.take_latencies_priv();
@@ -47,7 +47,7 @@ impl PausableTrace {
         self.ltp.generate_latencies(lp)
     }
 
-    pub fn wait_and_collect(&self) -> Latencies {
+    pub fn wait_and_report(&self) -> Latencies {
         let join_handle = self.join_handle.try_lock().unwrap().take().unwrap();
         join_handle.join().unwrap();
         self.ltp.control.ensure_tls_dropped();

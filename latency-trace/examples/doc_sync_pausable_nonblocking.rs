@@ -1,19 +1,6 @@
-//! Example of latency measurement for a simple sync function.
-
 use latency_trace::{LatencyTrace, PausableMode};
-use std::{
-    thread,
-    time::{Duration, Instant},
-};
+use std::{thread, time::Duration};
 use tracing::{instrument, trace_span};
-
-/// Returns command line argument or default
-fn arg() -> u64 {
-    match std::env::args().nth(1) {
-        Some(v) => u64::from_str_radix(&v, 10).expect("argument must be integer"),
-        None => 2000,
-    }
-}
 
 #[instrument(level = "trace")]
 fn f() {
@@ -24,7 +11,7 @@ fn f() {
             });
 
             // Simulated work
-            thread::sleep(Duration::from_micros(arg() * 3));
+            thread::sleep(Duration::from_micros(6000));
 
             g();
         });
@@ -34,26 +21,14 @@ fn f() {
 #[instrument(level = "trace")]
 fn g() {
     // Simulated work
-    thread::sleep(Duration::from_micros(arg() * 2));
+    thread::sleep(Duration::from_micros(4000));
 }
 
 fn main() {
-    // std::env::set_var("RUST_LOG", "latency_trace=trace");
-    // _ = env_logger::try_init();
-
-    let start = Instant::now();
-
     let pausable = LatencyTrace::default().measure_latencies_pausable(PausableMode::Nonblocking, f);
-    thread::sleep(Duration::from_micros(arg() * 12));
+    thread::sleep(Duration::from_micros(24000));
     let latencies1 = pausable.pause_and_report();
     let latencies2 = pausable.wait_and_report();
-
-    println!(
-        "\n=== {} {} ===========================================================",
-        std::env::args().nth(0).unwrap(),
-        arg()
-    );
-    println!("Elapsed time: {:?}", Instant::now().duration_since(start));
 
     println!("\nlatencies1 in microseconds");
     for (span_group, stats) in latencies1.summary_stats() {

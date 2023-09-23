@@ -36,6 +36,21 @@ Two other design choices support the low overhead goal.
 - The _tracing_ library's [Registry](https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/registry/struct.Registry.html#) is used to store temporary timing data at runtime. As noted in the documentation, "This registry is implemented using a [lock-free sharded slab](https://docs.rs/sharded-slab/0.1.4/x86_64-unknown-linux-gnu/sharded_slab/index.html), and is highly optimized for concurrent access."
 - Runtime data collection takes place independently on each thread, overwhelmingly without the need for inter-thread coordination. The only inter-thread coordination involved is one mutex lock request per thread for the entire duration of the measurement, regardless of the number of spans executed. _After_ the test execution has completed, information is collated from the various threads, with zero impact on the latency measurements. The [thread-local-drop] framework is used to support this design approach.
 
+## Usage modes
+
+This framework is used to measure latencies for a sync or async function `f` that takes not arguments and contains code instrumented  with the *tracing* framework.  Any code to be measured can be wrapped by such a function.
+
+The following modes of latency information reporting are supported:
+
+- ***Direct*** -- Information is reported only after `f` terminates.
+- ***Pausable*** -- Partial information can be reported during `f`'s execution. In this case, there are two sub-options:
+  - ***Nonblocking*** -- `f`'s execution continues normally but latency information collection is paused while the previously collected data is collated for reporting. In this case, some latency information is lost during the collection pause. This is the preferred option.
+  - ***Blocking*** -- `f`'s execution is blocked while the previously collected data is collated for reporting. In this case, there is no loss of latency information but there is distortion of latencies for the period during which `f`'s execution was paused.
+
+The *direct* mode has the lowest overhead -- see [Key design choices](#key-design-choices) above. It is suitable for code that runs to completion in a reasonable amount of time.
+
+The *pausable* modes are suitable for code that is expected to run for extended periods of time, including servers. The *pausable* modes add some overhead beyond the direct mode as a read is performed on an [RwLock](https://doc.rust-lang.org/stable/std/sync/struct.RwLock.html) for each span. Informal benchmarking performed by the author indicates that this additional overhead is small, but this depends on the use case and the user is encouraged to perform their own benchmarks.
+
 ## Example usage
 
 ### Simple sync example
@@ -125,6 +140,56 @@ fn main() {
     println!("{:?}", latencies.summary_stats());
 }
 ```
+
+## Simple sync pausable example
+
+```rust
+use latency_trace::{LatencyTrace, PausableMode};
+use std::{thread, time::Duration};
+use tracing::{instrument, trace_span};
+
+#[instrument(level = "trace")]
+fn f() {
+    for _ in 0..1000 {
+        trace_span!("loop_body").in_scope(|| {
+            trace_span!("empty").in_scope(|| {
+                // Empty span used to show some of the tracing overhead.
+            });
+
+            // Simulated work
+            thread::sleep(Duration::from_micros(6000));
+
+            g();
+        });
+    }
+}
+
+#[instrument(level = "trace")]
+fn g() {
+    // Simulated work
+    thread::sleep(Duration::from_micros(4000));
+}
+
+fn main() {
+    let pausable = LatencyTrace::default()
+        .measure_latencies_pausable(PausableMode::Nonblocking, f);
+    thread::sleep(Duration::from_micros(24000));
+    let latencies1 = pausable.pause_and_report();
+    let latencies2 = pausable.wait_and_report();
+
+    println!("\nlatencies1 in microseconds");
+    for (span_group, stats) in latencies1.summary_stats() {
+        println!("  * {:?}, {:?}", span_group, stats);
+    }
+
+    println!("\nlatencies2 in microseconds");
+    for (span_group, stats) in latencies2.summary_stats() {
+        println!("  * {:?}, {:?}", span_group, stats);
+    }
+}
+```
+
+
 
 ## Related work
 

@@ -45,8 +45,8 @@ fn main() {
 
     let pausable = LatencyTrace::default().measure_latencies_pausable(PausableMode::Blocking, f);
     thread::sleep(Duration::from_micros(arg() * 12));
-    let latencies1 = pausable.pause_and_collect();
-    let latencies2 = pausable.wait_and_collect();
+    let latencies1 = pausable.pause_and_report();
+    let latencies2 = pausable.wait_and_report();
 
     println!(
         "\n=== {} {} ===========================================================",
