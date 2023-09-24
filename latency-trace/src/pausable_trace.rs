@@ -9,12 +9,21 @@ use tracing::{
 };
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
+/// Defines whether a [`PausableTrace`] operates in [nonblocking](PausableMode::Nonblocking) or
+/// [blocking](PausableMode::Blocking) mode.
 #[derive(Clone)]
 pub enum PausableMode {
-    Blocking,
+    /// Execution of the function being measured continues normally but latency information collection is paused while
+    /// the previously collected data is extracted for reporting.
+    /// In this case, some latency information is lost during the collection pause. This is the preferred option.
     Nonblocking,
+    /// Execution of the function being measured is blocked while the previously collected data is extracted for reporting.
+    /// In this case, there is no loss of latency information but there is distortion of latencies for the period during
+    /// which execution is paused.
+    Blocking,
 }
 
+/// Represents an ongoing collection of latency information with the ability to be paused before completion.
 #[derive(Clone)]
 pub struct PausableTrace {
     ltp: LatencyTracePriv,
@@ -39,6 +48,8 @@ impl PausableTrace {
         *jh = Some(join_handle);
     }
 
+    /// Pauses latency information collection, extracts what has been collected thus far from the various threads,
+    /// and returns the results. Latency collection resumes after extraction of the previously collected information.
     pub fn pause_and_report(&self) -> Latencies {
         let lock = self.allow_updates.write().unwrap();
         self.ltp.control.ensure_tls_dropped();
@@ -47,6 +58,7 @@ impl PausableTrace {
         self.ltp.generate_latencies(lp)
     }
 
+    /// Blocks until the function being measured completes, and then returns the collected latency information.
     pub fn wait_and_report(&self) -> Latencies {
         let join_handle = self.join_handle.try_lock().unwrap().take().unwrap();
         join_handle.join().unwrap();

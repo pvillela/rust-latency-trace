@@ -75,7 +75,8 @@ impl LatencyTrace {
     }
 
     /// Measures latencies of spans in `f`.
-    /// Will panic if this function or [Self::measure_latencies_tokio] have been previously called in the same process.
+    /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
+    /// previously called in the same process.
     pub fn measure_latencies(self, f: impl FnOnce() + Send + 'static) -> Latencies {
         let ltp = LatencyTracePriv::new(self.0);
         Registry::default().with(ltp.clone()).init();
@@ -86,7 +87,8 @@ impl LatencyTrace {
     }
 
     /// Measures latencies of spans in async function `f` running on the *tokio* runtime.
-    /// Will panic if this function or [Self::measure_latencies] have been previously called in the same process.
+    /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
+    /// previously called in the same process.
     pub fn measure_latencies_tokio<F>(self, f: impl FnOnce() -> F + Send + 'static) -> Latencies
     where
         F: Future<Output = ()> + Send,
@@ -102,6 +104,10 @@ impl LatencyTrace {
         })
     }
 
+    /// Measures latencies of spans in `f`, returning a [`PausableTrace`] that allows measurements to be
+    /// paused and reported before `f` completes.
+    /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
+    /// previously called in the same process.
     pub fn measure_latencies_pausable(
         self,
         mode: PausableMode,
@@ -115,6 +121,10 @@ impl LatencyTrace {
         pt
     }
 
+    /// Measures latencies of spans in `f`, returning a [`PausableTrace`] that allows measurements to be
+    /// paused and reported before `f` completes.
+    /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
+    /// previously called in the same process.
     pub fn measure_latencies_pausable_tokio<F>(
         self,
         mode: PausableMode,

@@ -34,22 +34,26 @@ This framework uses [hdrhistogram](https://docs.rs/hdrhistogram/latest/hdrhistog
 Two other design choices support the low overhead goal.
 
 - The _tracing_ library's [Registry](https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/registry/struct.Registry.html#) is used to store temporary timing data at runtime. As noted in the documentation, "This registry is implemented using a [lock-free sharded slab](https://docs.rs/sharded-slab/0.1.4/x86_64-unknown-linux-gnu/sharded_slab/index.html), and is highly optimized for concurrent access."
-- Runtime data collection takes place independently on each thread, overwhelmingly without the need for inter-thread coordination. The only inter-thread coordination involved is one mutex lock request per thread for the entire duration of the measurement, regardless of the number of spans executed. _After_ the test execution has completed, information is collated from the various threads, with zero impact on the latency measurements. The [thread-local-drop] framework is used to support this design approach.
+- Runtime data collection takes place independently on each thread, overwhelmingly without the need for inter-thread coordination. The only inter-thread coordination involved is one mutex lock request per thread for the entire duration of the measurement, regardless of the number of spans executed. _After_ the test execution has completed, information is extracted from the various threads, with zero impact on the latency measurements. The [thread-local-drop] framework is used to support this design approach.
 
 ## Usage modes
 
-This framework is used to measure latencies for a sync or async function `f` that takes not arguments and contains code instrumented  with the *tracing* framework.  Any code to be measured can be wrapped by such a function.
+This framework is used to measure latencies for a sync or async function `f` that takes no arguments and contains code instrumented with the _tracing_ framework. Any code to be measured can be wrapped by such a function.
 
 The following modes of latency information reporting are supported:
 
-- ***Direct*** -- Information is reported only after `f` terminates.
-- ***Pausable*** -- Partial information can be reported during `f`'s execution. In this case, there are two sub-options:
-  - ***Nonblocking*** -- `f`'s execution continues normally but latency information collection is paused while the previously collected data is collated for reporting. In this case, some latency information is lost during the collection pause. This is the preferred option.
-  - ***Blocking*** -- `f`'s execution is blocked while the previously collected data is collated for reporting. In this case, there is no loss of latency information but there is distortion of latencies for the period during which `f`'s execution was paused.
+- **_Direct_** -- Information is reported only after `f` terminates.
+- **_Pausable_** -- Partial information can be reported during `f`'s execution. In this case, there are two sub-options:
+  - **_Nonblocking_** -- `f`'s execution continues normally but latency information collection is paused while the previously collected data is extracted for reporting. In this case, some latency information is lost during the collection pause. This is the preferred option.
+  - **_Blocking_** -- `f`'s execution is blocked while the previously collected data is extracted for reporting. In this case, there is no loss of latency information but there is distortion of latencies for the period during which `f`'s execution was paused.
 
-The *direct* mode has the lowest overhead -- see [Key design choices](#key-design-choices) above. It is suitable for code that runs to completion in a reasonable amount of time.
+The _direct_ mode has the lowest overhead -- see [Key design choices](#key-design-choices) above. It is suitable for code that runs to completion in a reasonable amount of time.
 
-The *pausable* modes are suitable for code that is expected to run for extended periods of time, including servers. The *pausable* modes add some overhead beyond the direct mode as a read is performed on an [RwLock](https://doc.rust-lang.org/stable/std/sync/struct.RwLock.html) for each span. Informal benchmarking performed by the author indicates that this additional overhead is small, but this depends on the use case and the user is encouraged to perform their own benchmarks.
+The _pausable_ modes are suitable for code that is expected to run for extended periods of time, including servers. The _pausable_ modes add some overhead beyond the direct mode as a read is performed on an [RwLock](https://doc.rust-lang.org/stable/std/sync/struct.RwLock.html) for each span. Informal benchmarking performed by the author indicates that this additional overhead is small, but this depends on the use case and the user is encouraged to perform their own benchmarks.
+
+## Async runtimes
+
+This framework supports [tokio](https://crates.io/crates/tokio) out-of-the-box (see [`LatencyTrace::measure_latencies_tokio`] and [`LatencyTrace::measure_latencies_pausable_tokio`]) but other async runtimes can be used as well by simply wrapping the async code with the chosen async runtime and using one of the sync methods ([`LatencyTrace::measure_latencies`] or [`LatencyTrace::measure_latencies_pausable`]). The source code for the above-mentioned _tokio_ variants shows exactly how to do it.
 
 ## Example usage
 
@@ -189,13 +193,10 @@ fn main() {
 }
 ```
 
-## Async runtimes
-
-This framework supports [tokio](https://crates.io/crates/tokio) out-of-the-box (see [`LatencyTrace::measure_latencies_tokio`] and [`LatencyTrace::measure_latencies_pausable_tokio`]) but other async runtimes can be used as well by simply wrapping the async code with the chosen async runtime and using one of the sync methods ([`LatencyTrace::measure_latencies`] or [`LatencyTrace::measure_latencies_pausable`]). The source code for the above-mentioned *tokio* variants shows exactly how to do it.
+**Async pausable** is similar to the above but uses [`LatencyTrace::measure_latencies_pausable_tokio`] instead.
 
 ## Related work
 
 [tracing-timing](https://crates.io/crates/tracing-timing/0.2.8) also collects latency information for code instrumented with the [tracing](https://crates.io/crates/tracing) library, using histograms from [hdrhistogram](https://crates.io/crates/hdrhistogram). _tracing-timing_ collects latencies for [events](https://docs.rs/tracing/0.1.37/tracing/#events) within [spans](https://docs.rs/tracing/0.1.37/tracing/#spans). This provides more flexibility but also requires events to be defined within spans in order to measure latencies. Interpreting the latency results associated with events can be challenging for async code. By contrast, this framework simply measures span latencies and ignores events.
 
 I am grateful to the author of _tracing-timing_ for creating a high-quality, well-documented library which introduced me to the _hdrhistogram_ crate and provided key insights into latency tracing concepts and mechanisms.
-

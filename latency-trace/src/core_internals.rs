@@ -145,7 +145,9 @@ impl Timing {
 //=================
 // Timings
 
-/// Type of timing information recorded for span groups.
+/// Mapping of [SpanGroup]s to the [Timing] information recorded for them.
+///
+/// Any map iterator shows parent span groups before their children.
 pub type Timings = BTreeMapExt<SpanGroup, Timing>;
 
 impl Timings {
