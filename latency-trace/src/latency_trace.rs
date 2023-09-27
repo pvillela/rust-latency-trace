@@ -81,8 +81,10 @@ impl LatencyTrace {
         let ltp = LatencyTracePriv::new(self.0);
         Registry::default().with(ltp.clone()).init();
         f();
-        ltp.control.ensure_tls_dropped();
-        let lp = ltp.take_latencies_priv();
+        let mut lock = ltp.control.lock();
+        ltp.control.ensure_tls_dropped(&mut lock);
+        let lp = ltp.take_latencies_priv(&mut lock);
+        drop(lock);
         ltp.generate_latencies(lp)
     }
 

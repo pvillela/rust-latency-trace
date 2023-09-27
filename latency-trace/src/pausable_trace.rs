@@ -51,10 +51,12 @@ impl PausableTrace {
     /// Pauses latency information collection, extracts what has been collected thus far from the various threads,
     /// and returns the results. Latency collection resumes after extraction of the previously collected information.
     pub fn pause_and_report(&self) -> Latencies {
-        let lock = self.allow_updates.write().unwrap();
-        self.ltp.control.ensure_tls_dropped();
-        let lp = self.ltp.take_latencies_priv();
-        drop(lock);
+        let allow_updates_lock = self.allow_updates.write().unwrap();
+        let mut control_lock = self.ltp.control.lock();
+        self.ltp.control.ensure_tls_dropped(&mut control_lock);
+        let lp = self.ltp.take_latencies_priv(&mut control_lock);
+        drop(control_lock);
+        drop(allow_updates_lock);
         self.ltp.generate_latencies(lp)
     }
 
@@ -62,8 +64,10 @@ impl PausableTrace {
     pub fn wait_and_report(&self) -> Latencies {
         let join_handle = self.join_handle.try_lock().unwrap().take().unwrap();
         join_handle.join().unwrap();
-        self.ltp.control.ensure_tls_dropped();
-        let lp = self.ltp.take_latencies_priv();
+        let mut control_lock = self.ltp.control.lock();
+        self.ltp.control.ensure_tls_dropped(&mut control_lock);
+        let lp = self.ltp.take_latencies_priv(&mut control_lock);
+        drop(control_lock);
         self.ltp.generate_latencies(lp)
     }
 }

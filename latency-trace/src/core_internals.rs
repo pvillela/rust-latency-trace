@@ -1,5 +1,6 @@
 //! Core library implementation.
 
+use crate::{histogram_summary, BTreeMapExt, Mappable, SummaryStats};
 use hdrhistogram::Histogram;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -8,11 +9,9 @@ use std::{
     thread::{self, ThreadId},
     time::Instant,
 };
-use thread_local_drop::{self, Control, Holder};
+use thread_local_drop::{self, Control, ControlLock, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
-
-use crate::{histogram_summary, BTreeMapExt, Mappable, SummaryStats};
 
 //=================
 // Callsite
@@ -461,9 +460,11 @@ impl LatencyTracePriv {
 
     /// This is exposed separately from [Self::generate_latencies] to isolate the code that holds the control lock.
     /// This is useful in the implementation of `PausableTrace` in the `latency-trace` crate.
-    pub(crate) fn take_latencies_priv(&self) -> LatenciesPriv {
-        self.control.take_acc(LatenciesPriv::new())
-            .expect("Control::take_acc should always return Ok when called after Control::ensure_tls_dropped")
+    pub(crate) fn take_latencies_priv(
+        &self,
+        lock: &mut ControlLock<'_, LatenciesPriv>,
+    ) -> LatenciesPriv {
+        self.control.take_acc(lock, LatenciesPriv::new())
     }
 
     /// Generates the publicly accessible [`Latencies`] in post-processing after all thread-local
