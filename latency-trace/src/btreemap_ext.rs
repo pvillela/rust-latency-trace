@@ -1,9 +1,6 @@
 use crate::Wrapper;
 use std::{borrow::Borrow, collections::BTreeMap};
 
-//=================
-// BTreeMapExt
-
 /// Wrapper of [BTreeMap] that provides an additional [`map_values`](Self::map_values) method.
 /// As this type [Deref](std::ops::Deref)s to [BTreeMap] and implements [IntoIterator]s with the same results as
 /// those of [BTreeMap], it supports `for` loops and all immutable [BTreeMap] methods.

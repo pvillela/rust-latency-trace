@@ -1,6 +1,6 @@
 //! Core library implementation.
 
-use crate::{histogram_summary, BTreeMapExt, Mappable, SummaryStats};
+use crate::{histogram_summary, BTreeMapExt, SummaryStats, Wrapper};
 use hdrhistogram::Histogram;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -128,7 +128,7 @@ struct SpanGroupTemp {
 // Timing
 
 /// Wraps an auto-resizable [`Histogram<u64>`].
-pub type Timing = Mappable<Histogram<u64>>;
+pub type Timing = Wrapper<Histogram<u64>>;
 
 impl Timing {
     /// Constructs a [`Timing`]. The arguments correspond to [hdrhistogram::Histogram::high] and
@@ -138,6 +138,10 @@ impl Timing {
         hist.auto(true);
 
         Self::wrap(hist)
+    }
+
+    pub fn map<U>(&self, mut f: impl FnMut(&Histogram<u64>) -> U) -> Wrapper<U> {
+        Wrapper(f(&self.0))
     }
 }
 
