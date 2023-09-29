@@ -1,6 +1,6 @@
 //! Core library implementation.
 
-use crate::{histogram_summary, BTreeMapExt, Mappable, SummaryStats};
+use crate::{histogram_summary, BTreeMapExt, SummaryStats};
 use hdrhistogram::Histogram;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -128,17 +128,14 @@ struct SpanGroupTemp {
 // Timing
 
 /// Wraps an auto-resizable [`Histogram<u64>`].
-pub type Timing = Mappable<Histogram<u64>>;
+pub type Timing = Histogram<u64>;
 
-impl Timing {
-    /// Constructs a [`Timing`]. The arguments correspond to [hdrhistogram::Histogram::high] and
-    ///  [hdrhistogram::Histogram::sigfig].
-    fn new(hist_high: u64, hist_sigfig: u8) -> Self {
-        let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
-        hist.auto(true);
-
-        Self::wrap(hist)
-    }
+/// Constructs a [`Timing`]. The arguments correspond to [hdrhistogram::Histogram::high] and
+///  [hdrhistogram::Histogram::sigfig].
+fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
+    let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
+    hist.auto(true);
+    hist
 }
 
 //=================
@@ -147,7 +144,9 @@ impl Timing {
 /// Mapping of [SpanGroup]s to the [Timing] information recorded for them.
 ///
 /// Any map iterator shows parent span groups before their children.
-pub type Timings = BTreeMapExt<SpanGroup, Timing>;
+pub type Timings = BTreeMap<SpanGroup, Timing>;
+
+pub trait Aggregatable
 
 impl Timings {
     /// Combines histograms of span group according to sets of span groups that yield the same value when `f`

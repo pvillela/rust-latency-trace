@@ -211,9 +211,6 @@ pub use crate::latency_trace::*;
 mod summary_stats;
 pub use summary_stats::*;
 
-mod wrapper;
-pub use wrapper::*;
-
 mod btreemap_ext;
 pub use btreemap_ext::*;
 
