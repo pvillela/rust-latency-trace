@@ -1,6 +1,6 @@
 //! Core library implementation.
 
-use crate::{histogram_summary, BTreeMapExt, SummaryStats, Wrapper};
+use crate::{histogram_summary, BTreeMapExt, SummaryStats};
 use hdrhistogram::Histogram;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -127,22 +127,15 @@ struct SpanGroupTemp {
 //=================
 // Timing
 
-/// Wraps an auto-resizable [`Histogram<u64>`].
-pub type Timing = Wrapper<Histogram<u64>>;
+/// Alias of [`Histogram<u64>`].
+pub type Timing = Histogram<u64>;
 
-impl Timing {
-    /// Constructs a [`Timing`]. The arguments correspond to [hdrhistogram::Histogram::high] and
-    ///  [hdrhistogram::Histogram::sigfig].
-    fn new(hist_high: u64, hist_sigfig: u8) -> Self {
-        let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
-        hist.auto(true);
-
-        Self::wrap(hist)
-    }
-
-    pub fn map<U>(&self, mut f: impl FnMut(&Histogram<u64>) -> U) -> Wrapper<U> {
-        Wrapper(f(&self.0))
-    }
+/// Constructs a [`Timing`]. The arguments correspond to [hdrhistogram::Histogram::high] and
+///  [hdrhistogram::Histogram::sigfig].
+fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
+    let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
+    hist.auto(true);
+    hist
 }
 
 //=================
@@ -151,9 +144,10 @@ impl Timing {
 /// Mapping of [SpanGroup]s to the [Timing] information recorded for them.
 ///
 /// Any map iterator shows parent span groups before their children.
-pub type Timings = BTreeMapExt<SpanGroup, Timing>;
+pub type Timings = BTreeMap<SpanGroup, Timing>;
 
-impl Timings {
+/// Adds an [`aggregate`](Self::aggregate) method to [`Timings`];
+pub trait TimingsAggregate {
     /// Combines histograms of span group according to sets of span groups that yield the same value when `f`
     /// is applied. The values resulting from applying `f` to span groups are called ***aggregate key***s and
     /// the sets of span groups corresponding to each *aggregate key* are called ***aggregates***.
@@ -162,12 +156,15 @@ impl Timings {
     /// have the same callsite.
     ///
     /// This function returns a pair with the following components:
-    /// - a [BTreeMapExt] that associates each *aggregate key* to its aggregated histogram;
+    /// - a [BTreeMap] that associates each *aggregate key* to its aggregated histogram;
     /// - a boolean that is `true` if the aggregation is consistent, `false` otherwise.
-    pub fn aggregate<G>(
-        &self,
-        f: impl Fn(&SpanGroup) -> G,
-    ) -> (BTreeMapExt<G, Histogram<u64>>, bool)
+    fn aggregate<G>(&self, f: impl Fn(&SpanGroup) -> G) -> (BTreeMap<G, Histogram<u64>>, bool)
+    where
+        G: Ord + Clone;
+}
+
+impl TimingsAggregate for Timings {
+    fn aggregate<G>(&self, f: impl Fn(&SpanGroup) -> G) -> (BTreeMap<G, Histogram<u64>>, bool)
     where
         G: Ord + Clone,
     {
@@ -180,11 +177,11 @@ impl Timings {
             let hist = match res.get_mut(&g) {
                 Some(hist) => hist,
                 None => {
-                    res.insert(g.clone(), Histogram::new_from(&v.0));
+                    res.insert(g.clone(), Histogram::new_from(&v));
                     res.get_mut(&g).unwrap()
                 }
             };
-            hist.add(&v.0).unwrap();
+            hist.add(v).unwrap();
 
             // Check aggregation consistency.
             if aggregates_are_consistent {
@@ -198,7 +195,7 @@ impl Timings {
             }
         }
 
-        (res.into(), aggregates_are_consistent)
+        (res, aggregates_are_consistent)
     }
 }
 
@@ -213,7 +210,7 @@ impl Timings {
 #[derive(Debug)]
 pub struct Latencies {
     pub(crate) span_groups: Vec<SpanGroup>,
-    pub(crate) timings: BTreeMapExt<SpanGroup, Timing>,
+    pub(crate) timings: BTreeMap<SpanGroup, Timing>,
 }
 
 impl Latencies {
@@ -224,11 +221,11 @@ impl Latencies {
 
     /// Returns a mapping from the span groups to the [`Timing`] information
     /// collected for them. The span groups are ordered such that parent span groups appear before their children.
-    pub fn timings(&self) -> &BTreeMapExt<SpanGroup, Timing> {
+    pub fn timings(&self) -> &BTreeMap<SpanGroup, Timing> {
         &self.timings
     }
 
-    pub fn summary_stats(&self) -> BTreeMapExt<SpanGroup, SummaryStats> {
+    pub fn summary_stats(&self) -> BTreeMap<SpanGroup, SummaryStats> {
         self.timings.map_values(histogram_summary)
     }
 }
@@ -286,8 +283,8 @@ impl LatencyTraceCfg {
                 let timing = acc
                     .timings
                     .entry(k)
-                    .or_insert_with(|| Timing::new(hist_high, hist_sigfig));
-                timing.0.add(v.0).unwrap();
+                    .or_insert_with(|| new_timing(hist_high, hist_sigfig));
+                timing.add(v).unwrap();
             }
         }
     }
@@ -353,7 +350,7 @@ impl LatencyTracePriv {
                     );
                     timings.insert(
                         span_group_priv.clone(),
-                        Timing::new(self.hist_high, self.hist_sigfig),
+                        new_timing(self.hist_high, self.hist_sigfig),
                     );
                     timings.get_mut(span_group_priv).unwrap()
                 }
@@ -534,7 +531,6 @@ where
 
         self.update_timings(&span_group_priv, |timing| {
             timing
-                .0
                 .record((Instant::now() - span_timing.created_at).as_micros() as u64)
                 .unwrap();
         });

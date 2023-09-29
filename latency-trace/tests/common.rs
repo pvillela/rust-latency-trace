@@ -1,5 +1,5 @@
 use dev_utils::test_structs::{SpanNameTestSpec, TestSpec};
-use latency_trace::Latencies;
+use latency_trace::{Latencies, TimingsAggregate};
 use std::collections::HashSet;
 
 pub fn are_close(left: f64, right: f64, pct: f64) -> bool {
@@ -134,8 +134,8 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
             parent_name.map(|parent_name| parent_name_set.insert(parent_name));
             parent_props.map(|parent_props| parent_props_set.insert(parent_props));
 
-            let total_time_mean = timing.value().mean();
-            let total_time_count = timing.value().len();
+            let total_time_mean = timing.mean();
+            let total_time_count = timing.len();
 
             {
                 assert!(

@@ -13,7 +13,7 @@ pub fn print_summary(latencies: &Latencies) {
     println!("\nSummary statistics by span group:");
 
     for (span_group, v) in latencies.timings() {
-        let summary = v.map(histogram_summary);
+        let summary = histogram_summary(v);
         println!("  * {:?}, {:?}", span_group, summary);
     }
 }
