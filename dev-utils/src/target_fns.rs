@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_names)]
+
 use std::{thread, time::Duration};
 use tracing::{instrument, trace_span, Instrument};
 
