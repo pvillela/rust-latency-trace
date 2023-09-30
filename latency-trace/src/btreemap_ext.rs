@@ -19,6 +19,5 @@ impl<K, V> BTreeMapExt<K, V> for BTreeMap<K, V> {
         self.iter()
             .map(|(k, v)| (k.clone(), f(v.borrow())))
             .collect::<BTreeMap<_, _>>()
-            .into()
     }
 }

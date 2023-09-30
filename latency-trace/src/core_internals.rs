@@ -177,7 +177,7 @@ impl TimingsAggregate for Timings {
             let hist = match res.get_mut(&g) {
                 Some(hist) => hist,
                 None => {
-                    res.insert(g.clone(), Histogram::new_from(&v));
+                    res.insert(g.clone(), Histogram::new_from(v));
                     res.get_mut(&g).unwrap()
                 }
             };
@@ -436,7 +436,7 @@ impl LatencyTracePriv {
             };
             let parent_idx = match parent_sgp {
                 None => None,
-                Some(psgp) => sgp_to_idx.get(&psgp).map(|idx| *idx),
+                Some(psgp) => sgp_to_idx.get(&psgp).copied(),
             };
 
             let sg = &mut span_groups[*idx];
@@ -455,7 +455,7 @@ impl LatencyTracePriv {
 
         Latencies {
             span_groups,
-            timings: timings.into(),
+            timings,
         }
     }
 
