@@ -1,13 +1,16 @@
-use dev_utils::test_structs::{SpanNameTestSpec, TestSpec};
+use dev_utils::test_support::{f64_are_close, u64_comparator, SpanNameTestSpec, TestSpec};
 use latency_trace::{Latencies, TimingsAggregate};
 use std::collections::HashSet;
 
-pub fn are_close(left: f64, right: f64, pct: f64) -> bool {
-    let avg_abs = (left.abs() + right.abs()) / 2.0;
-    (left - right).abs() <= avg_abs * pct
+pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
+    run_test_general(ltcs, test_spec, u64_comparator(0.0))
 }
 
-pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
+pub fn run_test_general(
+    ltcs: &Latencies,
+    test_spec: TestSpec,
+    timing_count_comparator: impl Fn(u64, u64) -> bool,
+) {
     let span_groups_and_keys_are_same = ltcs
         .span_groups()
         .iter()
@@ -92,13 +95,13 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
             let total_time_count = agg_timing.len();
 
             assert!(
-                are_close(total_time_mean, expected_total_time_mean, 0.2),
+                f64_are_close(total_time_mean, expected_total_time_mean, 0.2),
                 "{name} aggregate total_time_mean: {total_time_mean}, {}",
                 expected_total_time_mean
             );
 
-            assert_eq!(
-                total_time_count, expected_agg_by_name_count,
+            assert!(
+                timing_count_comparator(total_time_count, expected_agg_by_name_count),
                 "{name} aggregate total_time_count: {total_time_count}, {expected_agg_by_name_count}"
             );
         }
@@ -139,12 +142,12 @@ pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
 
             {
                 assert!(
-                    are_close(total_time_mean, expected_total_time_mean, 0.25),
+                    f64_are_close(total_time_mean, expected_total_time_mean, 0.25),
                     "{name} total_time_mean: {total_time_mean}, {expected_total_time_mean}"
                 );
 
-                assert_eq!(
-                    total_time_count, expected_timing_count,
+                assert!(
+                    timing_count_comparator(total_time_count, expected_timing_count),
                     "{name} total_time_count: {total_time_count}, {expected_timing_count}"
                 );
             };

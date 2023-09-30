@@ -1,3 +1,3 @@
 pub mod gen_random;
 pub mod target_fns;
-pub mod test_structs;
+pub mod test_support;

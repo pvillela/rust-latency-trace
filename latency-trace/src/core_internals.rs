@@ -109,10 +109,10 @@ impl SpanGroup {
 /// data collection.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct SpanGroupPriv {
-    /// callsite ID of the span group followed by the callsite IDs of its ancestors.
+    /// callsite ID of the span group preceded by the callsite IDs of its ancestors.
     callsite_id_path: CallsiteIdPath,
 
-    /// Properties of the span group followed by the properties of its ancestors.
+    /// Properties of the span group preceded by the properties of its ancestors.
     props_path: PropsPath,
 }
 

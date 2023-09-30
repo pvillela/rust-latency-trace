@@ -1,5 +1,20 @@
 use std::collections::BTreeMap;
 
+pub fn f64_are_close(left: f64, right: f64, pct: f64) -> bool {
+    let avg_abs = (left.abs() + right.abs()) / 2.0;
+    (left - right).abs() <= avg_abs * pct
+}
+
+pub fn u64_comparator(pct: f64) -> impl Fn(u64, u64) -> bool {
+    move |left: u64, right: u64| {
+        if pct == 0.0 {
+            return left.abs_diff(right) == 0;
+        }
+        let avg_abs = (left as f64 + right as f64) / 2.0;
+        left.abs_diff(right) as f64 <= avg_abs * pct
+    }
+}
+
 #[derive(Debug)]
 pub struct SpanNameTestSpec {
     pub expected_props: Vec<Vec<(&'static str, &'static str)>>,

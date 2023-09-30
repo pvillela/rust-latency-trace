@@ -3,7 +3,7 @@ mod common;
 use common::run_test;
 use dev_utils::{
     target_fns::target_fn,
-    test_structs::{
+    test_support::{
         span_name_test_spec_f, span_name_test_spec_inner_async_span,
         span_name_test_spec_outer_async_span, span_name_test_spec_root_async_1,
         span_name_test_spec_root_async_2, span_name_test_spec_sync_span_1,
