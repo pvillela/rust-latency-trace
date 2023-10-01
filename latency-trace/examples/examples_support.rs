@@ -1,19 +1,24 @@
-use latency_trace::{histogram_summary, Latencies};
+use std::collections::BTreeMap;
 
-pub fn print_summary(latencies: &Latencies) {
+use latency_trace::{summary_stats, SpanGroup, Timings};
+
+pub fn print_summary(latencies: &Timings) {
+    let id_to_span_group: BTreeMap<u64, SpanGroup> =
+        latencies.keys().map(|k| (k.id(), k.clone())).collect();
+
     println!("\nSpan group parents:");
 
-    for span_group in latencies.span_groups() {
+    for span_group in latencies.keys() {
         let parent = span_group
-            .parent_idx()
-            .map(|pidx| &latencies.span_groups()[pidx]);
+            .parent_id()
+            .map(|pid| id_to_span_group.get(&pid).unwrap());
         println!("  * {:?} -> {:?}", span_group, parent);
     }
 
     println!("\nSummary statistics by span group:");
 
-    for (span_group, v) in latencies.timings() {
-        let summary = histogram_summary(v);
+    for (span_group, v) in latencies {
+        let summary = summary_stats(v);
         println!("  * {:?}, {:?}", span_group, summary);
     }
 }

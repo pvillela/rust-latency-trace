@@ -108,11 +108,11 @@ pub fn run_test_general(
 
         // Assertions by SpanGroup
         for (span_group, timing) in ltcs.timings().iter().filter(|(k, _)| k.name() == name) {
-            let idx = span_group.idx();
+            let id = span_group.id();
             assert_eq!(
                 span_group,
-                ltcs.span_groups().get(idx).unwrap(),
-                "the span_group must be found in span_groups vector at position `idx`: {:?}",
+                ltcs.span_groups().get(id).unwrap(),
+                "the span_group must be found in span_groups vector at position `id`: {:?}",
                 span_group
             );
 
@@ -122,8 +122,8 @@ pub fn run_test_general(
             let parent_idx = span_group.parent_idx();
             parent_idx.map(|parent_idx| {
                 assert!(
-                    parent_idx < idx,
-                    "parent_idx {parent_idx} must be less than span_group.idx {idx}; name={name}",
+                    parent_idx < id,
+                    "parent_idx {parent_idx} must be less than span_group.id {id}; name={name}",
                 );
             });
 

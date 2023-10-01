@@ -1,4 +1,4 @@
-use latency_trace::{LatencyTrace, PausableMode};
+use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace, PausableMode};
 use std::{thread, time::Duration};
 use tracing::{instrument, trace_span};
 
@@ -31,12 +31,12 @@ fn main() {
     let latencies2 = pausable.wait_and_report();
 
     println!("\nlatencies1 in microseconds");
-    for (span_group, stats) in latencies1.summary_stats() {
+    for (span_group, stats) in latencies1.map_values(summary_stats) {
         println!("  * {:?}, {:?}", span_group, stats);
     }
 
     println!("\nlatencies2 in microseconds");
-    for (span_group, stats) in latencies2.summary_stats() {
+    for (span_group, stats) in latencies2.map_values(summary_stats) {
         println!("  * {:?}, {:?}", span_group, stats);
     }
 }

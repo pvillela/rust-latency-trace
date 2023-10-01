@@ -1,4 +1,4 @@
-use crate::{Latencies, LatencyTracePriv};
+use crate::{LatencyTracePriv, Timings};
 use std::{
     sync::{Arc, Mutex, RwLock, TryLockError},
     thread::JoinHandle,
@@ -50,25 +50,25 @@ impl PausableTrace {
 
     /// Pauses latency information collection, extracts what has been collected thus far from the various threads,
     /// and returns the results. Latency collection resumes after extraction of the previously collected information.
-    pub fn pause_and_report(&self) -> Latencies {
+    pub fn pause_and_report(&self) -> Timings {
         let allow_updates_lock = self.allow_updates.write().unwrap();
         let mut control_lock = self.ltp.control.lock();
         self.ltp.control.ensure_tls_dropped(&mut control_lock);
         let lp = self.ltp.take_latencies_priv(&mut control_lock);
         drop(control_lock);
         drop(allow_updates_lock);
-        self.ltp.generate_latencies(lp)
+        self.ltp.generate_timings(lp)
     }
 
     /// Blocks until the function being measured completes, and then returns the collected latency information.
-    pub fn wait_and_report(&self) -> Latencies {
+    pub fn wait_and_report(&self) -> Timings {
         let join_handle = self.join_handle.try_lock().unwrap().take().unwrap();
         join_handle.join().unwrap();
         let mut control_lock = self.ltp.control.lock();
         self.ltp.control.ensure_tls_dropped(&mut control_lock);
         let lp = self.ltp.take_latencies_priv(&mut control_lock);
         drop(control_lock);
-        self.ltp.generate_latencies(lp)
+        self.ltp.generate_timings(lp)
     }
 }
 

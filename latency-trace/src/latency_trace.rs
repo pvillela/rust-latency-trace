@@ -1,7 +1,7 @@
 //! Main public interface extension to the core library, including latency measurement methods.
 
 use crate::{
-    default_span_grouper, Latencies, LatencyTraceCfg, LatencyTracePriv, PausableMode, PausableTrace,
+    default_span_grouper, LatencyTraceCfg, LatencyTracePriv, PausableMode, PausableTrace, Timings,
 };
 use std::{future::Future, sync::Arc, thread};
 use tracing::span::Attributes;
@@ -77,7 +77,7 @@ impl LatencyTrace {
     /// Measures latencies of spans in `f`.
     /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
-    pub fn measure_latencies(self, f: impl FnOnce() + Send + 'static) -> Latencies {
+    pub fn measure_latencies(self, f: impl FnOnce() + Send + 'static) -> Timings {
         let ltp = LatencyTracePriv::new(self.0);
         Registry::default().with(ltp.clone()).init();
         f();
@@ -85,13 +85,13 @@ impl LatencyTrace {
         ltp.control.ensure_tls_dropped(&mut lock);
         let lp = ltp.take_latencies_priv(&mut lock);
         drop(lock);
-        ltp.generate_latencies(lp)
+        ltp.generate_timings(lp)
     }
 
     /// Measures latencies of spans in async function `f` running on the *tokio* runtime.
     /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
-    pub fn measure_latencies_tokio<F>(self, f: impl FnOnce() -> F + Send + 'static) -> Latencies
+    pub fn measure_latencies_tokio<F>(self, f: impl FnOnce() -> F + Send + 'static) -> Timings
     where
         F: Future<Output = ()> + Send,
     {

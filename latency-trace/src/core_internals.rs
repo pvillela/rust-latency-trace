@@ -1,7 +1,7 @@
 //! Core library implementation.
 
-use crate::{histogram_summary, BTreeMapExt, SummaryStats};
 use hdrhistogram::Histogram;
+use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, HashMap},
     hash::Hash,
@@ -10,7 +10,7 @@ use std::{
     time::Instant,
 };
 use thread_local_drop::{self, Control, ControlLock, Holder};
-use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
+use tracing::{span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
 //=================
@@ -35,17 +35,12 @@ impl CallsiteInfo {
     }
 }
 
-fn callsite_id_to_usize(id: &Identifier) -> usize {
-    let y = id.0 as *const dyn tracing::Callsite;
-    y as *const () as usize
-}
-
 //=================
 // SpanGroup
 
-type CallsiteIdPath = Arc<Vec<Identifier>>;
-type Props = Arc<Vec<(String, String)>>;
-type PropsPath = Arc<Vec<Props>>;
+type CallsiteInfoPath = Arc<Vec<Arc<CallsiteInfo>>>;
+type Props = Vec<(String, String)>;
+type PropsPath = Arc<Vec<Arc<Props>>>;
 
 /// Represents a set of [tracing::Span]s for which latency information should be collected as a group. It is
 /// the unit of latency information collection.
@@ -61,14 +56,15 @@ type PropsPath = Arc<Vec<Props>>;
 /// This struct holds the following information:
 /// - [`callsite`](Self::callsite) information
 /// - a [`props`](Self::props) field that contains the span group's list of name-value pairs (which may be empty)
-/// - an [`idx`](Self::idx) field that uniquely characterizes the span group
-/// - a [`parent_idx`](Self::parent_idx) field that is the `idx` field of the parent span group, if any.
+/// - an [`id`](Self::id) field that uniquely characterizes the span group
+/// - a [`parent_idx`](Self::parent_idx) field that is the `id` field of the parent span group, if any.
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
-    pub(crate) idx: usize,
     pub(crate) callsite: Arc<CallsiteInfo>,
-    pub(crate) props: Arc<Vec<(String, String)>>,
-    pub(crate) parent_idx: Option<usize>,
+    pub(crate) props: Arc<Props>,
+    pub(crate) depth: usize,
+    pub(crate) id: u64,
+    pub(crate) parent_id: Option<u64>,
 }
 
 impl SpanGroup {
@@ -95,25 +91,38 @@ impl SpanGroup {
     }
 
     /// Returns the span group's index in the list of all span groups.
-    pub fn idx(&self) -> usize {
-        self.idx
+    pub fn id(&self) -> u64 {
+        self.id
     }
 
     /// Returns the index of the span group's parent in the list of all span groups.
-    pub fn parent_idx(&self) -> Option<usize> {
-        self.parent_idx
+    pub fn parent_id(&self) -> Option<u64> {
+        self.parent_id
     }
 }
 
 /// Private form of spangroup used during trace collection, more efficient than [`SpanGroup`] for trace
 /// data collection.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-struct SpanGroupPriv {
-    /// callsite ID of the span group preceded by the callsite IDs of its ancestors.
-    callsite_id_path: CallsiteIdPath,
+pub(crate) struct SpanGroupPriv {
+    /// callsite info of the span group preceded by the callsite IDs of its ancestors.
+    callsite_info_path: CallsiteInfoPath,
 
     /// Properties of the span group preceded by the properties of its ancestors.
     props_path: PropsPath,
+}
+
+impl SpanGroupPriv {
+    fn parent(&self) -> Option<Self> {
+        let len = self.callsite_info_path.len();
+        if len == 1 {
+            return None;
+        }
+        Some(SpanGroupPriv {
+            callsite_info_path: Arc::new(self.callsite_info_path[0..len - 1].into()),
+            props_path: Arc::new(self.props_path[0..len - 1].into()),
+        })
+    }
 }
 
 /// Intermediate form of SpanGroup that is sortable and ensures that parents always appear before
@@ -130,8 +139,8 @@ struct SpanGroupTemp {
 /// Alias of [`Histogram<u64>`].
 pub type Timing = Histogram<u64>;
 
-/// Constructs a [`Timing`]. The arguments correspond to [hdrhistogram::Histogram::high] and
-///  [hdrhistogram::Histogram::sigfig].
+/// Constructs a [`Timing`]. The arguments correspond to [Histogram::high] and
+///  [Histogram::sigfig].
 fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
     let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
     hist.auto(true);
@@ -199,50 +208,7 @@ impl TimingsAggregate for Timings {
     }
 }
 
-//=================
-// Latencies
-
-/// Provides the list of [`SpanGroup`]s and  a mapping from the span groups to the [`Timing`] information
-/// collected for them.
-///
-/// The span groups are ordered such that parent span groups appear before their children.
-
-#[derive(Debug)]
-pub struct Latencies {
-    pub(crate) span_groups: Vec<SpanGroup>,
-    pub(crate) timings: BTreeMap<SpanGroup, Timing>,
-}
-
-impl Latencies {
-    /// Returns the list of [`SpanGroup`]s, ordered such that parent span groups appear before their children.
-    pub fn span_groups(&self) -> &[SpanGroup] {
-        &self.span_groups
-    }
-
-    /// Returns a mapping from the span groups to the [`Timing`] information
-    /// collected for them. The span groups are ordered such that parent span groups appear before their children.
-    pub fn timings(&self) -> &BTreeMap<SpanGroup, Timing> {
-        &self.timings
-    }
-
-    pub fn summary_stats(&self) -> BTreeMap<SpanGroup, SummaryStats> {
-        self.timings.map_values(histogram_summary)
-    }
-}
-
-pub(crate) struct LatenciesPriv {
-    callsites: HashMap<Identifier, Arc<CallsiteInfo>>,
-    timings: HashMap<SpanGroupPriv, Timing>,
-}
-
-impl LatenciesPriv {
-    fn new() -> Self {
-        Self {
-            callsites: HashMap::new(),
-            timings: HashMap::new(),
-        }
-    }
-}
+pub(crate) type TimingsPriv = HashMap<SpanGroupPriv, Timing>;
 
 //=================
 // SpanTiming
@@ -250,7 +216,7 @@ impl LatenciesPriv {
 /// Information about a span stored in the registry.
 #[derive(Debug)]
 struct SpanTiming {
-    callsite_id_path: CallsiteIdPath,
+    callsite_info_path: CallsiteInfoPath,
     props_path: PropsPath,
     created_at: Instant,
 }
@@ -269,19 +235,13 @@ pub(crate) struct LatencyTraceCfg {
 
 impl LatencyTraceCfg {
     /// Used to accumulate results on [`Control`].
-    fn op(&self) -> impl Fn(LatenciesPriv, &mut LatenciesPriv, &ThreadId) + Send + Sync + 'static {
+    fn op(&self) -> impl Fn(TimingsPriv, &mut TimingsPriv, &ThreadId) + Send + Sync + 'static {
         let hist_high = self.hist_high;
         let hist_sigfig = self.hist_sigfig;
-        move |data: LatenciesPriv, acc: &mut LatenciesPriv, tid: &ThreadId| {
+        move |timings: TimingsPriv, acc: &mut TimingsPriv, tid: &ThreadId| {
             log::debug!("executing `op` for {:?}", tid);
-            let callsites = data.callsites;
-            let timings = data.timings;
-            for (k, v) in callsites {
-                acc.callsites.entry(k).or_insert_with(|| v);
-            }
             for (k, v) in timings {
                 let timing = acc
-                    .timings
                     .entry(k)
                     .or_insert_with(|| new_timing(hist_high, hist_sigfig));
                 timing.add(v).unwrap();
@@ -296,7 +256,7 @@ impl LatencyTraceCfg {
 /// Provides access to [Timings] containing the latencies collected for different span groups.
 #[derive(Clone)]
 pub(crate) struct LatencyTracePriv {
-    pub(crate) control: Control<LatenciesPriv, LatenciesPriv>,
+    pub(crate) control: Control<TimingsPriv, TimingsPriv>,
     span_grouper: SpanGrouper,
     hist_high: u64,
     hist_sigfig: u8,
@@ -305,40 +265,15 @@ pub(crate) struct LatencyTracePriv {
 impl LatencyTracePriv {
     pub(crate) fn new(config: LatencyTraceCfg) -> LatencyTracePriv {
         LatencyTracePriv {
-            control: Control::new(LatenciesPriv::new(), config.op()),
+            control: Control::new(TimingsPriv::new(), config.op()),
             span_grouper: config.span_grouper,
             hist_high: config.hist_high,
             hist_sigfig: config.hist_sigfig,
         }
     }
 
-    fn ensure_callsites_updated(
-        &self,
-        callsite_id: Identifier,
-        callsite_fn: impl FnOnce() -> Arc<CallsiteInfo>,
-    ) {
-        log::trace!(
-            "entered `ensure_callsites_updated`for {:?} on {:?}",
-            callsite_id,
-            thread::current().id(),
-        );
-        self.control.with_tl_mut(&LOCAL_INFO, |info_priv| {
-            let callsites = &mut info_priv.callsites;
-            if callsites.contains_key(&callsite_id) {
-                // Both local and global callsites map are good for this callsite.
-                return;
-            }
-
-            // Update local callsites
-            {
-                callsites.insert(callsite_id, callsite_fn());
-            }
-        });
-    }
-
     fn update_timings(&self, span_group_priv: &SpanGroupPriv, f: impl Fn(&mut Timing)) {
-        self.control.with_tl_mut(&LOCAL_INFO, |lp| {
-            let timings = &mut lp.timings;
+        self.control.with_tl_mut(&LOCAL_INFO, |timings| {
             let timing = {
                 if let Some(timing) = timings.get_mut(span_group_priv) {
                     timing
@@ -366,114 +301,66 @@ impl LatencyTracePriv {
         });
     }
 
-    /// Step in transforming the accumulated data in Control into the [`Latencies`] output.
-    /// Due to their structure, SpanGroupTemp is sortable and ensures that parents always appear before
-    /// children in sort order.
-    fn to_latencies_1(lp: &LatenciesPriv) -> BTreeMap<SpanGroupTemp, SpanGroupPriv> {
-        lp.timings
-            .keys()
-            .map(|sgp| {
-                let callsite_uid_path = sgp
-                    .callsite_id_path
-                    .iter()
-                    .map(callsite_id_to_usize)
-                    .collect::<Vec<usize>>();
-                let sgt = SpanGroupTemp {
-                    callsite_uid_path,
-                    props_path: sgp.props_path.clone(),
-                };
-                (sgt, sgp.clone())
-            })
-            .collect()
-    }
-
-    /// Step in transforming the accumulated data in Control into the [`Latencies`] output.
-    /// Generages a vector os [SpanGroup]s, each with its `idx` but without `parent_idx`, as well as
-    /// a map from [SpanGroupPriv] to the corresponding idx in the vector.
-    /// Since the input is ordered so that parents always appear before their children, the resulting
-    /// [`SpanGroup`] instances have the same ordering, which is reflected by their `idx` field and
-    /// corresopnds to their position in the output vector.
-    fn to_latencies_2(
-        lp: &LatenciesPriv,
-        sgt_to_sgp: BTreeMap<SpanGroupTemp, SpanGroupPriv>,
-    ) -> (Vec<SpanGroup>, HashMap<SpanGroupPriv, usize>) {
-        let mut idx = 0;
-        let mut sgp_to_idx: HashMap<SpanGroupPriv, usize> = HashMap::new();
-        let mut span_groups: Vec<SpanGroup> = Vec::with_capacity(sgt_to_sgp.len());
-        sgt_to_sgp.into_iter().for_each(|(_, sgp)| {
-            let cid = sgp.callsite_id_path.last().unwrap();
-            let sg = SpanGroup {
-                callsite: lp.callsites.get(cid).unwrap().clone(),
-                props: sgp.props_path.last().unwrap().clone(),
-                idx,
-                parent_idx: None,
-            };
-            span_groups.push(sg);
-            sgp_to_idx.insert(sgp, idx);
-            idx += 1;
+    /// Transforms `sgp` to a SpanGroup and adds it to `sgp_to_sg`.
+    fn grow_sgp_to_sg(sgp: &SpanGroupPriv, sgp_to_sg: &mut HashMap<SpanGroupPriv, SpanGroup>) {
+        let parent_sgp = sgp.parent();
+        let parent_id = &parent_sgp.map(|parent_sgp| match sgp_to_sg.get(&parent_sgp) {
+            Some(sg) => sg.id,
+            None => {
+                Self::grow_sgp_to_sg(&parent_sgp, sgp_to_sg);
+                sgp_to_sg.get(&parent_sgp).unwrap().id
+            }
         });
-        (span_groups, sgp_to_idx)
+
+        let callsite = sgp.callsite_info_path.last().unwrap().clone();
+        let props = sgp.props_path.last().unwrap().clone();
+
+        let mut hasher = Sha256::new();
+        if let Some(parent_id) = parent_id {
+            hasher.update(parent_id.to_le_bytes());
+        }
+        hasher.update(format!("{:?}", callsite));
+        hasher.update(format!("{:?}", props));
+        let hash = hasher.finalize();
+        let id = u64::from_le_bytes(hash[0..8].try_into().unwrap());
+
+        let sg = SpanGroup {
+            callsite,
+            props,
+            depth: sgp.callsite_info_path.len(),
+            id,
+            parent_id: *parent_id,
+        };
+        sgp_to_sg.insert(sgp.clone(), sg);
     }
 
-    /// Step in transforming the accumulated data in Control into the [`Latencies`] output.
-    /// Adds the `parent_idx`to each [SpanGroup] in `span_groups` and produces the [Latencies] output.
-    fn to_latencies_3(
-        &self,
-        lp: LatenciesPriv,
-        mut span_groups: Vec<SpanGroup>,
-        sgp_to_idx: HashMap<SpanGroupPriv, usize>,
-    ) -> Latencies {
-        // Add parent_idx to items in `span_groups`
-        for (sgp, idx) in sgp_to_idx.iter() {
-            let path_len = sgp.callsite_id_path.len();
-            let parent_sgp = if path_len == 1 {
-                None
-            } else {
-                Some(SpanGroupPriv {
-                    callsite_id_path: Vec::from(&sgp.callsite_id_path[..path_len - 1]).into(),
-                    props_path: Vec::from(&sgp.props_path[..path_len - 1]).into(),
-                })
-            };
-            let parent_idx = match parent_sgp {
-                None => None,
-                Some(psgp) => sgp_to_idx.get(&psgp).copied(),
-            };
-
-            let sg = &mut span_groups[*idx];
-            sg.parent_idx = parent_idx;
+    /// Generates the publicly accessible [`Latencies`] in post-processing after all thread-local
+    /// data has been accumulated.
+    pub(crate) fn generate_timings(&self, tp: TimingsPriv) -> Timings {
+        let mut sgp_to_sg: HashMap<SpanGroupPriv, SpanGroup> = HashMap::new();
+        for sgp in tp.keys() {
+            Self::grow_sgp_to_sg(&sgp, &mut sgp_to_sg);
         }
 
-        let timings: BTreeMap<SpanGroup, Timing> = lp
-            .timings
+        let mut timings: Timings = tp
             .into_iter()
-            .map(|(sgp, timing)| {
-                let idx = *sgp_to_idx.get(&sgp).unwrap();
-                let sg = span_groups[idx].clone();
-                (sg, timing)
-            })
+            .map(|(sgp, timing)| (sgp_to_sg.remove(&sgp).unwrap(), timing))
             .collect();
 
-        Latencies {
-            span_groups,
-            timings,
+        for sg in sgp_to_sg.into_values() {
+            timings.insert(sg, new_timing(self.hist_high, self.hist_sigfig));
         }
+
+        timings
     }
 
     /// This is exposed separately from [Self::generate_latencies] to isolate the code that holds the control lock.
     /// This is useful in the implementation of `PausableTrace` in the `latency-trace` crate.
     pub(crate) fn take_latencies_priv(
         &self,
-        lock: &mut ControlLock<'_, LatenciesPriv>,
-    ) -> LatenciesPriv {
-        self.control.take_acc(lock, LatenciesPriv::new())
-    }
-
-    /// Generates the publicly accessible [`Latencies`] in post-processing after all thread-local
-    /// data has been accumulated.
-    pub(crate) fn generate_latencies(&self, lp: LatenciesPriv) -> Latencies {
-        let sgt_to_sgp = Self::to_latencies_1(&lp);
-        let (span_groups, sgp_to_idx) = Self::to_latencies_2(&lp, sgt_to_sgp);
-        self.to_latencies_3(lp, span_groups, sgp_to_idx)
+        lock: &mut ControlLock<'_, TimingsPriv>,
+    ) -> TimingsPriv {
+        self.control.take_acc(lock, TimingsPriv::new())
     }
 }
 
@@ -487,23 +374,27 @@ where
         log::trace!("`on_new_span` start: name={}, id={:?}", span.name(), id);
         let parent_span = span.parent();
 
-        let callsite_id = span.metadata().callsite();
+        let meta = span.metadata();
+        let callsite_info = CallsiteInfo {
+            name: span.name(),
+            code_line: format!("{}:{}", meta.file().unwrap(), meta.line().unwrap()),
+        };
         let props = (self.span_grouper)(attrs);
-        let (callsite_id_path, props_path) = match parent_span {
-            None => (vec![callsite_id], vec![Arc::new(props)]),
+        let (callsite_info_path, props_path) = match parent_span {
+            None => (vec![Arc::new(callsite_info)], vec![Arc::new(props)]),
             Some(parent_span) => {
                 let ext = parent_span.extensions();
                 let pst = ext.get::<SpanTiming>().unwrap();
-                let mut callsite_id_path = pst.callsite_id_path.as_ref().clone();
-                callsite_id_path.push(callsite_id);
+                let mut callsite_info_path = pst.callsite_info_path.as_ref().clone();
+                callsite_info_path.push(callsite_info.into());
                 let mut props_path = pst.props_path.as_ref().clone();
                 props_path.push(Arc::new(props));
-                (callsite_id_path, props_path)
+                (callsite_info_path, props_path)
             }
         };
 
         span.extensions_mut().insert(SpanTiming {
-            callsite_id_path: callsite_id_path.into(),
+            callsite_info_path: callsite_info_path.into(),
             props_path: props_path.into(),
             created_at: Instant::now(),
         });
@@ -518,14 +409,12 @@ where
     fn on_close(&self, id: Id, ctx: Context<'_, S>) {
         let span = ctx.span(&id).unwrap();
         log::trace!("`on_close` start: name={}, id={:?}", span.name(), id);
-        let meta = span.metadata();
-        let callsite_id = meta.callsite();
 
         let ext = span.extensions();
         let span_timing = ext.get::<SpanTiming>().unwrap();
 
         let span_group_priv = SpanGroupPriv {
-            callsite_id_path: span_timing.callsite_id_path.clone(),
+            callsite_info_path: span_timing.callsite_info_path.clone(),
             props_path: span_timing.props_path.clone(),
         };
 
@@ -541,12 +430,6 @@ where
             id
         );
 
-        self.ensure_callsites_updated(callsite_id, || {
-            let name = meta.name();
-            let code_line = format!("{}:{}", meta.file().unwrap(), meta.line().unwrap());
-            Arc::new(CallsiteInfo { name, code_line })
-        });
-
         log::trace!("`on_close` end: name={}, id={:?}", span.name(), id);
     }
 }
@@ -555,5 +438,5 @@ where
 // Thread-locals
 
 thread_local! {
-    static LOCAL_INFO: Holder<LatenciesPriv, LatenciesPriv> = Holder::new(LatenciesPriv::new);
+    static LOCAL_INFO: Holder<TimingsPriv, TimingsPriv> = Holder::new(TimingsPriv::new);
 }
