@@ -24,6 +24,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 hdrhistogram = "7.5"
 log = "0.4"
 sha2 = "0.10"
+base64ct = { version = "1", features = ["alloc"] }
 
 [dev-dependencies]
 dev-utils = { path = "../dev-utils" }

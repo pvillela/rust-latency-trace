@@ -1,5 +1,6 @@
 //! Core library implementation.
 
+use base64ct::{Base64, Encoding};
 use hdrhistogram::Histogram;
 use sha2::{Digest, Sha256};
 use std::{
@@ -63,8 +64,8 @@ pub struct SpanGroup {
     pub(crate) callsite: Arc<CallsiteInfo>,
     pub(crate) props: Arc<Props>,
     pub(crate) depth: usize,
-    pub(crate) id: u64,
-    pub(crate) parent_id: Option<u64>,
+    pub(crate) id: Arc<str>,
+    pub(crate) parent_id: Option<Arc<str>>,
 }
 
 impl SpanGroup {
@@ -90,14 +91,14 @@ impl SpanGroup {
         self.callsite.code_line()
     }
 
-    /// Returns the span group's index in the list of all span groups.
-    pub fn id(&self) -> u64 {
-        self.id
+    /// Returns the span group's ID.
+    pub fn id(&self) -> &str {
+        &self.id
     }
 
-    /// Returns the index of the span group's parent in the list of all span groups.
-    pub fn parent_id(&self) -> Option<u64> {
-        self.parent_id
+    /// Returns the ID of the span group's parent.
+    pub fn parent_id(&self) -> Option<&str> {
+        self.parent_id.iter().map(|x| x.as_ref()).next()
     }
 }
 
@@ -304,32 +305,35 @@ impl LatencyTracePriv {
     /// Transforms `sgp` to a SpanGroup and adds it to `sgp_to_sg`.
     fn grow_sgp_to_sg(sgp: &SpanGroupPriv, sgp_to_sg: &mut HashMap<SpanGroupPriv, SpanGroup>) {
         let parent_sgp = sgp.parent();
-        let parent_id = &parent_sgp.map(|parent_sgp| match sgp_to_sg.get(&parent_sgp) {
-            Some(sg) => sg.id,
-            None => {
-                Self::grow_sgp_to_sg(&parent_sgp, sgp_to_sg);
-                sgp_to_sg.get(&parent_sgp).unwrap().id
-            }
-        });
+        let parent_id: Option<Arc<str>> = parent_sgp
+            .iter()
+            .map(|parent_sgp| match sgp_to_sg.get(&parent_sgp) {
+                Some(sg) => sg.id.clone(),
+                None => {
+                    Self::grow_sgp_to_sg(&parent_sgp, sgp_to_sg);
+                    sgp_to_sg.get(&parent_sgp).unwrap().id.clone()
+                }
+            })
+            .next();
 
         let callsite = sgp.callsite_info_path.last().unwrap().clone();
         let props = sgp.props_path.last().unwrap().clone();
 
         let mut hasher = Sha256::new();
-        if let Some(parent_id) = parent_id {
-            hasher.update(parent_id.to_le_bytes());
+        if let Some(parent_id) = parent_id.clone() {
+            hasher.update(parent_id.as_ref());
         }
         hasher.update(format!("{:?}", callsite));
         hasher.update(format!("{:?}", props));
         let hash = hasher.finalize();
-        let id = u64::from_le_bytes(hash[0..8].try_into().unwrap());
+        let id = Base64::encode_string(&hash[0..12]);
 
         let sg = SpanGroup {
             callsite,
             props,
             depth: sgp.callsite_info_path.len(),
-            id,
-            parent_id: *parent_id,
+            id: id.into(),
+            parent_id,
         };
         sgp_to_sg.insert(sgp.clone(), sg);
     }
