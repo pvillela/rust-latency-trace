@@ -15,7 +15,7 @@
 //!
 //! ## Core concepts
 //!
-//! This library collects latency information for [spans](https://docs.rs/tracing/0.1.37/tracing/#spans). Spans are defined in the code using macros and functions from the Rust [tracing](https://crates.io/crates/tracing) library which define span **_callsite_**s, i.e., the places in the code where spans are defined. As the code is executed, a span definition in the code may be executed multiple times -- each such execution is a span instance. Span instances arising from the same span definition are grouped into [`SpanGroup`]s for latency information collection, which is done using [Histogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/struct.Histogram.html)s from the [hdrhistogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/) library.
+//! This library collects latency information for [spans](https://docs.rs/tracing/0.1.37/tracing/#spans). Spans are defined in the code using macros and functions from the Rust [tracing](https://crates.io/crates/tracing) library which define span **_callsite_**s, i.e., the places in the code where spans are defined. As the code is executed, a span definition in the code may be executed multiple times -- each such execution is a span instance. Span instances arising from the same span definition are grouped into [`SpanGroup`]s for latency information collection. Latencies are collected using [Histogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/struct.Histogram.html)s from the [hdrhistogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/) library.
 //!
 //! The grouping of spans for latency collection is not exactly based on the span definitions in the code. Spans at runtime are structured as a set of [span trees](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships) that correspond to the nesting of spans from code execution paths. The grouping of runtime spans for latency collection should respect the runtime parent-child relationships among spans.
 //!
@@ -23,7 +23,7 @@
 //!
 //! The coarsest-grained grouping of spans is characterized by a **_callsite path_** -- a callsite and the (possibly empty) list of its ancestor callsites based on the different runtime execution paths (see [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships)). This is the default `SpanGroup` definition. Finer-grained groupings of spans can differentiate groups of spans with the same callsite path by taking into account values computed at runtime from the spans' runtime [Attributes](https://docs.rs/tracing/0.1.37/tracing/span/struct.Attributes.html).
 //!
-//! While the granularity of latency information collection cannot be finer than a [`SpanGroup`], the collected latency information can be subsequently aggregated further by grouping `SpanGroup`s as needed (see [`TimingsAggregate::aggregate`].)
+//! While the granularity of latency information collection cannot be finer than a [`SpanGroup`], the collected latency information can be subsequently aggregated further by grouping `SpanGroup`s as needed (see [`TimingsExt::aggregate`].)
 //!
 //! ## Key design choices
 //!
@@ -71,7 +71,7 @@
 //!             });
 //!
 //!             // Simulated work
-//!             thread::sleep(Duration::from_micros(6000));
+//!             thread::sleep(Duration::from_micros(1200));
 //!
 //!             g();
 //!         });
@@ -81,7 +81,7 @@
 //! #[instrument(level = "trace")]
 //! fn g() {
 //!     // Simulated work
-//!     thread::sleep(Duration::from_micros(4000));
+//!     thread::sleep(Duration::from_micros(800));
 //! }
 //!
 //! fn main() {
@@ -114,7 +114,7 @@
 //!             });
 //!
 //!             // Simulated work
-//!             tokio::time::sleep(Duration::from_micros(6000)).await;
+//!             tokio::time::sleep(Duration::from_micros(1200)).await;
 //!
 //!             g().await;
 //!         }
@@ -126,7 +126,7 @@
 //! #[instrument(level = "trace")]
 //! async fn g() {
 //!     // Simulated work
-//!     tokio::time::sleep(Duration::from_micros(4000)).await;
+//!     tokio::time::sleep(Duration::from_micros(800)).await;
 //! }
 //!
 //! fn main() {
@@ -159,7 +159,7 @@
 //!             });
 //!
 //!             // Simulated work
-//!             thread::sleep(Duration::from_micros(6000));
+//!             thread::sleep(Duration::from_micros(1200));
 //!
 //!             g();
 //!         });
@@ -169,12 +169,12 @@
 //! #[instrument(level = "trace")]
 //! fn g() {
 //!     // Simulated work
-//!     thread::sleep(Duration::from_micros(4000));
+//!     thread::sleep(Duration::from_micros(800));
 //! }
 //!
 //! fn main() {
 //!     let pausable = LatencyTrace::default().measure_latencies_pausable(PausableMode::Nonblocking, f);
-//!     thread::sleep(Duration::from_micros(24000));
+//!     thread::sleep(Duration::from_micros(4800));
 //!     let latencies1 = pausable.pause_and_report();
 //!     let latencies2 = pausable.wait_and_report();
 //!

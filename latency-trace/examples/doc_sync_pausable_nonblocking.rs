@@ -11,7 +11,7 @@ fn f() {
             });
 
             // Simulated work
-            thread::sleep(Duration::from_micros(6000));
+            thread::sleep(Duration::from_micros(1200));
 
             g();
         });
@@ -21,12 +21,12 @@ fn f() {
 #[instrument(level = "trace")]
 fn g() {
     // Simulated work
-    thread::sleep(Duration::from_micros(4000));
+    thread::sleep(Duration::from_micros(800));
 }
 
 fn main() {
     let pausable = LatencyTrace::default().measure_latencies_pausable(PausableMode::Nonblocking, f);
-    thread::sleep(Duration::from_micros(24000));
+    thread::sleep(Duration::from_micros(4800));
     let latencies1 = pausable.pause_and_report();
     let latencies2 = pausable.wait_and_report();
 

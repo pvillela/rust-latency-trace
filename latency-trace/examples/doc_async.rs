@@ -11,7 +11,7 @@ async fn f() {
             });
 
             // Simulated work
-            tokio::time::sleep(Duration::from_micros(6000)).await;
+            tokio::time::sleep(Duration::from_micros(1200)).await;
 
             g().await;
         }
@@ -23,7 +23,7 @@ async fn f() {
 #[instrument(level = "trace")]
 async fn g() {
     // Simulated work
-    tokio::time::sleep(Duration::from_micros(4000)).await;
+    tokio::time::sleep(Duration::from_micros(800)).await;
 }
 
 fn main() {

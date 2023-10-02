@@ -46,7 +46,7 @@ type PropsPath = Arc<Vec<Arc<Props>>>;
 /// Represents a set of [tracing::Span]s for which latency information should be collected as a group. It is
 /// the unit of latency information collection.
 ///
-/// Spans are defined in the code using macros and functions from the Rust [tracing](https://crates.io/crates/tracing) library which define span ***callsite***s, i.e., the places in the code where spans are defined. As the code is executed, a span definition in the code may be executed multiple times -- each such execution is a span instance. Span instances arising from the same span definition are grouped into [`SpanGroup`]s for latency information collection, which is done using [Histogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/struct.Histogram.html)s from the [hdrhistogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/) library.
+/// Spans are defined in the code using macros and functions from the Rust [tracing](https://crates.io/crates/tracing) library which define span ***callsite***s, i.e., the places in the code where spans are defined. As the code is executed, a span definition in the code may be executed multiple times -- each such execution is a span instance. Span instances arising from the same span definition are grouped into [`SpanGroup`]s for latency information collection. Latencies are collected using [Histogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/struct.Histogram.html)s from the [hdrhistogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/) library.
 ///
 /// The grouping of spans for latency collection is not exactly based on the span definitions in the code. Spans at runtime are structured as a set of [span trees](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships) that correspond to the nesting of spans from code execution paths. The grouping of runtime spans for latency collection should respect the runtime parent-child relationships among spans.
 ///
@@ -58,7 +58,7 @@ type PropsPath = Arc<Vec<Arc<Props>>>;
 /// - [`callsite`](Self::callsite) information
 /// - a [`props`](Self::props) field that contains the span group's list of name-value pairs (which may be empty)
 /// - an [`id`](Self::id) field that uniquely characterizes the span group
-/// - a [`parent_idx`](Self::parent_idx) field that is the `id` field of the parent span group, if any.
+/// - a [`parent_id`](Self::parent_id) field that is the `id` field of the parent span group, if any.
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
     pub(crate) callsite: Arc<CallsiteInfo>,
@@ -106,7 +106,7 @@ impl SpanGroup {
 /// data collection.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct SpanGroupPriv {
-    /// callsite info of the span group preceded by the callsite IDs of its ancestors.
+    /// Callsite info of the span group preceded by the callsite IDs of its ancestors.
     callsite_info_path: CallsiteInfoPath,
 
     /// Properties of the span group preceded by the properties of its ancestors.
@@ -126,22 +126,13 @@ impl SpanGroupPriv {
     }
 }
 
-/// Intermediate form of SpanGroup that is sortable and ensures that parents always appear before
-/// children in sort order.
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
-struct SpanGroupTemp {
-    callsite_uid_path: Vec<usize>,
-    props_path: PropsPath,
-}
-
 //=================
 // Timing
 
 /// Alias of [`Histogram<u64>`].
 pub type Timing = Histogram<u64>;
 
-/// Constructs a [`Timing`]. The arguments correspond to [Histogram::high] and
-///  [Histogram::sigfig].
+/// Constructs a [`Timing`]. The arguments correspond to [Histogram::high] and [Histogram::sigfig].
 fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
     let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
     hist.auto(true);
@@ -152,11 +143,9 @@ fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
 // Timings
 
 /// Mapping of [SpanGroup]s to the [Timing] information recorded for them.
-///
-/// Any map iterator shows parent span groups before their children.
 pub type Timings = BTreeMap<SpanGroup, Timing>;
 
-/// Adds an [`aggregate`](Self::aggregate) method to [`Timings`];
+/// Adds methods to [`Timings`];
 pub trait TimingsExt {
     /// Combines histograms of span group according to sets of span groups that yield the same value when `f`
     /// is applied. The values resulting from applying `f` to span groups are called ***aggregate key***s and
@@ -324,16 +313,16 @@ impl LatencyTracePriv {
         });
     }
 
-    /// Transforms `sgp` to a SpanGroup and adds it to `sgp_to_sg`.
+    /// Transforms a SpanGroupPriv to a SpanGroup and adds it to `sgp_to_sg`.
     fn grow_sgp_to_sg(sgp: &SpanGroupPriv, sgp_to_sg: &mut HashMap<SpanGroupPriv, SpanGroup>) {
         let parent_sgp = sgp.parent();
         let parent_id: Option<Arc<str>> = parent_sgp
             .iter()
-            .map(|parent_sgp| match sgp_to_sg.get(&parent_sgp) {
+            .map(|parent_sgp| match sgp_to_sg.get(parent_sgp) {
                 Some(sg) => sg.id.clone(),
                 None => {
-                    Self::grow_sgp_to_sg(&parent_sgp, sgp_to_sg);
-                    sgp_to_sg.get(&parent_sgp).unwrap().id.clone()
+                    Self::grow_sgp_to_sg(parent_sgp, sgp_to_sg);
+                    sgp_to_sg.get(parent_sgp).unwrap().id.clone()
                 }
             })
             .next();
@@ -360,12 +349,12 @@ impl LatencyTracePriv {
         sgp_to_sg.insert(sgp.clone(), sg);
     }
 
-    /// Generates the publicly accessible [`Latencies`] in post-processing after all thread-local
+    /// Generates the publicly accessible [`Timings`] in post-processing after all thread-local
     /// data has been accumulated.
     pub(crate) fn generate_timings(&self, tp: TimingsPriv) -> Timings {
         let mut sgp_to_sg: HashMap<SpanGroupPriv, SpanGroup> = HashMap::new();
         for sgp in tp.keys() {
-            Self::grow_sgp_to_sg(&sgp, &mut sgp_to_sg);
+            Self::grow_sgp_to_sg(sgp, &mut sgp_to_sg);
         }
 
         let mut timings: Timings = tp
@@ -380,7 +369,7 @@ impl LatencyTracePriv {
         timings
     }
 
-    /// This is exposed separately from [Self::generate_latencies] to isolate the code that holds the control lock.
+    /// This is exposed separately from [Self::generate_timings] to isolate the code that holds the control lock.
     /// This is useful in the implementation of `PausableTrace` in the `latency-trace` crate.
     pub(crate) fn take_latencies_priv(
         &self,
