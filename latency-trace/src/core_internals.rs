@@ -14,6 +14,8 @@ use thread_local_drop::{self, Control, ControlLock, Holder};
 use tracing::{span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
+use crate::Wrapper;
+
 //=================
 // Callsite
 
@@ -142,11 +144,35 @@ fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
 //=================
 // Timings
 
-/// Mapping of [SpanGroup]s to the [Timing] information recorded for them.
-pub type Timings = BTreeMap<SpanGroup, Timing>;
+/// [`Wrapper`] of [`BTreeMap`]`<K, `[`Timing`]`>`.
+pub type TimingsView<K> = Wrapper<BTreeMap<K, Timing>>;
 
-/// Adds methods to [`Timings`];
-pub trait TimingsExt {
+impl<K> TimingsView<K> {
+    pub fn add(&mut self, mut other: TimingsView<K>)
+    where
+        K: Ord,
+    {
+        // Combine into self the values in other that have keys in self.
+        for (k, h) in self.iter_mut() {
+            let other_h = other.remove(k);
+            if let Some(other_h) = other_h {
+                h.add(other_h).unwrap();
+            }
+        }
+
+        // Insert into self the entries in other that don't have keys in self.
+        for (k, h) in other.0.into_iter() {
+            self.insert(k, h);
+        }
+    }
+}
+
+type Timings0 = BTreeMap<SpanGroup, Timing>;
+
+/// Mapping of [`SpanGroup`]s to the [`Timing`] information recorded for them.
+pub type Timings = Wrapper<Timings0>;
+
+impl Timings {
     /// Combines histograms of span group according to sets of span groups that yield the same value when `f`
     /// is applied. The values resulting from applying `f` to span groups are called ***aggregate key***s and
     /// the sets of span groups corresponding to each *aggregate key* are called ***aggregates***.
@@ -157,26 +183,14 @@ pub trait TimingsExt {
     /// This function returns a pair with the following components:
     /// - a [BTreeMap] that associates each *aggregate key* to its aggregated histogram;
     /// - a boolean that is `true` if the aggregation is consistent, `false` otherwise.
-    fn aggregate<G>(&self, f: impl Fn(&SpanGroup) -> G) -> (BTreeMap<G, Histogram<u64>>, bool)
-    where
-        G: Ord + Clone;
-
-    /// Returns a map from span group ID to [`SpanGroup`].
-    fn id_to_span_group(&self) -> BTreeMap<String, SpanGroup>;
-
-    /// Returns a map from [`SpanGroup`] to its parent.
-    fn span_group_to_parent(&self) -> BTreeMap<SpanGroup, Option<SpanGroup>>;
-}
-
-impl TimingsExt for Timings {
-    fn aggregate<G>(&self, f: impl Fn(&SpanGroup) -> G) -> (BTreeMap<G, Histogram<u64>>, bool)
+    pub fn aggregate<G>(&self, f: impl Fn(&SpanGroup) -> G) -> (BTreeMap<G, Timing>, bool)
     where
         G: Ord + Clone,
     {
         let mut res: BTreeMap<G, Histogram<u64>> = BTreeMap::new();
         let mut aggregates: BTreeMap<G, Arc<CallsiteInfo>> = BTreeMap::new();
         let mut aggregates_are_consistent = true;
-        for (k, v) in self {
+        for (k, v) in self.iter() {
             // Construct aggregation map.
             let g = f(k);
             let hist = match res.get_mut(&g) {
@@ -203,13 +217,15 @@ impl TimingsExt for Timings {
         (res, aggregates_are_consistent)
     }
 
-    fn id_to_span_group(&self) -> BTreeMap<String, SpanGroup> {
+    /// Returns a map from span group ID to [`SpanGroup`].
+    pub fn id_to_span_group(&self) -> BTreeMap<String, SpanGroup> {
         self.keys()
             .map(|k| (k.id().to_owned(), k.clone()))
             .collect()
     }
 
-    fn span_group_to_parent(&self) -> BTreeMap<SpanGroup, Option<SpanGroup>> {
+    /// Returns a map from [`SpanGroup`] to its parent.
+    pub fn span_group_to_parent(&self) -> BTreeMap<SpanGroup, Option<SpanGroup>> {
         let id_to_sg = self.id_to_span_group();
         self.keys()
             .map(|sg| {
@@ -360,7 +376,8 @@ impl LatencyTracePriv {
         let mut timings: Timings = tp
             .into_iter()
             .map(|(sgp, timing)| (sgp_to_sg.remove(&sgp).unwrap(), timing))
-            .collect();
+            .collect::<Timings0>()
+            .into();
 
         for sg in sgp_to_sg.into_values() {
             timings.insert(sg, new_timing(self.hist_high, self.hist_sigfig));

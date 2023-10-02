@@ -1,4 +1,4 @@
-use latency_trace::{summary_stats, Timings, TimingsExt};
+use latency_trace::{summary_stats, Timings};
 
 pub fn print_summary(latencies: &Timings) {
     let sg_to_parent = latencies.span_group_to_parent();
@@ -11,7 +11,7 @@ pub fn print_summary(latencies: &Timings) {
 
     println!("\nSummary statistics by span group:");
 
-    for (span_group, v) in latencies {
+    for (span_group, v) in latencies.iter() {
         let summary = summary_stats(v);
         println!("  * {:?}, {:?}", span_group, summary);
     }

@@ -1,5 +1,5 @@
 use dev_utils::test_support::{f64_are_close, u64_comparator, SpanNameTestSpec, TestSpec};
-use latency_trace::{Timings, TimingsExt};
+use latency_trace::Timings;
 use std::collections::HashSet;
 
 pub fn run_test(tmgs: &Timings, test_spec: TestSpec) {
