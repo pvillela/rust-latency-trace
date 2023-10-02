@@ -1,17 +1,11 @@
-use std::collections::BTreeMap;
-
-use latency_trace::{summary_stats, SpanGroup, Timings};
+use latency_trace::{summary_stats, Timings, TimingsExt};
 
 pub fn print_summary(latencies: &Timings) {
-    let id_to_span_group: BTreeMap<u64, SpanGroup> =
-        latencies.keys().map(|k| (k.id(), k.clone())).collect();
+    let sg_to_parent = latencies.span_group_to_parent();
 
     println!("\nSpan group parents:");
 
-    for span_group in latencies.keys() {
-        let parent = span_group
-            .parent_id()
-            .map(|pid| id_to_span_group.get(&pid).unwrap());
+    for (span_group, parent) in sg_to_parent {
         println!("  * {:?} -> {:?}", span_group, parent);
     }
 

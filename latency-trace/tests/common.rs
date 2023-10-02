@@ -1,26 +1,16 @@
 use dev_utils::test_support::{f64_are_close, u64_comparator, SpanNameTestSpec, TestSpec};
-use latency_trace::{Latencies, TimingsAggregate};
+use latency_trace::{Timings, TimingsExt};
 use std::collections::HashSet;
 
-pub fn run_test(ltcs: &Latencies, test_spec: TestSpec) {
-    run_test_general(ltcs, test_spec, u64_comparator(0.0))
+pub fn run_test(tmgs: &Timings, test_spec: TestSpec) {
+    run_test_general(tmgs, test_spec, u64_comparator(0.0))
 }
 
 pub fn run_test_general(
-    ltcs: &Latencies,
+    tmgs: &Timings,
     test_spec: TestSpec,
     timing_count_comparator: impl Fn(u64, u64) -> bool,
 ) {
-    let span_groups_and_keys_are_same = ltcs
-        .span_groups()
-        .iter()
-        .zip(ltcs.timings().keys())
-        .all(|(left, right)| left == right);
-    assert!(
-        span_groups_and_keys_are_same,
-        "span_groups_and_keys_are_same"
-    );
-
     let TestSpec {
         span_group_count,
         span_name_test_specs,
@@ -30,19 +20,17 @@ pub fn run_test_general(
         span_name_test_specs.keys().map(|s| *s).collect();
     let mut name_set: HashSet<&'static str> = HashSet::new();
 
-    assert_eq!(
-        ltcs.span_groups().len(),
-        span_group_count,
-        "Number of span groups"
-    );
+    assert_eq!(tmgs.len(), span_group_count, "Number of span groups");
 
-    let (agg_timings, consistent_timings) = ltcs.timings().aggregate(|sg| sg.name());
+    let (agg_timings, consistent_timings) = tmgs.aggregate(|sg| sg.name());
     assert!(consistent_timings, "consistent_timings");
     assert_eq!(
         agg_timings.len(),
         span_name_test_specs.len(),
         "aggregation by name - number of aggregate values"
     );
+
+    let parents = tmgs.span_group_to_parent();
 
     // Force tests to proceed aphabetically by span name.
     for (name, spec) in span_name_test_specs {
@@ -107,31 +95,13 @@ pub fn run_test_general(
         }
 
         // Assertions by SpanGroup
-        for (span_group, timing) in ltcs.timings().iter().filter(|(k, _)| k.name() == name) {
-            let id = span_group.id();
-            assert_eq!(
-                span_group,
-                ltcs.span_groups().get(id).unwrap(),
-                "the span_group must be found in span_groups vector at position `id`: {:?}",
-                span_group
-            );
-
+        for (span_group, timing) in tmgs.iter().filter(|(k, _)| k.name() == name) {
             let props = span_group.props();
             props_set.insert(props.into());
 
-            let parent_idx = span_group.parent_idx();
-            parent_idx.map(|parent_idx| {
-                assert!(
-                    parent_idx < id,
-                    "parent_idx {parent_idx} must be less than span_group.id {id}; name={name}",
-                );
-            });
-
-            let parent = span_group
-                .parent_idx()
-                .map(|parent_idx| ltcs.span_groups()[parent_idx].clone());
+            let parent = parents.get(span_group).unwrap();
             let parent_name = parent.as_ref().map(|p| p.name());
-            let parent_props: Option<Vec<(String, String)>> = parent.map(|p| p.props().into());
+            let parent_props = parent.iter().map(|p| Vec::from(p.props())).next();
 
             // Insert parent_name and parent_props into corresponding sets
             parent_name.map(|parent_name| parent_name_set.insert(parent_name));

@@ -58,7 +58,7 @@
 //! ### Simple sync example
 //!
 //! ```rust
-//! use latency_trace::LatencyTrace;
+//! use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace};
 //! use std::{thread, time::Duration};
 //! use tracing::{instrument, trace_span};
 //!
@@ -88,20 +88,20 @@
 //!     let latencies = LatencyTrace::default().measure_latencies(f);
 //!
 //!     println!("\nLatency stats below are in microseconds");
-//!     for (span_group, stats) in latencies.summary_stats() {
+//!     for (span_group, stats) in latencies.map_values(summary_stats) {
 //!         println!("  * {:?}, {:?}", span_group, stats);
 //!     }
 //!
 //!     // A shorter way to print the summary stats, with uglier formatting.
-//!     println!("\nDebug print of `latencies.summary_stats()`:");
-//!     println!("{:?}", latencies.summary_stats());
+//!     println!("\nDebug print of `latencies.map_values(summary_stats)`:");
+//!     println!("{:?}", latencies.map_values(summary_stats));
 //! }
 //! ```
 //!
-//! ## Simple async example
+//! ### Simple async example
 //!
 //! ```rust
-//! use latency_trace::LatencyTrace;
+//! use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace};
 //! use std::time::Duration;
 //! use tracing::{instrument, trace_span, Instrument};
 //!
@@ -133,20 +133,20 @@
 //!     let latencies = LatencyTrace::default().measure_latencies_tokio(f);
 //!
 //!     println!("\nLatency stats below are in microseconds");
-//!     for (span_group, stats) in latencies.summary_stats() {
+//!     for (span_group, stats) in latencies.map_values(summary_stats) {
 //!         println!("  * {:?}, {:?}", span_group, stats);
 //!     }
 //!
 //!     // A shorter way to print the summary stats, with uglier formatting.
-//!     println!("\nDebug print of `latencies.summary_stats()`:");
-//!     println!("{:?}", latencies.summary_stats());
+//!     println!("\nDebug print of `latencies.map_values(summary_stats)`:");
+//!     println!("{:?}", latencies.map_values(summary_stats));
 //! }
 //! ```
 //!
-//! ## Simple sync pausable example
+//! ### Simple sync pausable example
 //!
 //! ```rust
-//! use latency_trace::{LatencyTrace, PausableMode};
+//! use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace, PausableMode};
 //! use std::{thread, time::Duration};
 //! use tracing::{instrument, trace_span};
 //!
@@ -173,19 +173,18 @@
 //! }
 //!
 //! fn main() {
-//!     let pausable = LatencyTrace::default()
-//!         .measure_latencies_pausable(PausableMode::Nonblocking, f);
+//!     let pausable = LatencyTrace::default().measure_latencies_pausable(PausableMode::Nonblocking, f);
 //!     thread::sleep(Duration::from_micros(24000));
 //!     let latencies1 = pausable.pause_and_report();
 //!     let latencies2 = pausable.wait_and_report();
 //!
 //!     println!("\nlatencies1 in microseconds");
-//!     for (span_group, stats) in latencies1.summary_stats() {
+//!     for (span_group, stats) in latencies1.map_values(summary_stats) {
 //!         println!("  * {:?}, {:?}", span_group, stats);
 //!     }
 //!
 //!     println!("\nlatencies2 in microseconds");
-//!     for (span_group, stats) in latencies2.summary_stats() {
+//!     for (span_group, stats) in latencies2.map_values(summary_stats) {
 //!         println!("  * {:?}, {:?}", span_group, stats);
 //!     }
 //! }

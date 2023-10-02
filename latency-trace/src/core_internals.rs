@@ -157,7 +157,7 @@ fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
 pub type Timings = BTreeMap<SpanGroup, Timing>;
 
 /// Adds an [`aggregate`](Self::aggregate) method to [`Timings`];
-pub trait TimingsAggregate {
+pub trait TimingsExt {
     /// Combines histograms of span group according to sets of span groups that yield the same value when `f`
     /// is applied. The values resulting from applying `f` to span groups are called ***aggregate key***s and
     /// the sets of span groups corresponding to each *aggregate key* are called ***aggregates***.
@@ -171,9 +171,15 @@ pub trait TimingsAggregate {
     fn aggregate<G>(&self, f: impl Fn(&SpanGroup) -> G) -> (BTreeMap<G, Histogram<u64>>, bool)
     where
         G: Ord + Clone;
+
+    /// Returns a map from span group ID to [`SpanGroup`].
+    fn id_to_span_group(&self) -> BTreeMap<String, SpanGroup>;
+
+    /// Returns a map from [`SpanGroup`] to its parent.
+    fn span_group_to_parent(&self) -> BTreeMap<SpanGroup, Option<SpanGroup>>;
 }
 
-impl TimingsAggregate for Timings {
+impl TimingsExt for Timings {
     fn aggregate<G>(&self, f: impl Fn(&SpanGroup) -> G) -> (BTreeMap<G, Histogram<u64>>, bool)
     where
         G: Ord + Clone,
@@ -206,6 +212,22 @@ impl TimingsAggregate for Timings {
         }
 
         (res, aggregates_are_consistent)
+    }
+
+    fn id_to_span_group(&self) -> BTreeMap<String, SpanGroup> {
+        self.keys()
+            .map(|k| (k.id().to_owned(), k.clone()))
+            .collect()
+    }
+
+    fn span_group_to_parent(&self) -> BTreeMap<SpanGroup, Option<SpanGroup>> {
+        let id_to_sg = self.id_to_span_group();
+        self.keys()
+            .map(|sg| {
+                let parent = sg.parent_id().map(|pid| id_to_sg.get(pid).unwrap().clone());
+                (sg.clone(), parent)
+            })
+            .collect()
     }
 }
 

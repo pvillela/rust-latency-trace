@@ -5,7 +5,7 @@
 //! provide visibility to the overhead of span creation and processing, which is ~0.5-1 microseconds
 //! per span instance on my 2022 Dell Inspiron 16.
 
-use latency_trace::LatencyTrace;
+use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace};
 use std::{hint::black_box, time::Instant};
 use tracing::{instrument, trace_span};
 
@@ -55,7 +55,7 @@ fn main() {
     );
 
     println!("\nLatency stats below are in microseconds");
-    for (span_group, stats) in latencies.summary_stats() {
+    for (span_group, stats) in latencies.map_values(summary_stats) {
         println!("  * {:?}, {:?}", span_group, stats);
     }
 }

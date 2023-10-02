@@ -33,6 +33,6 @@ fn main() {
     }
 
     // A shorter way to print the summary stats, with uglier formatting.
-    println!("\nDebug print of `latencies.summary_stats()`:");
+    println!("\nDebug print of `latencies.map_values(summary_stats)`:");
     println!("{:?}", latencies.map_values(summary_stats));
 }
