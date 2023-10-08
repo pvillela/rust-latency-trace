@@ -32,6 +32,7 @@ struct CallsiteInfoPriv {
 //=================
 // SpanGroup
 
+type CallsiteIdPath = Arc<Vec<Identifier>>;
 type CallsiteInfoPrivPath = Arc<Vec<Arc<CallsiteInfoPriv>>>;
 type Props = Vec<(String, String)>;
 type PropsPath = Arc<Vec<Arc<Props>>>;
@@ -96,8 +97,8 @@ impl SpanGroup {
 /// data collection.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct SpanGroupPriv {
-    /// Callsite info of the span group preceded by the callsite IDs of its ancestors.
-    callsite_info_path: CallsiteInfoPrivPath,
+    /// Callsite ID of the span group preceded by the callsite IDs of its ancestors.
+    callsite_id_path: CallsiteIdPath,
 
     /// Properties of the span group preceded by the properties of its ancestors.
     props_path: PropsPath,
@@ -105,13 +106,34 @@ pub(crate) struct SpanGroupPriv {
 
 impl SpanGroupPriv {
     fn parent(&self) -> Option<Self> {
-        let len = self.callsite_info_path.len();
+        let len = self.callsite_id_path.len();
         if len == 1 {
             return None;
         }
         Some(SpanGroupPriv {
-            callsite_info_path: Arc::new(self.callsite_info_path[0..len - 1].into()),
+            callsite_id_path: Arc::new(self.callsite_id_path[0..len - 1].into()),
             props_path: Arc::new(self.props_path[0..len - 1].into()),
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+struct SpanGroupTemp {
+    span_group_priv: SpanGroupPriv,
+    callsite_info_priv_path: CallsiteInfoPrivPath,
+}
+
+impl SpanGroupTemp {
+    fn parent(&self) -> Option<Self> {
+        let parent_sgp = match self.span_group_priv.parent() {
+            None => return None,
+            Some(sgp) => sgp,
+        };
+        let len = self.span_group_priv.callsite_id_path.len();
+        let callsite_info_priv_path = self.callsite_info_priv_path[0..len - 1].to_vec();
+        Some(SpanGroupTemp {
+            span_group_priv: parent_sgp,
+            callsite_info_priv_path: callsite_info_priv_path.into(),
         })
     }
 }
@@ -127,6 +149,22 @@ fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
     let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
     hist.auto(true);
     hist
+}
+
+pub(crate) struct TimingPriv {
+    hist: Timing,
+    callsite_info_priv_path: CallsiteInfoPrivPath,
+}
+
+impl TimingPriv {
+    fn new(hist_high: u64, hist_sigfig: u8, callsite_info_priv_path: CallsiteInfoPrivPath) -> Self {
+        let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
+        hist.auto(true);
+        Self {
+            hist,
+            callsite_info_priv_path,
+        }
+    }
 }
 
 //=================
@@ -224,7 +262,11 @@ impl Timings {
     }
 }
 
-pub(crate) type TimingsPriv = HashMap<SpanGroupPriv, Timing>;
+pub(crate) type TimingsPriv = HashMap<SpanGroupPriv, TimingPriv>;
+
+type TimingsTemp = HashMap<SpanGroupTemp, Timing>;
+
+type AccPriv = Vec<(ThreadId, HashMap<SpanGroupPriv, TimingPriv>)>;
 
 //=================
 // SpanTiming
@@ -232,7 +274,7 @@ pub(crate) type TimingsPriv = HashMap<SpanGroupPriv, Timing>;
 /// Information about a span stored in the registry.
 #[derive(Debug)]
 struct SpanTiming {
-    callsite_info_path: CallsiteInfoPrivPath,
+    callsite_info_priv_path: CallsiteInfoPrivPath,
     props_path: PropsPath,
     created_at: Instant,
 }
@@ -251,17 +293,18 @@ pub(crate) struct LatencyTraceCfg {
 
 impl LatencyTraceCfg {
     /// Used to accumulate results on [`Control`].
-    fn op(&self) -> impl Fn(TimingsPriv, &mut TimingsPriv, &ThreadId) + Send + Sync + 'static {
-        let hist_high = self.hist_high;
-        let hist_sigfig = self.hist_sigfig;
-        move |timings: TimingsPriv, acc: &mut TimingsPriv, tid: &ThreadId| {
+    fn op(&self) -> impl Fn(TimingsPriv, &mut AccPriv, &ThreadId) + Send + Sync + 'static {
+        // let hist_high = self.hist_high;
+        // let hist_sigfig = self.hist_sigfig;
+        move |timings: TimingsPriv, acc: &mut AccPriv, tid: &ThreadId| {
             log::debug!("executing `op` for {:?}", tid);
-            for (k, v) in timings {
-                let timing = acc
-                    .entry(k)
-                    .or_insert_with(|| new_timing(hist_high, hist_sigfig));
-                timing.add(v).unwrap();
-            }
+            // for (k, v) in timings {
+            //     let timing_priv = acc
+            //         .entry(k)
+            //         .or_insert_with(|| new_timing(hist_high, hist_sigfig));
+            //     timing_priv.add(v.hist).unwrap();
+            // }
+            acc.push((tid.clone(), timings));
         }
     }
 }
@@ -272,7 +315,7 @@ impl LatencyTraceCfg {
 /// Provides access to [Timings] containing the latencies collected for different span groups.
 #[derive(Clone)]
 pub(crate) struct LatencyTracePriv {
-    pub(crate) control: Control<TimingsPriv, TimingsPriv>,
+    pub(crate) control: Control<TimingsPriv, AccPriv>,
     span_grouper: SpanGrouper,
     hist_high: u64,
     hist_sigfig: u8,
@@ -281,14 +324,19 @@ pub(crate) struct LatencyTracePriv {
 impl LatencyTracePriv {
     pub(crate) fn new(config: LatencyTraceCfg) -> LatencyTracePriv {
         LatencyTracePriv {
-            control: Control::new(TimingsPriv::new(), config.op()),
+            control: Control::new(AccPriv::new(), config.op()),
             span_grouper: config.span_grouper,
             hist_high: config.hist_high,
             hist_sigfig: config.hist_sigfig,
         }
     }
 
-    fn update_timings(&self, span_group_priv: &SpanGroupPriv, f: impl Fn(&mut Timing)) {
+    fn update_timings(
+        &self,
+        span_group_priv: &SpanGroupPriv,
+        callsite_info_priv_path: &CallsiteInfoPrivPath,
+        f: impl Fn(&mut TimingPriv),
+    ) {
         self.control.with_tl_mut(&LOCAL_INFO, |timings| {
             let timing = {
                 if let Some(timing) = timings.get_mut(span_group_priv) {
@@ -301,7 +349,11 @@ impl LatencyTracePriv {
                     );
                     timings.insert(
                         span_group_priv.clone(),
-                        new_timing(self.hist_high, self.hist_sigfig),
+                        TimingPriv::new(
+                            self.hist_high,
+                            self.hist_sigfig,
+                            callsite_info_priv_path.clone(),
+                        ),
                     );
                     timings.get_mut(span_group_priv).unwrap()
                 }
@@ -317,35 +369,51 @@ impl LatencyTracePriv {
         });
     }
 
-    /// Transforms a SpanGroupPriv to a SpanGroup and adds it to `sgp_to_sg`.
-    fn grow_sgp_to_sg(sgp: &SpanGroupPriv, sgp_to_sg: &mut HashMap<SpanGroupPriv, SpanGroup>) {
-        let parent_sgp = sgp.parent();
-        let parent_id: Option<Arc<str>> = parent_sgp
+    fn move_callsite_info_to_key(timings_priv: TimingsPriv) -> TimingsTemp {
+        timings_priv
+            .into_iter()
+            .map(|(k, v)| {
+                let callsite_priv = v.callsite_info_priv_path;
+                let hist = v.hist;
+                let sgt = SpanGroupTemp {
+                    span_group_priv: k,
+                    callsite_info_priv_path: callsite_priv,
+                };
+                (sgt, hist)
+            })
+            .collect()
+    }
+
+    /// Transforms a SpanGroupTemp into a SpanGroup and adds it to `sgt_to_sg`.
+    fn grow_sgt_to_sg(sgt: &SpanGroupTemp, sgt_to_sg: &mut HashMap<SpanGroupTemp, SpanGroup>) {
+        let parent_sgt = sgt.parent();
+        let parent_id: Option<Arc<str>> = parent_sgt
             .iter()
-            .map(|parent_sgp| match sgp_to_sg.get(parent_sgp) {
+            .map(|parent_sgp| match sgt_to_sg.get(parent_sgp) {
                 Some(sg) => sg.id.clone(),
                 None => {
-                    Self::grow_sgp_to_sg(parent_sgp, sgp_to_sg);
-                    sgp_to_sg.get(parent_sgp).unwrap().id.clone()
+                    Self::grow_sgt_to_sg(parent_sgp, sgt_to_sg);
+                    sgt_to_sg.get(parent_sgp).unwrap().id.clone()
                 }
             })
             .next();
 
-        let callsite_priv = sgp.callsite_info_path.last().unwrap().clone();
-        let code_line = callsite_priv
+        let callsite_info = sgt.callsite_info_priv_path.last().unwrap();
+
+        let code_line = callsite_info
             .file
             .clone()
-            .zip(callsite_priv.line.clone())
+            .zip(callsite_info.line.clone())
             .map(|(file, line)| format!("{}:{}", file, line))
-            .unwrap_or_else(|| format!("{:?}", callsite_priv.callsite_id));
+            .unwrap_or_else(|| format!("{:?}", callsite_info.callsite_id));
 
-        let props = sgp.props_path.last().unwrap().clone();
+        let props = sgt.span_group_priv.props_path.last().unwrap().clone();
 
         let mut hasher = Sha256::new();
         if let Some(parent_id) = parent_id.clone() {
             hasher.update(parent_id.as_ref());
         }
-        hasher.update(callsite_priv.name);
+        hasher.update(callsite_info.name);
         hasher.update([0 as u8; 1]);
         hasher.update(code_line.clone());
         for (k, v) in props.iter() {
@@ -358,31 +426,32 @@ impl LatencyTracePriv {
         let id = Base64::encode_string(&hash[0..8]);
 
         let sg = SpanGroup {
-            name: callsite_priv.name,
+            name: callsite_info.name,
             id: id.into(),
             code_line: code_line.into(),
             props,
             parent_id,
-            depth: sgp.callsite_info_path.len(),
+            depth: sgt.callsite_info_priv_path.len(),
         };
-        sgp_to_sg.insert(sgp.clone(), sg);
+        sgt_to_sg.insert(sgt.clone(), sg);
     }
 
     /// Generates the publicly accessible [`Timings`] in post-processing after all thread-local
     /// data has been accumulated.
     pub(crate) fn generate_timings(&self, tp: TimingsPriv) -> Timings {
-        let mut sgp_to_sg: HashMap<SpanGroupPriv, SpanGroup> = HashMap::new();
-        for sgp in tp.keys() {
-            Self::grow_sgp_to_sg(sgp, &mut sgp_to_sg);
+        let timings_temp = Self::move_callsite_info_to_key(tp);
+        let mut sgt_to_sg: HashMap<SpanGroupTemp, SpanGroup> = HashMap::new();
+        for sgt in timings_temp.keys() {
+            Self::grow_sgt_to_sg(sgt, &mut sgt_to_sg);
         }
 
-        let mut timings: Timings = tp
+        let mut timings: Timings = timings_temp
             .into_iter()
-            .map(|(sgp, timing)| (sgp_to_sg.remove(&sgp).unwrap(), timing))
+            .map(|(sgt, timing)| (sgt_to_sg.remove(&sgt).unwrap(), timing))
             .collect::<Timings0>()
             .into();
 
-        for sg in sgp_to_sg.into_values() {
+        for sg in sgt_to_sg.into_values() {
             timings.insert(sg, new_timing(self.hist_high, self.hist_sigfig));
         }
 
@@ -391,11 +460,8 @@ impl LatencyTracePriv {
 
     /// This is exposed separately from [Self::generate_timings] to isolate the code that holds the control lock.
     /// This is useful in the implementation of `PausableTrace` in the `latency-trace` crate.
-    pub(crate) fn take_latencies_priv(
-        &self,
-        lock: &mut ControlLock<'_, TimingsPriv>,
-    ) -> TimingsPriv {
-        self.control.take_acc(lock, TimingsPriv::new())
+    pub(crate) fn take_latencies_priv(&self, lock: &mut ControlLock<'_, AccPriv>) -> AccPriv {
+        self.control.take_acc(lock, AccPriv::new())
     }
 }
 
@@ -422,7 +488,7 @@ where
             Some(parent_span) => {
                 let ext = parent_span.extensions();
                 let pst = ext.get::<SpanTiming>().unwrap();
-                let mut callsite_info_path = pst.callsite_info_path.as_ref().clone();
+                let mut callsite_info_path = pst.callsite_info_priv_path.as_ref().clone();
                 callsite_info_path.push(callsite_info.into());
                 let mut props_path = pst.props_path.as_ref().clone();
                 props_path.push(Arc::new(props));
@@ -431,7 +497,7 @@ where
         };
 
         span.extensions_mut().insert(SpanTiming {
-            callsite_info_path: callsite_info_path.into(),
+            callsite_info_priv_path: callsite_info_path.into(),
             props_path: props_path.into(),
             created_at: Instant::now(),
         });
@@ -451,15 +517,24 @@ where
         let span_timing = ext.get::<SpanTiming>().unwrap();
 
         let span_group_priv = SpanGroupPriv {
-            callsite_info_path: span_timing.callsite_info_path.clone(),
+            callsite_id_path: span_timing
+                .callsite_info_priv_path
+                .iter()
+                .map(|x| x.callsite_id.clone())
+                .collect::<Vec<_>>()
+                .into(),
             props_path: span_timing.props_path.clone(),
         };
 
-        self.update_timings(&span_group_priv, |timing| {
-            timing
-                .record((Instant::now() - span_timing.created_at).as_micros() as u64)
-                .unwrap();
-        });
+        self.update_timings(
+            &span_group_priv,
+            &span_timing.callsite_info_priv_path,
+            |tp| {
+                tp.hist
+                    .record((Instant::now() - span_timing.created_at).as_micros() as u64)
+                    .unwrap();
+            },
+        );
 
         log::trace!(
             "`on_close` completed call to update_timings: name={}, id={:?}",
@@ -475,5 +550,5 @@ where
 // Thread-locals
 
 thread_local! {
-    static LOCAL_INFO: Holder<TimingsPriv, TimingsPriv> = Holder::new(TimingsPriv::new);
+    static LOCAL_INFO: Holder<TimingsPriv, AccPriv> = Holder::new(TimingsPriv::new);
 }
