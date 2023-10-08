@@ -5,13 +5,14 @@ use hdrhistogram::Histogram;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, HashMap},
+    fmt::Debug,
     hash::Hash,
     sync::Arc,
     thread::{self, ThreadId},
     time::Instant,
 };
 use thread_local_drop::{self, Control, ControlLock, Holder};
-use tracing::{span::Attributes, Id, Subscriber};
+use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
 use crate::Wrapper;
@@ -20,28 +21,18 @@ use crate::Wrapper;
 // Callsite
 
 /// Provides [name](Self::name) and [code line](Self::code_line) information about where the tracing span was defined.
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
-pub struct CallsiteInfo {
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+struct CallsiteInfoPriv {
+    callsite_id: Identifier,
     name: &'static str,
-    code_line: String,
-}
-
-impl CallsiteInfo {
-    /// Name of the tracing span.
-    pub fn name(&self) -> &'static str {
-        self.name
-    }
-
-    /// Line of code where the tracing span was defined.
-    pub fn code_line(&self) -> &str {
-        &self.code_line
-    }
+    file: Option<String>,
+    line: Option<u32>,
 }
 
 //=================
 // SpanGroup
 
-type CallsiteInfoPath = Arc<Vec<Arc<CallsiteInfo>>>;
+type CallsiteInfoPrivPath = Arc<Vec<Arc<CallsiteInfoPriv>>>;
 type Props = Vec<(String, String)>;
 type PropsPath = Arc<Vec<Arc<Props>>>;
 
@@ -57,23 +48,35 @@ type PropsPath = Arc<Vec<Arc<Props>>>;
 /// The coarsest-grained grouping of spans is characterized by a ***callsite path*** -- a callsite and the (possibly empty) list of its ancestor callsites based on the different runtime execution paths (see [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships)). This is the default `SpanGroup` definition. Finer-grained groupings of spans can differentiate groups of spans with the same callsite path by taking into account values computed at runtime from the spans' runtime [Attributes](https://docs.rs/tracing/0.1.37/tracing/span/struct.Attributes.html).
 ///
 /// This struct holds the following information:
-/// - [`callsite`](Self::callsite) information
+/// - its [`name`](Self::name)
+/// - an [`id`](Self::id) that, together with its `name`, uniquely identifies the span group
 /// - a [`props`](Self::props) field that contains the span group's list of name-value pairs (which may be empty)
-/// - an [`id`](Self::id) field that uniquely characterizes the span group
-/// - a [`parent_id`](Self::parent_id) field that is the `id` field of the parent span group, if any.
+/// - a [`parent_id`](Self::parent_id) that is the `id` field of the parent span group, if any.
+/// - its [`depth`](Self::depth) that is the number of ancestor span groups this span group has
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
-    pub(crate) callsite: Arc<CallsiteInfo>,
-    pub(crate) props: Arc<Props>,
-    pub(crate) depth: usize,
-    pub(crate) id: Arc<str>,
-    pub(crate) parent_id: Option<Arc<str>>,
+    name: &'static str,
+    id: Arc<str>,
+    code_line: Arc<String>,
+    props: Arc<Props>,
+    parent_id: Option<Arc<str>>,
+    depth: usize,
 }
 
 impl SpanGroup {
-    /// Returns the span group's [CallsiteInfo].
-    pub fn callsite(&self) -> &CallsiteInfo {
-        &self.callsite
+    /// Returns the span group's name.
+    pub fn nae(&self) -> &'static str {
+        self.name
+    }
+
+    /// Returns the span group's ID.
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Returns the span group's file name and code line.
+    pub fn code_line(&self) -> &str {
+        &self.code_line
     }
 
     /// Returns the span group's properties list.
@@ -81,21 +84,6 @@ impl SpanGroup {
     /// This list can be empty as is the case with the default span grouper.
     pub fn props(&self) -> &[(String, String)] {
         &self.props
-    }
-
-    /// Returns the callsite's name.
-    pub fn name(&self) -> &'static str {
-        self.callsite.name
-    }
-
-    /// Returns the callsite's file name and code line.
-    pub fn code_line(&self) -> &str {
-        self.callsite.code_line()
-    }
-
-    /// Returns the span group's ID.
-    pub fn id(&self) -> &str {
-        &self.id
     }
 
     /// Returns the ID of the span group's parent.
@@ -109,7 +97,7 @@ impl SpanGroup {
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct SpanGroupPriv {
     /// Callsite info of the span group preceded by the callsite IDs of its ancestors.
-    callsite_info_path: CallsiteInfoPath,
+    callsite_info_path: CallsiteInfoPrivPath,
 
     /// Properties of the span group preceded by the properties of its ancestors.
     props_path: PropsPath,
@@ -188,7 +176,7 @@ impl Timings {
         G: Ord + Clone,
     {
         let mut res: BTreeMap<G, Histogram<u64>> = BTreeMap::new();
-        let mut aggregates: BTreeMap<G, Arc<CallsiteInfo>> = BTreeMap::new();
+        let mut aggregates: BTreeMap<G, Arc<String>> = BTreeMap::new();
         let mut aggregates_are_consistent = true;
         for (k, v) in self.iter() {
             // Construct aggregation map.
@@ -205,9 +193,9 @@ impl Timings {
             // Check aggregation consistency.
             if aggregates_are_consistent {
                 aggregates_are_consistent = match aggregates.get(&g) {
-                    Some(callsite) => callsite.as_ref() == k.callsite(),
+                    Some(code_line) => code_line.as_ref() == k.code_line(),
                     None => {
-                        aggregates.insert(g.clone(), k.callsite.clone());
+                        aggregates.insert(g.clone(), k.code_line.clone());
                         true
                     }
                 };
@@ -244,7 +232,7 @@ pub(crate) type TimingsPriv = HashMap<SpanGroupPriv, Timing>;
 /// Information about a span stored in the registry.
 #[derive(Debug)]
 struct SpanTiming {
-    callsite_info_path: CallsiteInfoPath,
+    callsite_info_path: CallsiteInfoPrivPath,
     props_path: PropsPath,
     created_at: Instant,
 }
@@ -343,24 +331,39 @@ impl LatencyTracePriv {
             })
             .next();
 
-        let callsite = sgp.callsite_info_path.last().unwrap().clone();
+        let callsite_priv = sgp.callsite_info_path.last().unwrap().clone();
+        let code_line = callsite_priv
+            .file
+            .clone()
+            .zip(callsite_priv.line.clone())
+            .map(|(file, line)| format!("{}:{}", file, line))
+            .unwrap_or_else(|| format!("{:?}", callsite_priv.callsite_id));
+
         let props = sgp.props_path.last().unwrap().clone();
 
         let mut hasher = Sha256::new();
         if let Some(parent_id) = parent_id.clone() {
             hasher.update(parent_id.as_ref());
         }
-        hasher.update(format!("{:?}", callsite));
-        hasher.update(format!("{:?}", props));
+        hasher.update(callsite_priv.name);
+        hasher.update([0 as u8; 1]);
+        hasher.update(code_line.clone());
+        for (k, v) in props.iter() {
+            hasher.update([0 as u8; 1]);
+            hasher.update(k);
+            hasher.update([0 as u8; 1]);
+            hasher.update(v);
+        }
         let hash = hasher.finalize();
-        let id = Base64::encode_string(&hash[0..12]);
+        let id = Base64::encode_string(&hash[0..8]);
 
         let sg = SpanGroup {
-            callsite,
-            props,
-            depth: sgp.callsite_info_path.len(),
+            name: callsite_priv.name,
             id: id.into(),
+            code_line: code_line.into(),
+            props,
             parent_id,
+            depth: sgp.callsite_info_path.len(),
         };
         sgp_to_sg.insert(sgp.clone(), sg);
     }
@@ -407,9 +410,11 @@ where
         let parent_span = span.parent();
 
         let meta = span.metadata();
-        let callsite_info = CallsiteInfo {
+        let callsite_info = CallsiteInfoPriv {
             name: span.name(),
-            code_line: format!("{}:{}", meta.file().unwrap(), meta.line().unwrap()),
+            callsite_id: meta.callsite(),
+            file: meta.file().map(|s| s.to_owned()),
+            line: meta.line(),
         };
         let props = (self.span_grouper)(attrs);
         let (callsite_info_path, props_path) = match parent_span {
