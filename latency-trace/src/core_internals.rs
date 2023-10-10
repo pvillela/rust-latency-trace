@@ -11,7 +11,7 @@ use std::{
     thread::{self, ThreadId},
     time::Instant,
 };
-use thread_local_drop::{self, Control, ControlLock, Holder};
+use thread_local_drop::{self, Control, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
@@ -20,7 +20,7 @@ use crate::Wrapper;
 //=================
 // Callsite
 
-/// Provides [name](Self::name) and [code line](Self::code_line) information about where the tracing span was defined.
+/// Provides information about where the tracing span was defined.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct CallsiteInfoPriv {
     callsite_id: Identifier,
@@ -30,12 +30,17 @@ struct CallsiteInfoPriv {
 }
 
 //=================
-// SpanGroup
+// Paths
+
+// Types used in span groups or to support data collection.
 
 type CallsiteIdPath = Arc<Vec<Identifier>>;
 type CallsiteInfoPrivPath = Arc<Vec<Arc<CallsiteInfoPriv>>>;
 type Props = Vec<(String, String)>;
 type PropsPath = Arc<Vec<Arc<Props>>>;
+
+//=================
+// SpanGroup
 
 /// Represents a set of [tracing::Span]s for which latency information should be collected as a group. It is
 /// the unit of latency information collection.
@@ -52,6 +57,8 @@ type PropsPath = Arc<Vec<Arc<Props>>>;
 /// - its [`name`](Self::name)
 /// - an [`id`](Self::id) that, together with its `name`, uniquely identifies the span group
 /// - a [`props`](Self::props) field that contains the span group's list of name-value pairs (which may be empty)
+/// - a [`code_line`](Self::code_line) field that contains the file name and line number where the span was defined *or*,
+///   in case debug information is not available, the callsite [`Identifier`].
 /// - a [`parent_id`](Self::parent_id) that is the `id` field of the parent span group, if any.
 /// - its [`depth`](Self::depth) that is the number of ancestor span groups this span group has
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
@@ -66,7 +73,7 @@ pub struct SpanGroup {
 
 impl SpanGroup {
     /// Returns the span group's name.
-    pub fn nae(&self) -> &'static str {
+    pub fn name(&self) -> &'static str {
         self.name
     }
 
@@ -91,9 +98,13 @@ impl SpanGroup {
     pub fn parent_id(&self) -> Option<&str> {
         self.parent_id.iter().map(|x| x.as_ref()).next()
     }
+
+    pub fn depth(&self) -> usize {
+        self.depth
+    }
 }
 
-/// Private form of spangroup used during trace collection, more efficient than [`SpanGroup`] for trace
+/// Private form of [`SpanGroup`] used during trace collection, more efficient than [`SpanGroup`] for trace
 /// data collection.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct SpanGroupPriv {
@@ -117,6 +128,8 @@ impl SpanGroupPriv {
     }
 }
 
+/// Intermediate form of [`SpanGroup`] used in post-processing when transforming between [`SpanGroupPriv`]
+/// and [`SpanGroup`].
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct SpanGroupTemp {
     span_group_priv: SpanGroupPriv,
@@ -158,8 +171,7 @@ pub(crate) struct TimingPriv {
 
 impl TimingPriv {
     fn new(hist_high: u64, hist_sigfig: u8, callsite_info_priv_path: CallsiteInfoPrivPath) -> Self {
-        let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
-        hist.auto(true);
+        let hist = new_timing(hist_high, hist_sigfig);
         Self {
             hist,
             callsite_info_priv_path,
@@ -193,13 +205,11 @@ impl<K> TimingsView<K> {
     }
 }
 
-type Timings0 = BTreeMap<SpanGroup, Timing>;
-
 /// Mapping of [`SpanGroup`]s to the [`Timing`] information recorded for them.
-pub type Timings = Wrapper<Timings0>;
+pub type Timings = TimingsView<SpanGroup>;
 
 impl Timings {
-    /// Combines histograms of span group according to sets of span groups that yield the same value when `f`
+    /// Combines histograms of span groups according to sets of span groups that yield the same value when `f`
     /// is applied. The values resulting from applying `f` to span groups are called ***aggregate key***s and
     /// the sets of span groups corresponding to each *aggregate key* are called ***aggregates***.
     ///
@@ -244,7 +254,7 @@ impl Timings {
     }
 
     /// Returns a map from span group ID to [`SpanGroup`].
-    pub fn id_to_span_group(&self) -> BTreeMap<String, SpanGroup> {
+    fn id_to_span_group(&self) -> BTreeMap<String, SpanGroup> {
         self.keys()
             .map(|k| (k.id().to_owned(), k.clone()))
             .collect()
@@ -262,11 +272,19 @@ impl Timings {
     }
 }
 
-pub(crate) type TimingsPriv = HashMap<SpanGroupPriv, TimingPriv>;
+/// Type of latency information internally collected for span groups. The key is [SpanGroupPriv], which is as
+/// light as possible to minimize processing overhead when accessing the map. Therefore, part of the information
+/// required to produce the ultimate results is kept in the map's values as the `callsite_info_priv_path` field
+/// in [TimingsPriv].
+type TimingsPriv = HashMap<SpanGroupPriv, TimingPriv>;
 
+/// Intermediate form of latency information collected for span groups, used during post-processing while
+/// transforming [`SpanGroupPriv`] to [`SpanGroup`].
 type TimingsTemp = HashMap<SpanGroupTemp, Timing>;
 
-type AccPriv = Vec<(ThreadId, HashMap<SpanGroupPriv, TimingPriv>)>;
+/// Type of accumulator of thread-local values, prior to transforming the collected information to a [`Timings`].
+/// Used to minimize the time holding the control lock during post-processing.
+type AccTimings = Vec<(ThreadId, HashMap<SpanGroupPriv, TimingPriv>)>;
 
 //=================
 // SpanTiming
@@ -280,11 +298,16 @@ struct SpanTiming {
 }
 
 //=================
-// LatencyTraceCfg
+// SpanGrouper
 
+/// Internal type of span groupers.
 pub(crate) type SpanGrouper =
     Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>;
 
+//=================
+// LatencyTraceCfg
+
+/// Configuration information used by both [`LatencyTracePriv`] and [`LatencyTrace`](super::LatencyTrace).
 pub(crate) struct LatencyTraceCfg {
     pub(crate) span_grouper: SpanGrouper,
     pub(crate) hist_high: u64,
@@ -293,10 +316,10 @@ pub(crate) struct LatencyTraceCfg {
 
 impl LatencyTraceCfg {
     /// Used to accumulate results on [`Control`].
-    fn op(&self) -> impl Fn(TimingsPriv, &mut AccPriv, &ThreadId) + Send + Sync + 'static {
+    fn op(&self) -> impl Fn(TimingsPriv, &mut AccTimings, &ThreadId) + Send + Sync + 'static {
         // let hist_high = self.hist_high;
         // let hist_sigfig = self.hist_sigfig;
-        move |timings: TimingsPriv, acc: &mut AccPriv, tid: &ThreadId| {
+        move |timings: TimingsPriv, acc: &mut AccTimings, tid: &ThreadId| {
             log::debug!("executing `op` for {:?}", tid);
             // for (k, v) in timings {
             //     let timing_priv = acc
@@ -312,10 +335,11 @@ impl LatencyTraceCfg {
 //=================
 // LatencyTracePriv
 
-/// Provides access to [Timings] containing the latencies collected for different span groups.
+/// Implements [Layer] and provides access to [Timings] containing the latencies collected for different span groups.
+/// This is the central struct in this framework's implementation.
 #[derive(Clone)]
 pub(crate) struct LatencyTracePriv {
-    pub(crate) control: Control<TimingsPriv, AccPriv>,
+    pub(crate) control: Control<TimingsPriv, AccTimings>,
     span_grouper: SpanGrouper,
     hist_high: u64,
     hist_sigfig: u8,
@@ -324,13 +348,14 @@ pub(crate) struct LatencyTracePriv {
 impl LatencyTracePriv {
     pub(crate) fn new(config: LatencyTraceCfg) -> LatencyTracePriv {
         LatencyTracePriv {
-            control: Control::new(AccPriv::new(), config.op()),
+            control: Control::new(AccTimings::new(), config.op()),
             span_grouper: config.span_grouper,
             hist_high: config.hist_high,
             hist_sigfig: config.hist_sigfig,
         }
     }
 
+    /// Updates timings for the given span group. Called by [Layer] impl.
     fn update_timings(
         &self,
         span_group_priv: &SpanGroupPriv,
@@ -369,6 +394,8 @@ impl LatencyTracePriv {
         });
     }
 
+    /// Part of post-processing.
+    /// Moves callsite info in [TimingsPriv] values into the keys in [TimingsTemp].
     fn move_callsite_info_to_key(timings_priv: TimingsPriv) -> TimingsTemp {
         timings_priv
             .into_iter()
@@ -384,7 +411,8 @@ impl LatencyTracePriv {
             .collect()
     }
 
-    /// Transforms a SpanGroupTemp into a SpanGroup and adds it to `sgt_to_sg`.
+    /// Part of post-processing.
+    /// Transforms a [SpanGroupTemp] into a [SpanGroup] and adds it to `sgt_to_sg`.
     fn grow_sgt_to_sg(sgt: &SpanGroupTemp, sgt_to_sg: &mut HashMap<SpanGroupTemp, SpanGroup>) {
         let parent_sgt = sgt.parent();
         let parent_id: Option<Arc<str>> = parent_sgt
@@ -436,21 +464,37 @@ impl LatencyTracePriv {
         sgt_to_sg.insert(sgt.clone(), sg);
     }
 
+    /// Post-processing orchestration of the above two functions.
     /// Generates the publicly accessible [`Timings`] in post-processing after all thread-local
     /// data has been accumulated.
-    pub(crate) fn generate_timings(&self, tp: TimingsPriv) -> Timings {
-        let timings_temp = Self::move_callsite_info_to_key(tp);
+    pub(crate) fn reduce_acc_timings(&self, acc: AccTimings) -> Timings {
+        // Reduces acc to TimingsPriv
+        let mut timings_priv: TimingsPriv = TimingsPriv::new();
+        for (_, m) in acc.into_iter() {
+            for (k, v) in m {
+                let tp = timings_priv.get_mut(&k);
+                match tp {
+                    Some(tp) => tp.hist.add(v.hist).unwrap(),
+                    None => {
+                        timings_priv.insert(k, v);
+                    }
+                }
+            }
+        }
+
+        // Transform TimingsPriv into TimingsTemp and sgt_to_sg.
+        let timings_temp = Self::move_callsite_info_to_key(timings_priv);
         let mut sgt_to_sg: HashMap<SpanGroupTemp, SpanGroup> = HashMap::new();
         for sgt in timings_temp.keys() {
             Self::grow_sgt_to_sg(sgt, &mut sgt_to_sg);
         }
 
+        // Transform TimingsTemp and sgt_to_sg into Timings.
         let mut timings: Timings = timings_temp
             .into_iter()
             .map(|(sgt, timing)| (sgt_to_sg.remove(&sgt).unwrap(), timing))
-            .collect::<Timings0>()
+            .collect::<BTreeMap<SpanGroup, Timing>>()
             .into();
-
         for sg in sgt_to_sg.into_values() {
             timings.insert(sg, new_timing(self.hist_high, self.hist_sigfig));
         }
@@ -458,10 +502,11 @@ impl LatencyTracePriv {
         timings
     }
 
-    /// This is exposed separately from [Self::generate_timings] to isolate the code that holds the control lock.
-    /// This is useful in the implementation of `PausableTrace` in the `latency-trace` crate.
-    pub(crate) fn take_latencies_priv(&self, lock: &mut ControlLock<'_, AccPriv>) -> AccPriv {
-        self.control.take_acc(lock, AccPriv::new())
+    /// Extracts the accumulated timings.
+    pub(crate) fn take_acc_timings(&self) -> AccTimings {
+        let mut lock = self.control.lock();
+        self.control.ensure_tls_dropped(&mut lock);
+        self.control.take_acc(&mut lock, AccTimings::new())
     }
 }
 
@@ -550,5 +595,5 @@ where
 // Thread-locals
 
 thread_local! {
-    static LOCAL_INFO: Holder<TimingsPriv, AccPriv> = Holder::new(TimingsPriv::new);
+    static LOCAL_INFO: Holder<TimingsPriv, AccTimings> = Holder::new(TimingsPriv::new);
 }

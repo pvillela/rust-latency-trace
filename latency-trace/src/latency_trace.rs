@@ -19,8 +19,7 @@ pub struct LatencyTrace(LatencyTraceCfg);
 impl Default for LatencyTrace {
     /// Instantiates a [LatencyTrace] with default configuration. The defaults are:
     /// - Grouping of spans using the [`default_span_grouper`], which simply groups by the span's
-    /// callsite information (see [`CallsiteInfo`](crate::CallsiteInfo), which distills the
-    /// *tracing* framework's Callsite concept
+    /// callsite information, which distills the *tracing* framework's Callsite concept
     /// (see [Metadata and Callsite](https://docs.rs/tracing-core/0.1.31/tracing_core/)).
     /// - Histograms use a `hist_high` of `20,000,000` (20 seconds) and a `hist_sigfig` of 2.
     ///
@@ -81,11 +80,8 @@ impl LatencyTrace {
         let ltp = LatencyTracePriv::new(self.0);
         Registry::default().with(ltp.clone()).init();
         f();
-        let mut lock = ltp.control.lock();
-        ltp.control.ensure_tls_dropped(&mut lock);
-        let lp = ltp.take_latencies_priv(&mut lock);
-        drop(lock);
-        ltp.generate_timings(lp)
+        let acc = ltp.take_acc_timings();
+        ltp.reduce_acc_timings(acc)
     }
 
     /// Measures latencies of spans in async function `f` running on the *tokio* runtime.
