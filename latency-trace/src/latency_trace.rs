@@ -81,7 +81,7 @@ impl LatencyTrace {
         Registry::default().with(ltp.clone()).init();
         f();
         let acc = ltp.take_acc_timings();
-        ltp.reduce_acc_timings(acc)
+        ltp.report_timings(acc)
     }
 
     /// Measures latencies of spans in async function `f` running on the *tokio* runtime.

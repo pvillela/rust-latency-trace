@@ -54,7 +54,7 @@ impl PausableTrace {
         let allow_updates_lock = self.allow_updates.write().unwrap();
         let acc = self.ltp.take_acc_timings();
         drop(allow_updates_lock);
-        self.ltp.reduce_acc_timings(acc)
+        self.ltp.report_timings(acc)
     }
 
     /// Blocks until the function being measured completes, and then returns the collected latency information.
@@ -62,7 +62,7 @@ impl PausableTrace {
         let join_handle = self.join_handle.try_lock().unwrap().take().unwrap();
         join_handle.join().unwrap();
         let acc = self.ltp.take_acc_timings();
-        self.ltp.reduce_acc_timings(acc)
+        self.ltp.report_timings(acc)
     }
 }
 
