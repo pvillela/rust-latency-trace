@@ -164,6 +164,7 @@ fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
     hist
 }
 
+#[derive(Debug)]
 pub(crate) struct TimingPriv {
     hist: Timing,
     callsite_info_priv_path: CallsiteInfoPrivPath,
@@ -396,6 +397,7 @@ impl LatencyTracePriv {
 
     /// Extracts the accumulated timings.
     pub(crate) fn take_acc_timings(&self) -> AccTimings {
+        log::trace!("entering `take_acc_timings`");
         let mut lock = self.control.lock();
         self.control.ensure_tls_dropped(&mut lock);
         self.control.take_acc(&mut lock, AccTimings::new())
@@ -404,6 +406,7 @@ impl LatencyTracePriv {
     /// Part of post-processing.
     /// Moves callsite info in [TimingsPriv] values into the keys in [TimingsTemp].
     fn move_callsite_info_to_key(timings_priv: TimingsPriv) -> TimingsTemp {
+        log::trace!("entering `move_callsite_info_to_key`");
         timings_priv
             .into_iter()
             .map(|(k, v)| {
@@ -428,6 +431,7 @@ impl LatencyTracePriv {
     /// - Generates the span group IDs, which are inherently recursive as a span group's ID is a hash that
     ///   depends on its parent's ID.
     fn grow_sgt_to_sg(sgt: &SpanGroupTemp, sgt_to_sg: &mut HashMap<SpanGroupTemp, SpanGroup>) {
+        log::trace!("entering `grow_sgt_to_sg`");
         let parent_sgt = sgt.parent();
         let parent_id: Option<Arc<str>> = parent_sgt
             .iter()
@@ -481,6 +485,9 @@ impl LatencyTracePriv {
     /// Part of post-processing.
     /// Reduces acc to TimingsPriv.
     fn reduce_acc_to_timings_priv(&self, acc: AccTimings) -> TimingsPriv {
+        log::trace!("entering `reduce_acc_to_timings_priv`");
+        // acc.iter().for_each(|x| log::trace!("{:?}", x));
+        // log::trace!("acc: {:?}", acc);
         let mut timings_priv: TimingsPriv = TimingsPriv::new();
         for (_, m) in acc.into_iter() {
             for (k, v) in m {
@@ -493,6 +500,7 @@ impl LatencyTracePriv {
                 }
             }
         }
+        log::trace!("exiting `reduce_acc_to_timings_priv`");
         timings_priv
     }
 
@@ -500,6 +508,7 @@ impl LatencyTracePriv {
     /// Generates the publicly accessible [`Timings`] in post-processing after all thread-local
     /// data has been accumulated.
     pub(crate) fn report_timings(&self, acc: AccTimings) -> Timings {
+        log::trace!("entering `report_timings`");
         // Reduces acc to TimingsPriv
         let timings_priv: TimingsPriv = self.reduce_acc_to_timings_priv(acc);
 
