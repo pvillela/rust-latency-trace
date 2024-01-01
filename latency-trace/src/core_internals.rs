@@ -484,12 +484,11 @@ impl LatencyTracePriv {
 
     /// Part of post-processing.
     /// Reduces acc to TimingsPriv.
-    fn reduce_acc_to_timings_priv(&self, acc: AccTimings) -> TimingsPriv {
+    fn reduce_acc_to_timings_priv(acc: AccTimings) -> TimingsPriv {
         log::trace!("entering `reduce_acc_to_timings_priv`");
-        // acc.iter().for_each(|x| log::trace!("{:?}", x));
-        // log::trace!("acc: {:?}", acc);
         let mut timings_priv: TimingsPriv = TimingsPriv::new();
-        for (_, m) in acc.into_iter() {
+        for (tid, m) in acc.into_iter() {
+            println!("{:?} -> {}", tid, m.len());
             for (k, v) in m {
                 let tp = timings_priv.get_mut(&k);
                 match tp {
@@ -510,7 +509,7 @@ impl LatencyTracePriv {
     pub(crate) fn report_timings(&self, acc: AccTimings) -> Timings {
         log::trace!("entering `report_timings`");
         // Reduces acc to TimingsPriv
-        let timings_priv: TimingsPriv = self.reduce_acc_to_timings_priv(acc);
+        let timings_priv: TimingsPriv = Self::reduce_acc_to_timings_priv(acc);
 
         // Transform TimingsPriv into TimingsTemp and sgt_to_sg.
         let timings_temp = Self::move_callsite_info_to_key(timings_priv);

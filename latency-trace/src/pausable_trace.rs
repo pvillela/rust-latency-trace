@@ -58,10 +58,18 @@ impl PausableTrace {
     }
 
     /// Blocks until the function being measured completes, and then returns the collected latency information.
+    ///
+    /// Should only be called once, from main thread. May panic otherwise.
     pub fn wait_and_report(&self) -> Timings {
+        // try_lock() below should always succeed because this function is the only one that should be joining
+        // the handle and it should only be called once from the main thread.
         let join_handle = self.join_handle.try_lock().unwrap().take().unwrap();
         join_handle.join().unwrap();
+
+        let allow_updates_lock = self.allow_updates.write().unwrap();
         let acc = self.ltp.take_acc_timings();
+        drop(allow_updates_lock);
+
         self.ltp.report_timings(acc)
     }
 }

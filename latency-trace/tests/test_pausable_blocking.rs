@@ -15,7 +15,7 @@ use std::{collections::BTreeMap, thread, time::Duration};
 
 #[test]
 fn test_pausable_blocking() {
-    std::env::set_var("RUST_LOG", "latency_trace=trace");
+    std::env::set_var("RUST_LOG", "latency_trace=trace,thread_local_drop=trace");
     _ = env_logger::try_init();
 
     let pausable =

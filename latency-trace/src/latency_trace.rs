@@ -96,9 +96,7 @@ impl LatencyTrace {
                 .enable_all()
                 .build()
                 .unwrap()
-                .block_on(async {
-                    f().await;
-                });
+                .block_on(f());
         })
     }
 
@@ -136,9 +134,7 @@ impl LatencyTrace {
                 .enable_all()
                 .build()
                 .unwrap()
-                .block_on(async {
-                    f().await;
-                });
+                .block_on(f());
         })
     }
 }
