@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thread-local-drop = { path = "../../thread-local-drop" }
+thread-local-collect = { path = "../../thread-local-collect" }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 

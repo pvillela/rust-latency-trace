@@ -11,7 +11,7 @@ use std::{
     thread::{self, ThreadId},
     time::Instant,
 };
-use thread_local_drop::{self, Control, Holder};
+use thread_local_collect::{self, Control, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
