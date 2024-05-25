@@ -11,7 +11,7 @@ use std::{
     thread::{self, ThreadId},
     time::Instant,
 };
-use thread_local_collect::{self, Control, Holder};
+use thread_local_collect::tlm::probed::{Control, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
@@ -317,10 +317,10 @@ pub(crate) struct LatencyTraceCfg {
 
 impl LatencyTraceCfg {
     /// Used to accumulate results on [`Control`].
-    fn op(&self) -> impl Fn(TimingsPriv, &mut AccTimings, &ThreadId) + Send + Sync + 'static {
+    fn op(&self) -> impl Fn(TimingsPriv, &mut AccTimings, ThreadId) + Send + Sync + 'static {
         // let hist_high = self.hist_high;
         // let hist_sigfig = self.hist_sigfig;
-        move |timings: TimingsPriv, acc: &mut AccTimings, tid: &ThreadId| {
+        move |timings: TimingsPriv, acc: &mut AccTimings, tid: ThreadId| {
             log::debug!("executing `op` for {:?}", tid);
             // for (k, v) in timings {
             //     let timing_priv = acc
@@ -349,7 +349,12 @@ pub(crate) struct LatencyTracePriv {
 impl LatencyTracePriv {
     pub(crate) fn new(config: LatencyTraceCfg) -> LatencyTracePriv {
         LatencyTracePriv {
-            control: Control::new(AccTimings::new(), config.op()),
+            control: Control::new(
+                &LOCAL_INFO,
+                AccTimings::new(),
+                TimingsPriv::new,
+                config.op(),
+            ),
             span_grouper: config.span_grouper,
             hist_high: config.hist_high,
             hist_sigfig: config.hist_sigfig,
@@ -363,7 +368,7 @@ impl LatencyTracePriv {
         callsite_info_priv_path: &CallsiteInfoPrivPath,
         f: impl Fn(&mut TimingPriv),
     ) {
-        self.control.with_tl_mut(&LOCAL_INFO, |timings| {
+        self.control.with_data_mut(|timings| {
             let timing = {
                 if let Some(timing) = timings.get_mut(span_group_priv) {
                     timing
@@ -398,9 +403,8 @@ impl LatencyTracePriv {
     /// Extracts the accumulated timings.
     pub(crate) fn take_acc_timings(&self) -> AccTimings {
         log::trace!("entering `take_acc_timings`");
-        let mut lock = self.control.lock();
-        self.control.ensure_tls_dropped(&mut lock);
-        self.control.take_acc(&mut lock, AccTimings::new())
+        self.control.take_tls();
+        self.control.take_acc(AccTimings::new())
     }
 
     /// Part of post-processing.
@@ -617,5 +621,6 @@ where
 // Thread-locals
 
 thread_local! {
-    static LOCAL_INFO: Holder<TimingsPriv, AccTimings> = Holder::new(TimingsPriv::new);
+    // static LOCAL_INFO: Holder<TimingsPriv, AccTimings> = Holder::new(TimingsPriv::new);
+    static LOCAL_INFO: Holder<TimingsPriv, AccTimings> = Holder::new();
 }

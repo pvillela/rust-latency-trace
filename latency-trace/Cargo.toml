@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thread-local-collect = { path = "../../thread-local-collect" }
+thread_local_collect = { git = "https://github.com/pvillela/rust-thread-local-collect", tag = "v0.5.0" }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 
@@ -28,5 +28,5 @@ base64ct = { version = "1", features = ["alloc"] }
 
 [dev-dependencies]
 dev-utils = { path = "../dev-utils" }
-env_logger = "0.10"
+env_logger = "0.11"
 rand = "0.8"
