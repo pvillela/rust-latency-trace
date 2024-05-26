@@ -164,7 +164,7 @@ fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
     hist
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct TimingPriv {
     hist: Timing,
     callsite_info_priv_path: CallsiteInfoPrivPath,
@@ -405,6 +405,11 @@ impl LatencyTracePriv {
         log::trace!("entering `take_acc_timings`");
         self.control.take_tls();
         self.control.take_acc(AccTimings::new())
+    }
+
+    pub(crate) fn probe_acc_timings(&self) -> AccTimings {
+        log::trace!("entering `take_acc_timings`");
+        self.control.probe_tls()
     }
 
     /// Part of post-processing.

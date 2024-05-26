@@ -10,3 +10,5 @@ log = "0.4"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 rand = "0.8"
+# thread_local_collect = { git = "https://github.com/pvillela/rust-thread-local-collect", tag = "v0.5.0" }
+thread_local_collect = { path = "../../thread-local-collect" }

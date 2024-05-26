@@ -1,4 +1,4 @@
-use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace, PausableMode};
+use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace};
 use std::{thread, time::Duration};
 use tracing::{instrument, trace_span};
 
@@ -25,9 +25,9 @@ fn g() {
 }
 
 fn main() {
-    let pausable = LatencyTrace::default().measure_latencies_pausable(PausableMode::Nonblocking, f);
+    let pausable = LatencyTrace::default().measure_latencies_pausable(f);
     thread::sleep(Duration::from_micros(4800));
-    let latencies1 = pausable.pause_and_report();
+    let latencies1 = pausable.probe_latencies();
     let latencies2 = pausable.wait_and_report();
 
     println!("\nlatencies1 in microseconds");

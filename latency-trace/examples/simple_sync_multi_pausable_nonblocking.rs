@@ -1,6 +1,6 @@
 //! Example of latency measurement for a simple sync function.
 
-use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace, PausableMode};
+use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace};
 use std::{
     thread,
     time::{Duration, Instant},
@@ -43,16 +43,15 @@ fn main() {
 
     let start = Instant::now();
 
-    let pausable =
-        LatencyTrace::default().measure_latencies_pausable(PausableMode::Nonblocking, || {
-            thread::scope(|s| {
-                for _ in 0..5 {
-                    s.spawn(f);
-                }
-            });
+    let pausable = LatencyTrace::default().measure_latencies_pausable(|| {
+        thread::scope(|s| {
+            for _ in 0..5 {
+                s.spawn(f);
+            }
         });
+    });
     thread::sleep(Duration::from_micros(arg() * 12));
-    let latencies1 = pausable.pause_and_report();
+    let latencies1 = pausable.probe_latencies();
     let latencies2 = pausable.wait_and_report();
 
     println!(

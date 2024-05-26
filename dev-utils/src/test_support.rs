@@ -1,5 +1,13 @@
 use std::collections::BTreeMap;
 
+fn safe_div(x1: u64, x2: u64) -> u64 {
+    if x2 != 0 {
+        x1 / x2
+    } else {
+        0
+    }
+}
+
 pub fn f64_are_close(left: f64, right: f64, pct: f64) -> bool {
     let avg_abs = (left.abs() + right.abs()) / 2.0;
     (left - right).abs() <= avg_abs * pct
@@ -29,6 +37,7 @@ pub struct SpanNameTestSpec {
 }
 
 pub struct TestSpec {
+    pub spec_name: &'static str,
     pub span_group_count: usize,
     pub span_name_test_specs: BTreeMap<&'static str, SpanNameTestSpec>,
 }
@@ -69,7 +78,7 @@ pub fn span_name_test_spec_root_async_1(
         expected_parent_names: vec![],
         expected_parent_props,
         expected_mean: 150.0 * 8.0 * 1000.0,
-        expected_timing_count: N_EXEC.e_root_async_1 / n_root_async_1,
+        expected_timing_count: safe_div(N_EXEC.e_root_async_1, n_root_async_1),
         expected_agg_by_name_count: N_EXEC.e_root_async_1,
     }
 }
@@ -84,7 +93,7 @@ pub fn span_name_test_spec_root_async_2(
         expected_parent_names: vec![],
         expected_parent_props,
         expected_mean: 150.0 * 8.0 * 1000.0,
-        expected_timing_count: N_EXEC.e_root_async_2 / n_root_async_2,
+        expected_timing_count: safe_div(N_EXEC.e_root_async_2, n_root_async_2),
         expected_agg_by_name_count: N_EXEC.e_root_async_2,
     }
 }
@@ -99,7 +108,7 @@ pub fn span_name_test_spec_f(
         expected_parent_names: vec!["root_async_1", "root_async_2"],
         expected_parent_props,
         expected_mean: 150.0 * 8.0 * 1000.0,
-        expected_timing_count: N_EXEC.e_f / n_f,
+        expected_timing_count: safe_div(N_EXEC.e_f, n_f),
         expected_agg_by_name_count: N_EXEC.e_f,
     }
 }
@@ -114,7 +123,7 @@ pub fn span_name_test_spec_outer_async_span(
         expected_parent_names: vec!["f"],
         expected_parent_props,
         expected_mean: 150.0 * 1000.0,
-        expected_timing_count: N_EXEC.e_outer_async_span / n_outer_async_span,
+        expected_timing_count: safe_div(N_EXEC.e_outer_async_span, n_outer_async_span),
         expected_agg_by_name_count: N_EXEC.e_outer_async_span,
     }
 }
@@ -129,7 +138,7 @@ pub fn span_name_test_spec_inner_async_span(
         expected_parent_names: vec!["outer_async_span"],
         expected_parent_props,
         expected_mean: 37.0 * 1000.0,
-        expected_timing_count: N_EXEC.e_inner_async_span / n_inner_async_span,
+        expected_timing_count: safe_div(N_EXEC.e_inner_async_span, n_inner_async_span),
         expected_agg_by_name_count: N_EXEC.e_inner_async_span,
     }
 }
@@ -144,7 +153,7 @@ pub fn span_name_test_spec_sync_span_1(
         expected_parent_names: vec!["outer_async_span"],
         expected_parent_props,
         expected_mean: 13.0 * 1000.0,
-        expected_timing_count: N_EXEC.e_sync_span_1 / n_sync_span_1,
+        expected_timing_count: safe_div(N_EXEC.e_sync_span_1, n_sync_span_1),
         expected_agg_by_name_count: N_EXEC.e_sync_span_1,
     }
 }
@@ -159,7 +168,7 @@ pub fn span_name_test_spec_sync_span_2(
         expected_parent_names: vec!["inner_async_span"],
         expected_parent_props,
         expected_mean: 12.0 * 1000.0,
-        expected_timing_count: N_EXEC.e_sync_span_2 / n_sync_span_2,
+        expected_timing_count: safe_div(N_EXEC.e_sync_span_2, n_sync_span_2),
         expected_agg_by_name_count: N_EXEC.e_sync_span_2,
     }
 }

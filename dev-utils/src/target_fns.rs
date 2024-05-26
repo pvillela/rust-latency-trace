@@ -1,14 +1,26 @@
 #![allow(clippy::disallowed_names)]
 
-use std::{thread, time::Duration};
+use crate::gater::Gater;
+use std::{sync::Arc, thread, time::Duration};
 use tracing::{instrument, trace_span, Instrument};
 
-#[instrument(level = "trace")]
-async fn f() {
+pub const PROBE_GATE_F_PROCEED: u8 = 0;
+pub const PROBE_GATE_F1_PROBE_READY: u8 = 1;
+pub const PROBE_GATE_F2_PROBE_READY: u8 = 2;
+
+#[instrument(level = "trace", skip(probe_gater))]
+async fn f(f_instance: u8, probe_gater: Option<Arc<Gater>>) {
     let mut foo: u64 = 1;
 
     for i in 0..8 {
         log::trace!("Before outer_async_span");
+
+        if i == 4 {
+            if let Some(probe_gater) = probe_gater.clone() {
+                probe_gater.open(f_instance);
+                probe_gater.wait_for_async(PROBE_GATE_F_PROCEED).await;
+            }
+        }
 
         async {
             trace_span!("sync_span_1").in_scope(|| {
@@ -33,9 +45,18 @@ async fn f() {
     }
 }
 
-pub async fn target_fn() {
-    let h1 = tokio::spawn(async { f().await }.instrument(trace_span!("root_async_1", foo = 1)));
-    let h2 = tokio::spawn(async { f().await }.instrument(trace_span!("root_async_2", bar = 2)));
+pub async fn target_fn(probe_gater: Option<Arc<Gater>>) {
+    let h1 = {
+        let probe_gater = probe_gater.clone();
+        tokio::spawn(
+            async { f(1, probe_gater).await }.instrument(trace_span!("root_async_1", foo = 1)),
+        )
+    };
+    let h2 = {
+        tokio::spawn(
+            async { f(2, probe_gater).await }.instrument(trace_span!("root_async_2", bar = 2)),
+        )
+    };
     h1.await.unwrap();
     h2.await.unwrap();
 }

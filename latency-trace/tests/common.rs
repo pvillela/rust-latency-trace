@@ -12,6 +12,7 @@ pub fn run_test_general(
     timing_count_comparator: impl Fn(u64, u64) -> bool,
 ) {
     let TestSpec {
+        spec_name,
         span_group_count,
         span_name_test_specs,
     } = test_spec;
@@ -20,14 +21,19 @@ pub fn run_test_general(
         span_name_test_specs.keys().map(|s| *s).collect();
     let mut name_set: HashSet<&'static str> = HashSet::new();
 
-    assert_eq!(tmgs.len(), span_group_count, "Number of span groups");
+    assert_eq!(
+        tmgs.len(),
+        span_group_count,
+        "spec_name={spec_name}: Number of span groups - tmgs.keys()={:?}",
+        tmgs.keys()
+    );
 
     let (agg_timings, consistent_timings) = tmgs.aggregate(|sg| sg.name());
     assert!(consistent_timings, "consistent_timings");
     assert_eq!(
         agg_timings.len(),
         span_name_test_specs.len(),
-        "aggregation by name - number of aggregate values"
+        "spec_name={spec_name}: aggregation by name - number of aggregate values"
     );
 
     let parents = tmgs.span_group_to_parent();
@@ -36,7 +42,7 @@ pub fn run_test_general(
     for (name, spec) in span_name_test_specs {
         assert!(
             expected_name_set.contains(name),
-            "{name} must be in expected_names"
+            "spec_name={spec_name}: {name} must be in expected_names"
         );
         name_set.insert(name);
 
@@ -84,13 +90,12 @@ pub fn run_test_general(
 
             assert!(
                 f64_are_close(total_time_mean, expected_total_time_mean, 0.2),
-                "{name} aggregate total_time_mean: {total_time_mean}, {}",
-                expected_total_time_mean
+                "spec_name={spec_name}: {name} aggregate total_time_mean: {total_time_mean}, {expected_total_time_mean}"
             );
 
             assert!(
                 timing_count_comparator(total_time_count, expected_agg_by_name_count),
-                "{name} aggregate total_time_count: {total_time_count}, {expected_agg_by_name_count}"
+                "spec_name={spec_name}: {name} aggregate total_time_count: {total_time_count}, {expected_agg_by_name_count}"
             );
         }
 
@@ -113,12 +118,12 @@ pub fn run_test_general(
             {
                 assert!(
                     f64_are_close(total_time_mean, expected_total_time_mean, 0.25),
-                    "{name} total_time_mean: {total_time_mean}, {expected_total_time_mean}"
+                    "spec_name={spec_name}: {name} total_time_mean: {total_time_mean}, {expected_total_time_mean}"
                 );
 
                 assert!(
                     timing_count_comparator(total_time_count, expected_timing_count),
-                    "{name} total_time_count: {total_time_count}, {expected_timing_count}"
+                    "spec_name={spec_name}: {name} total_time_count: {total_time_count}, {expected_timing_count}"
                 );
             };
         }
@@ -126,13 +131,16 @@ pub fn run_test_general(
         assert_eq!(props_set, expected_props_set, "{name} props_set");
         assert_eq!(
             parent_name_set, expected_parent_name_set,
-            "{name} parent_name_set"
+            "spec_name={spec_name}: {name} parent_name_set"
         );
         assert_eq!(
             parent_props_set, expected_parent_props_set,
-            "{name} parent_props_set"
+            "spec_name={spec_name}: {name} parent_props_set"
         );
     }
 
-    assert_eq!(name_set, expected_name_set, "name_set");
+    assert_eq!(
+        name_set, expected_name_set,
+        "spec_name={spec_name}: name_set"
+    );
 }
