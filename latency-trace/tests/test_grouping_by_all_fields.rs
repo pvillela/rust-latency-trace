@@ -29,6 +29,8 @@ fn test_grouping_by_all_fields() {
     let n_sync_span_2: u64 = n_inner_async_span * 1;
 
     let test_spec = TestSpec {
+        spec_name: "grouping_by_all_fields",
+
         span_group_count: (n_root_async_1
             + n_root_async_2
             + n_f

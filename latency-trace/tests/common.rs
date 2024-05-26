@@ -50,7 +50,7 @@ pub fn run_test_general(
             expected_props,
             expected_parent_names,
             expected_parent_props,
-            expected_mean: expected_total_time_mean,
+            expected_mean: expected_timing_mean,
             expected_timing_count,
             expected_agg_by_name_count,
         } = spec;
@@ -85,17 +85,17 @@ pub fn run_test_general(
         {
             let agg_timing = agg_timings.get(name).unwrap();
 
-            let total_time_mean = agg_timing.mean();
-            let total_time_count = agg_timing.len();
+            let timing_mean = agg_timing.mean();
+            let timing_count = agg_timing.len();
 
             assert!(
-                f64_are_close(total_time_mean, expected_total_time_mean, 0.2),
-                "spec_name={spec_name}: {name} aggregate total_time_mean: {total_time_mean}, {expected_total_time_mean}"
+                f64_are_close(timing_mean, expected_timing_mean, 0.2),
+                "spec_name={spec_name}: {name} aggregate timing_mean: {timing_mean}, {expected_timing_mean}"
             );
 
             assert!(
-                timing_count_comparator(total_time_count, expected_agg_by_name_count),
-                "spec_name={spec_name}: {name} aggregate total_time_count: {total_time_count}, {expected_agg_by_name_count}"
+                timing_count_comparator(timing_count, expected_agg_by_name_count),
+                "spec_name={spec_name}: {name} aggregate timing_count: {timing_count}, {expected_agg_by_name_count}"
             );
         }
 
@@ -112,18 +112,18 @@ pub fn run_test_general(
             parent_name.map(|parent_name| parent_name_set.insert(parent_name));
             parent_props.map(|parent_props| parent_props_set.insert(parent_props));
 
-            let total_time_mean = timing.mean();
-            let total_time_count = timing.len();
+            let timing_mean = timing.mean();
+            let timing_count = timing.len();
 
             {
                 assert!(
-                    f64_are_close(total_time_mean, expected_total_time_mean, 0.25),
-                    "spec_name={spec_name}: {name} total_time_mean: {total_time_mean}, {expected_total_time_mean}"
+                    f64_are_close(timing_mean, expected_timing_mean, 0.25),
+                    "spec_name={spec_name}: {name} timing_mean: {timing_mean}, {expected_timing_mean}"
                 );
 
                 assert!(
-                    timing_count_comparator(total_time_count, expected_timing_count),
-                    "spec_name={spec_name}: {name} total_time_count: {total_time_count}, {expected_timing_count}"
+                    timing_count_comparator(timing_count, expected_timing_count),
+                    "spec_name={spec_name}: {name} timing_count: {timing_count}, {expected_timing_count}"
                 );
             };
         }

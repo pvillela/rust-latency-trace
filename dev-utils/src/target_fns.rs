@@ -8,7 +8,7 @@ pub const PROBE_GATE_F_PROCEED: u8 = 0;
 pub const PROBE_GATE_F1_PROBE_READY: u8 = 1;
 pub const PROBE_GATE_F2_PROBE_READY: u8 = 2;
 
-#[instrument(level = "trace", skip(probe_gater))]
+#[instrument(level = "trace", skip(f_instance, probe_gater))]
 async fn f(f_instance: u8, probe_gater: Option<Arc<Gater>>) {
     let mut foo: u64 = 1;
 
@@ -45,7 +45,7 @@ async fn f(f_instance: u8, probe_gater: Option<Arc<Gater>>) {
     }
 }
 
-pub async fn target_fn(probe_gater: Option<Arc<Gater>>) {
+pub async fn target_fn_gated(probe_gater: Option<Arc<Gater>>) {
     let h1 = {
         let probe_gater = probe_gater.clone();
         tokio::spawn(
@@ -59,4 +59,8 @@ pub async fn target_fn(probe_gater: Option<Arc<Gater>>) {
     };
     h1.await.unwrap();
     h2.await.unwrap();
+}
+
+pub async fn target_fn() {
+    target_fn_gated(None).await
 }

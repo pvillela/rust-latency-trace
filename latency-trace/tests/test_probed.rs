@@ -4,7 +4,7 @@ use common::run_test;
 use dev_utils::{
     gater::Gater,
     target_fns::{
-        target_fn, PROBE_GATE_F1_PROBE_READY, PROBE_GATE_F2_PROBE_READY, PROBE_GATE_F_PROCEED,
+        target_fn_gated, PROBE_GATE_F1_PROBE_READY, PROBE_GATE_F2_PROBE_READY, PROBE_GATE_F_PROCEED,
     },
     test_support::{
         span_name_test_spec_f, span_name_test_spec_inner_async_span,
@@ -25,7 +25,7 @@ async fn test_pausable_blocking() {
 
     let pausable = LatencyTrace::default().measure_latencies_pausable_tokio({
         let probe_gater = probe_gater.clone();
-        || target_fn(Some(probe_gater))
+        || target_fn_gated(Some(probe_gater))
     });
 
     // Test interim latencies
@@ -91,6 +91,7 @@ async fn test_pausable_blocking() {
 
         let test_spec = TestSpec {
             spec_name: "probed_interim",
+
             span_group_count: (n_root_async_1
                 + n_root_async_2
                 + n_f
