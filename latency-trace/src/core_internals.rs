@@ -285,7 +285,7 @@ type TimingsTemp = HashMap<SpanGroupTemp, Timing>;
 
 /// Type of accumulator of thread-local values, prior to transforming the collected information to a [`Timings`].
 /// Used to minimize the time holding the control lock during post-processing.
-type AccTimings = Vec<(ThreadId, HashMap<SpanGroupPriv, TimingPriv>)>;
+type AccTimings = Vec<HashMap<SpanGroupPriv, TimingPriv>>;
 
 //=================
 // SpanTiming
@@ -328,7 +328,7 @@ impl LatencyTraceCfg {
             //         .or_insert_with(|| new_timing(hist_high, hist_sigfig));
             //     timing_priv.add(v.hist).unwrap();
             // }
-            acc.push((tid, timings));
+            acc.push(timings);
         }
     }
 }
@@ -496,8 +496,7 @@ impl LatencyTracePriv {
     fn reduce_acc_to_timings_priv(acc: AccTimings) -> TimingsPriv {
         log::trace!("entering `reduce_acc_to_timings_priv`");
         let mut timings_priv: TimingsPriv = TimingsPriv::new();
-        for (tid, m) in acc.into_iter() {
-            println!("{:?} -> {}", tid, m.len());
+        for m in acc.into_iter() {
             for (k, v) in m {
                 let tp = timings_priv.get_mut(&k);
                 match tp {
