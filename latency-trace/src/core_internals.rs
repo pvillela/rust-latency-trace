@@ -34,10 +34,10 @@ struct CallsiteInfoPriv {
 
 // Types used in span groups or to support data collection.
 
-type CallsiteIdPath = Arc<Vec<Identifier>>;
-type CallsiteInfoPrivPath = Arc<Vec<Arc<CallsiteInfoPriv>>>;
+type CallsiteIdPath = Vec<Identifier>;
+type CallsiteInfoPrivPath = Vec<Arc<CallsiteInfoPriv>>;
 type Props = Vec<(String, String)>;
-type PropsPath = Arc<Vec<Arc<Props>>>;
+type PropsPath = Vec<Arc<Props>>;
 
 //=================
 // SpanGroup
@@ -122,8 +122,8 @@ impl SpanGroupPriv {
             return None;
         }
         Some(SpanGroupPriv {
-            callsite_id_path: Arc::new(self.callsite_id_path[0..len - 1].into()),
-            props_path: Arc::new(self.props_path[0..len - 1].into()),
+            callsite_id_path: self.callsite_id_path[0..len - 1].into(),
+            props_path: self.props_path[0..len - 1].into(),
         })
     }
 }
@@ -564,9 +564,9 @@ where
             Some(parent_span) => {
                 let ext = parent_span.extensions();
                 let pst = ext.get::<SpanTiming>().unwrap();
-                let mut callsite_info_path = pst.callsite_info_priv_path.as_ref().clone();
+                let mut callsite_info_path = pst.callsite_info_priv_path.clone();
                 callsite_info_path.push(callsite_info.into());
-                let mut props_path = pst.props_path.as_ref().clone();
+                let mut props_path = pst.props_path.clone();
                 props_path.push(Arc::new(props));
                 (callsite_info_path, props_path)
             }
