@@ -47,7 +47,7 @@
 //!
 //! The *direct* mode has the lowest overhead -- see [Key design choices](#key-design-choices) above. It is suitable for code that runs to completion in a reasonable amount of time.
 //!
-//! The *pausable* modes are suitable for code that is expected to run for extended periods of time, including servers. The *pausable* modes add some overhead beyond the direct mode as a read is performed on an [RwLock](https://doc.rust-lang.org/stable/std/sync/struct.RwLock.html) for each span. Informal benchmarking performed by the author indicates that this additional overhead is small, but this depends on the use case and the user is encouraged to perform their own benchmarks.
+//! The *probed* modes are suitable for code that is expected to run for extended periods of time, including servers. The *probed* modes add some overhead beyond the direct mode as a read is performed on an [RwLock](https://doc.rust-lang.org/stable/std/sync/struct.RwLock.html) for each span. Informal benchmarking performed by the author indicates that this additional overhead is small, but this depends on the use case and the user is encouraged to perform their own benchmarks.
 //!
 //! ## Async runtimes
 //!
@@ -143,7 +143,7 @@
 //! }
 //! ```
 //!
-//! ### Simple sync pausable example
+//! ### Simple sync probed example
 //!
 //! ```rust
 //! use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace, PausableMode};
@@ -173,10 +173,10 @@
 //! }
 //!
 //! fn main() {
-//!     let pausable = LatencyTrace::default().measure_latencies_pausable(PausableMode::Nonblocking, f);
+//!     let probed = LatencyTrace::default().measure_latencies_pausable(PausableMode::Nonblocking, f);
 //!     thread::sleep(Duration::from_micros(4800));
-//!     let latencies1 = pausable.pause_and_report();
-//!     let latencies2 = pausable.wait_and_report();
+//!     let latencies1 = probed.pause_and_report();
+//!     let latencies2 = probed.wait_and_report();
 //!
 //!     println!("\nlatencies1 in microseconds");
 //!     for (span_group, stats) in latencies1.map_values(summary_stats) {
@@ -190,7 +190,7 @@
 //! }
 //! ```
 //!
-//! **Async pausable** is similar to the above but uses [`LatencyTrace::measure_latencies_pausable_tokio`] instead.
+//! **Async probed** is similar to the above but uses [`LatencyTrace::measure_latencies_pausable_tokio`] instead.
 //!
 //! ## Related work
 //!
@@ -213,8 +213,8 @@ pub use summary_stats::*;
 mod btreemap_ext;
 pub use btreemap_ext::*;
 
-mod pausable_trace;
-pub use pausable_trace::*;
+mod probed_trace;
+pub use probed_trace::*;
 
 mod wrapper;
 pub use wrapper::*;

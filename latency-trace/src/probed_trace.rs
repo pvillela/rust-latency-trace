@@ -6,12 +6,12 @@ use std::{
 
 /// Represents an ongoing collection of latency information with the ability to be paused before completion.
 #[derive(Clone)]
-pub struct PausableTrace {
+pub struct ProbedTrace {
     ltp: LatencyTracePriv,
     join_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
-impl PausableTrace {
+impl ProbedTrace {
     pub(crate) fn new(ltp: LatencyTracePriv) -> Self {
         Self {
             ltp,

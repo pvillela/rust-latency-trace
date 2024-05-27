@@ -1,4 +1,4 @@
-//! Example of latency measurement for a simple sync function.
+//! Example of probed latency measurement for a simple sync function.
 
 use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace};
 use std::{
@@ -43,10 +43,16 @@ fn main() {
 
     let start = Instant::now();
 
-    let pausable = LatencyTrace::default().measure_latencies_pausable(f);
+    let probed = LatencyTrace::default().measure_latencies_probed(|| {
+        thread::scope(|s| {
+            for _ in 0..5 {
+                s.spawn(f);
+            }
+        });
+    });
     thread::sleep(Duration::from_micros(arg() * 12));
-    let latencies1 = pausable.probe_latencies();
-    let latencies2 = pausable.wait_and_report();
+    let latencies1 = probed.probe_latencies();
+    let latencies2 = probed.wait_and_report();
 
     println!(
         "\n=== {} {} ===========================================================",

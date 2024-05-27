@@ -1,6 +1,6 @@
 //! Main public interface extension to the core library, including latency measurement methods.
 
-use crate::{default_span_grouper, LatencyTraceCfg, LatencyTracePriv, PausableTrace, Timings};
+use crate::{default_span_grouper, LatencyTraceCfg, LatencyTracePriv, ProbedTrace, Timings};
 use std::{future::Future, sync::Arc, thread};
 use tracing::span::Attributes;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry};
@@ -98,31 +98,31 @@ impl LatencyTrace {
         })
     }
 
-    /// Measures latencies of spans in `f`, returning a [`PausableTrace`] that allows measurements to be
+    /// Measures latencies of spans in `f`, returning a [`ProbedTrace`] that allows measurements to be
     /// paused and reported before `f` completes.
     /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
-    pub fn measure_latencies_pausable(self, f: impl FnOnce() + Send + 'static) -> PausableTrace {
+    pub fn measure_latencies_probed(self, f: impl FnOnce() + Send + 'static) -> ProbedTrace {
         let ltp = LatencyTracePriv::new(self.0);
-        let pt = PausableTrace::new(ltp.clone());
+        let pt = ProbedTrace::new(ltp.clone());
         Registry::default().with(ltp).init();
         let jh = thread::spawn(f);
         pt.set_join_handle(jh);
         pt
     }
 
-    /// Measures latencies of spans in `f`, returning a [`PausableTrace`] that allows measurements to be
+    /// Measures latencies of spans in `f`, returning a [`ProbedTrace`] that allows measurements to be
     /// paused and reported before `f` completes.
     /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
-    pub fn measure_latencies_pausable_tokio<F>(
+    pub fn measure_latencies_probed_tokio<F>(
         self,
         f: impl FnOnce() -> F + Send + 'static,
-    ) -> PausableTrace
+    ) -> ProbedTrace
     where
         F: Future<Output = ()> + Send,
     {
-        self.measure_latencies_pausable(|| {
+        self.measure_latencies_probed(|| {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()

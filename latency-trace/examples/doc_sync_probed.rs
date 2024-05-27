@@ -25,10 +25,10 @@ fn g() {
 }
 
 fn main() {
-    let pausable = LatencyTrace::default().measure_latencies_pausable(f);
+    let probed = LatencyTrace::default().measure_latencies_probed(f);
     thread::sleep(Duration::from_micros(4800));
-    let latencies1 = pausable.probe_latencies();
-    let latencies2 = pausable.wait_and_report();
+    let latencies1 = probed.probe_latencies();
+    let latencies2 = probed.wait_and_report();
 
     println!("\nlatencies1 in microseconds");
     for (span_group, stats) in latencies1.map_values(summary_stats) {

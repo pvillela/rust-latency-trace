@@ -328,7 +328,7 @@ impl LatencyTraceCfg {
             //         .or_insert_with(|| new_timing(hist_high, hist_sigfig));
             //     timing_priv.add(v.hist).unwrap();
             // }
-            acc.push((tid.clone(), timings));
+            acc.push((tid, timings));
         }
     }
 }
@@ -436,7 +436,7 @@ impl LatencyTracePriv {
     /// This function serves two purposes:
     /// - Generates span groups that have not yet received any timing information and therefore do not
     ///   appear as keys in the thread-local TimingsPriv maps. This can happen for parent span groups
-    ///   when using [super::PausableTrace].
+    ///   when using [super::ProbedTrace].
     /// - Generates the span group IDs, which are inherently recursive as a span group's ID is a hash that
     ///   depends on its parent's ID.
     fn grow_sgt_to_sg(sgt: &SpanGroupTemp, sgt_to_sg: &mut HashMap<SpanGroupTemp, SpanGroup>) {
@@ -458,7 +458,7 @@ impl LatencyTracePriv {
         let code_line = callsite_info
             .file
             .clone()
-            .zip(callsite_info.line.clone())
+            .zip(callsite_info.line)
             .map(|(file, line)| format!("{}:{}", file, line))
             .unwrap_or_else(|| format!("{:?}", callsite_info.callsite_id));
 
@@ -469,12 +469,12 @@ impl LatencyTracePriv {
             hasher.update(parent_id.as_ref());
         }
         hasher.update(callsite_info.name);
-        hasher.update([0 as u8; 1]);
+        hasher.update([0_u8; 1]);
         hasher.update(code_line.clone());
         for (k, v) in props.iter() {
-            hasher.update([0 as u8; 1]);
+            hasher.update([0_u8; 1]);
             hasher.update(k);
-            hasher.update([0 as u8; 1]);
+            hasher.update([0_u8; 1]);
             hasher.update(v);
         }
         let hash = hasher.finalize();

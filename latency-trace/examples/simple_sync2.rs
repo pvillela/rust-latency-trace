@@ -1,4 +1,4 @@
-//! Example of latency measurement for a simple sync function tha does nothing,
+//! Example of latency measurement for a simple sync function that does nothing,
 //! to demonstrate the overhead associated with tracing and the framework.
 //!
 //! The nested spans with no other significant executable code, other than the loop and function call,

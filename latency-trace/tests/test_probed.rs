@@ -17,32 +17,32 @@ use latency_trace::LatencyTrace;
 use std::{collections::BTreeMap, sync::Arc};
 
 #[tokio::test]
-async fn test_pausable_blocking() {
+async fn test_probed() {
     std::env::set_var("RUST_LOG", "latency_trace=trace,thread_local_collect=trace");
     // _ = env_logger::try_init();
 
     let probe_gater = Arc::new(Gater::new("probe_gater"));
 
-    let pausable = LatencyTrace::default().measure_latencies_pausable_tokio({
+    let probed = LatencyTrace::default().measure_latencies_probed_tokio({
         let probe_gater = probe_gater.clone();
         || target_fn_gated(Some(probe_gater))
     });
+
+    // Number of span groups by name
+    let n_root_async_1: u64 = 1;
+    let n_root_async_2: u64 = 1;
+    let n_f: u64 = (n_root_async_1 + n_root_async_2) * 1;
+    let n_outer_async_span: u64 = n_f * 1;
+    let n_inner_async_span: u64 = n_outer_async_span * 1;
+    let n_sync_span_1: u64 = n_outer_async_span * 1;
+    let n_sync_span_2: u64 = n_inner_async_span * 1;
 
     // Test interim latencies
     {
         probe_gater.wait_for_async(PROBE_GATE_F1_PROBE_READY).await;
         probe_gater.wait_for_async(PROBE_GATE_F2_PROBE_READY).await;
-        let latencies = pausable.probe_latencies();
+        let latencies = probed.probe_latencies();
         probe_gater.open(PROBE_GATE_F_PROCEED);
-
-        // Number of span groups by name
-        let n_root_async_1: u64 = 1;
-        let n_root_async_2: u64 = 1;
-        let n_f: u64 = (n_root_async_1 + n_root_async_2) * 1;
-        let n_outer_async_span: u64 = n_f * 1;
-        let n_inner_async_span: u64 = n_outer_async_span * 1;
-        let n_sync_span_1: u64 = n_outer_async_span * 1;
-        let n_sync_span_2: u64 = n_inner_async_span * 1;
 
         let test_spec_root_async_1 = SpanNameTestSpec {
             expected_mean: 0.0,
@@ -116,16 +116,7 @@ async fn test_pausable_blocking() {
 
     // Test final latencies
     {
-        let latencies = pausable.wait_and_report();
-
-        // Number of span groups by name
-        let n_root_async_1: u64 = 1;
-        let n_root_async_2: u64 = 1;
-        let n_f: u64 = (n_root_async_1 + n_root_async_2) * 1;
-        let n_outer_async_span: u64 = n_f * 1;
-        let n_inner_async_span: u64 = n_outer_async_span * 1;
-        let n_sync_span_1: u64 = n_outer_async_span * 1;
-        let n_sync_span_2: u64 = n_inner_async_span * 1;
+        let latencies = probed.wait_and_report();
 
         let test_spec = TestSpec {
             spec_name: "probed_final",
