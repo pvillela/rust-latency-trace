@@ -1,6 +1,6 @@
 //! Example of probed latency measurement for a simple sync function.
 
-use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace};
+use latency_trace::{summary_stats, LatencyTrace};
 use std::{
     thread,
     time::{Duration, Instant},

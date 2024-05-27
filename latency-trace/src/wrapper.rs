@@ -1,5 +1,6 @@
 use std::{
     borrow::Borrow,
+    collections::BTreeMap,
     fmt::Debug,
     ops::{Deref, DerefMut},
     rc::Rc,
@@ -75,5 +76,32 @@ impl<T> Borrow<T> for Wrapper<Arc<T>> {
 impl<T> Borrow<T> for Wrapper<Rc<T>> {
     fn borrow(&self) -> &T {
         self.0.borrow()
+    }
+}
+
+impl<T> IntoIterator for Wrapper<T>
+where
+    T: IntoIterator,
+{
+    type Item = T::Item;
+    type IntoIter = T::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<K, V> Wrapper<BTreeMap<K, V>> {
+    /// Returns a new [`Wrapper<BTreeMap>`] with the same keys as `self` and values corresponding to the
+    /// invocation of function `f` on the original values.
+    pub fn map_values<V1, BV>(&self, mut f: impl FnMut(&BV) -> V1) -> Wrapper<BTreeMap<K, V1>>
+    where
+        K: Ord + Clone,
+        V: Borrow<BV>,
+    {
+        self.iter()
+            .map(|(k, v)| (k.clone(), f(v.borrow())))
+            .collect::<BTreeMap<_, _>>()
+            .into()
     }
 }

@@ -183,7 +183,7 @@ impl TimingPriv {
 //=================
 // Timings
 
-/// [`Wrapper`] of [`BTreeMap`]`<K, `[`Timing`]`>`.
+/// [`Wrapper`] of [`BTreeMap`]`<K, `[`Timing`]`>`; inherits all [`BTreeMap`] methods.
 pub type TimingsView<K> = Wrapper<BTreeMap<K, Timing>>;
 
 impl<K> TimingsView<K> {
@@ -206,7 +206,7 @@ impl<K> TimingsView<K> {
     }
 }
 
-/// Mapping of [`SpanGroup`]s to the [`Timing`] information recorded for them.
+/// Mapping of [`SpanGroup`]s to the [`Timing`] information recorded for them; inherits all [`BTreeMap`] methods.
 pub type Timings = TimingsView<SpanGroup>;
 
 impl Timings {

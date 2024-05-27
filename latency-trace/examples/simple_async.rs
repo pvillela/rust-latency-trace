@@ -1,6 +1,6 @@
 //! Example of latency measurement for a simple async function.
 
-use latency_trace::{summary_stats, BTreeMapExt, LatencyTrace};
+use latency_trace::{summary_stats, LatencyTrace};
 use std::time::{Duration, Instant};
 use tracing::{instrument, trace_span, Instrument};
 
