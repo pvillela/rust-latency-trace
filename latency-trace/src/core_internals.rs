@@ -65,7 +65,7 @@ type PropsPath = Vec<Arc<Props>>;
 pub struct SpanGroup {
     name: &'static str,
     id: Arc<str>,
-    code_line: Arc<String>,
+    code_line: Arc<str>,
     props: Arc<Props>,
     parent_id: Option<Arc<str>>,
     depth: usize,
@@ -225,7 +225,7 @@ impl Timings {
         G: Ord + Clone,
     {
         let mut res: BTreeMap<G, Histogram<u64>> = BTreeMap::new();
-        let mut aggregates: BTreeMap<G, Arc<String>> = BTreeMap::new();
+        let mut aggregates: BTreeMap<G, Arc<str>> = BTreeMap::new();
         let mut aggregates_are_consistent = true;
         for (k, v) in self.iter() {
             // Construct aggregation map.
@@ -322,12 +322,6 @@ impl LatencyTraceCfg {
         // let hist_sigfig = self.hist_sigfig;
         move |timings: TimingsPriv, acc: &mut AccTimings, tid: ThreadId| {
             log::debug!("executing `op` for {:?}", tid);
-            // for (k, v) in timings {
-            //     let timing_priv = acc
-            //         .entry(k)
-            //         .or_insert_with(|| new_timing(hist_high, hist_sigfig));
-            //     timing_priv.add(v.hist).unwrap();
-            // }
             acc.push(timings);
         }
     }
