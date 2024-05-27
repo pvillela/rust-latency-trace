@@ -146,7 +146,7 @@ impl SpanGroupTemp {
         let callsite_info_priv_path = self.callsite_info_priv_path[0..len - 1].to_vec();
         Some(SpanGroupTemp {
             span_group_priv: parent_sgp,
-            callsite_info_priv_path: callsite_info_priv_path.into(),
+            callsite_info_priv_path,
         })
     }
 }
@@ -566,8 +566,8 @@ where
         };
 
         span.extensions_mut().insert(SpanTiming {
-            callsite_info_priv_path: callsite_info_path.into(),
-            props_path: props_path.into(),
+            callsite_info_priv_path: callsite_info_path,
+            props_path,
             created_at: Instant::now(),
         });
 
@@ -590,8 +590,7 @@ where
                 .callsite_info_priv_path
                 .iter()
                 .map(|x| x.callsite_id.clone())
-                .collect::<Vec<_>>()
-                .into(),
+                .collect::<Vec<_>>(),
             props_path: span_timing.props_path.clone(),
         };
 
