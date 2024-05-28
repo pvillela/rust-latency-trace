@@ -1,4 +1,4 @@
-# latency-trace
+# latency_trace
 
 This library supports latency measurement for functions and code blocks, both sync and async.
 

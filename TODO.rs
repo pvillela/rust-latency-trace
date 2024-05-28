@@ -5,4 +5,4 @@
 - Support filtering of spans
 - Update README.md from lib docs.
 - Document and publish thread-local-collect
-- Publish latency-trace
+- Publish latency_trace
