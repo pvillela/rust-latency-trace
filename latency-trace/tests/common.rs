@@ -1,16 +1,8 @@
-use dev_utils::test_support::{f64_are_close, u64_comparator, SpanNameTestSpec, TestSpec};
+use dev_utils::test_support::{f64_are_close, SpanNameTestSpec, TestSpec};
 use latency_trace::Timings;
 use std::collections::HashSet;
 
 pub fn run_test(tmgs: &Timings, test_spec: TestSpec) {
-    run_test_general(tmgs, test_spec, u64_comparator(0.0))
-}
-
-pub fn run_test_general(
-    tmgs: &Timings,
-    test_spec: TestSpec,
-    timing_count_comparator: impl Fn(u64, u64) -> bool,
-) {
     let TestSpec {
         spec_name,
         span_group_count,
@@ -42,7 +34,7 @@ pub fn run_test_general(
     for (name, spec) in span_name_test_specs {
         assert!(
             expected_name_set.contains(name),
-            "spec_name={spec_name}: {name} must be in expected_names"
+            "spec_name={spec_name}: name={name} must be in expected_names={expected_name_set:?}"
         );
         name_set.insert(name);
 
@@ -90,12 +82,12 @@ pub fn run_test_general(
 
             assert!(
                 f64_are_close(timing_mean, expected_timing_mean, 0.2),
-                "spec_name={spec_name}: {name} aggregate timing_mean: {timing_mean}, {expected_timing_mean}"
+                "spec_name={spec_name}: {name} aggregate timing_mean: actual={timing_mean}, expected={expected_timing_mean}"
             );
 
-            assert!(
-                timing_count_comparator(timing_count, expected_agg_by_name_count),
-                "spec_name={spec_name}: {name} aggregate timing_count: {timing_count}, {expected_agg_by_name_count}"
+            assert_eq!(
+                timing_count, expected_agg_by_name_count,
+                "spec_name={spec_name}: {name} aggregate timing_count"
             );
         }
 
@@ -118,12 +110,12 @@ pub fn run_test_general(
             {
                 assert!(
                     f64_are_close(timing_mean, expected_timing_mean, 0.25),
-                    "spec_name={spec_name}: {name} timing_mean: {timing_mean}, {expected_timing_mean}"
+                    "spec_name={spec_name}: {name} timing_mean: actual={timing_mean}, expected={expected_timing_mean}"
                 );
 
-                assert!(
-                    timing_count_comparator(timing_count, expected_timing_count),
-                    "spec_name={spec_name}: {name} timing_count: {timing_count}, {expected_timing_count}"
+                assert_eq!(
+                    timing_count, expected_timing_count,
+                    "spec_name={spec_name}: {name} timing_count"
                 );
             };
         }
