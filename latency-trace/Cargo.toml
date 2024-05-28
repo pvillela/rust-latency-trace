@@ -1,5 +1,5 @@
 [package]
-name = "latency-trace"
+name = "latency_trace"
 version = "0.1.0"
 edition = "2021"
 
@@ -28,6 +28,6 @@ sha2 = "0.10"
 base64ct = { version = "1", features = ["alloc"] }
 
 [dev-dependencies]
-dev-utils = { path = "../dev-utils" }
+dev_utils = { path = "../dev-utils" }
 env_logger = "0.11"
 rand = "0.8"
