@@ -53,4 +53,4 @@ The _pausable_ modes are suitable for code that is expected to run for extended 
 
 ## Async runtimes
 
-This framework supports [tokio](https://crates.io/crates/tokio) out-of-the-box (see [`LatencyTrace::measure_latencies_tokio`] and [`LatencyTrace::measure_latencies_pausable_tokio`]) but other async runtimes can be used as well by simply wrapping the async code with the chosen async runtime and using one of the sync methods ([`LatencyTrace::measure_latencies`] or [`LatencyTrace::measure_latencies_pausable`]). The source code for the above-mentioned _tokio_ variants shows exactly how to do it.
+This framework supports [tokio](https://crates.io/crates/tokio) out-of-the-box (see [`LatencyTrace::measure_latencies_tokio`] and [`LatencyTrace::measure_latencies_probed_tokio`]) but other async runtimes can be used as well by simply wrapping the async code with the chosen async runtime and using one of the sync methods ([`LatencyTrace::measure_latencies`] or [`LatencyTrace::measure_latencies_probed`]). The source code for the above-mentioned _tokio_ variants shows exactly how to do it.
