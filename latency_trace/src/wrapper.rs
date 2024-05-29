@@ -91,6 +91,30 @@ where
     }
 }
 
+impl<'a, T> IntoIterator for &'a Wrapper<T>
+where
+    &'a T: IntoIterator,
+{
+    type Item = <&'a T as IntoIterator>::Item;
+    type IntoIter = <&'a T as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a, T> IntoIterator for &'a mut Wrapper<T>
+where
+    &'a mut T: IntoIterator,
+{
+    type Item = <&'a mut T as IntoIterator>::Item;
+    type IntoIter = <&'a mut T as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl<K, V> Wrapper<BTreeMap<K, V>> {
     /// Returns a new [`Wrapper<BTreeMap>`] with the same keys as `self` and values corresponding to the
     /// invocation of function `f` on the original values.
