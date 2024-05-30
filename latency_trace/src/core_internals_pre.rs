@@ -1,3 +1,5 @@
+//! Collection of timing information in an efficient way that is not convenient to display.
+
 use hdrhistogram::Histogram;
 use std::{
     collections::HashMap,
@@ -11,18 +13,16 @@ use thread_local_collect::tlm::probed::{Control, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
-use crate::{LatencyTraceCfg, SpanGrouper, Timing};
-
 //=================
 // Callsite
 
 /// Provides information about where the tracing span was defined.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-struct CallsiteInfoPriv {
-    callsite_id: Identifier,
-    name: &'static str,
-    file: Option<String>,
-    line: Option<u32>,
+pub(crate) struct CallsiteInfoPriv {
+    pub(crate) callsite_id: Identifier,
+    pub(crate) name: &'static str,
+    pub(crate) file: Option<String>,
+    pub(crate) line: Option<u32>,
 }
 
 //=================
@@ -31,8 +31,8 @@ struct CallsiteInfoPriv {
 // Types used in span groups or to support data collection.
 
 type CallsiteIdPath = Vec<Identifier>;
-type CallsiteInfoPrivPath = Vec<Arc<CallsiteInfoPriv>>;
-type Props = Vec<(String, String)>;
+pub(crate) type CallsiteInfoPrivPath = Vec<Arc<CallsiteInfoPriv>>;
+pub(crate) type Props = Vec<(String, String)>;
 type PropsPath = Vec<Arc<Props>>;
 
 /// Private form of [`SpanGroup`] used during trace collection, more efficient than [`SpanGroup`] for trace
@@ -40,14 +40,14 @@ type PropsPath = Vec<Arc<Props>>;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct SpanGroupPriv {
     /// Callsite ID of the span group preceded by the callsite IDs of its ancestors.
-    callsite_id_path: CallsiteIdPath,
+    pub(crate) callsite_id_path: CallsiteIdPath,
 
     /// Properties of the span group preceded by the properties of its ancestors.
-    props_path: PropsPath,
+    pub(crate) props_path: PropsPath,
 }
 
 impl SpanGroupPriv {
-    fn parent(&self) -> Option<Self> {
+    pub(crate) fn parent(&self) -> Option<Self> {
         let len = self.callsite_id_path.len();
         if len == 1 {
             return None;
@@ -59,8 +59,14 @@ impl SpanGroupPriv {
     }
 }
 
+//=================
+// Timing and Timings
+
+/// Alias of [`Histogram<u64>`].
+pub type Timing = Histogram<u64>;
+
 /// Constructs a [`Timing`]. The arguments correspond to [Histogram::high] and [Histogram::sigfig].
-fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
+pub(crate) fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
     let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
     hist.auto(true);
     hist
@@ -68,8 +74,8 @@ fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
 
 #[derive(Debug, Clone)]
 pub(crate) struct TimingPriv {
-    hist: Timing,
-    callsite_info_priv_path: CallsiteInfoPrivPath,
+    pub(crate) hist: Timing,
+    pub(crate) callsite_info_priv_path: CallsiteInfoPrivPath,
 }
 
 impl TimingPriv {
@@ -86,11 +92,11 @@ impl TimingPriv {
 /// light as possible to minimize processing overhead when accessing the map. Therefore, part of the information
 /// required to produce the ultimate results is kept in the map's values as the `callsite_info_priv_path` field
 /// in [TimingsPriv].
-type TimingsPriv = HashMap<SpanGroupPriv, TimingPriv>;
+pub(crate) type TimingsPriv = HashMap<SpanGroupPriv, TimingPriv>;
 
 /// Type of accumulator of thread-local values, prior to transforming the collected information to a [`Timings`].
 /// Used to minimize the time holding the control lock during post-processing.
-type AccTimings = Vec<HashMap<SpanGroupPriv, TimingPriv>>;
+pub(crate) type AccTimings = Vec<HashMap<SpanGroupPriv, TimingPriv>>;
 
 //=================
 // SpanTiming
@@ -109,16 +115,33 @@ fn op(timings: TimingsPriv, acc: &mut AccTimings, tid: ThreadId) {
 }
 
 //=================
+// LatencyTraceCfg
+
+/// Configuration information used by both [`LatencyTracePriv`] and [`LatencyTrace`](super::LatencyTrace).
+pub(crate) struct LatencyTraceCfg {
+    pub(crate) span_grouper: SpanGrouper,
+    pub(crate) hist_high: u64,
+    pub(crate) hist_sigfig: u8,
+}
+
+//=================
+// SpanGrouper
+
+/// Internal type of span groupers.
+pub(crate) type SpanGrouper =
+    Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>;
+
+//=================
 // LatencyTracePriv
 
 /// Implements [Layer] and provides access to [Timings] containing the latencies collected for different span groups.
 /// This is the central struct in this framework's implementation.
 #[derive(Clone)]
 pub(crate) struct LatencyTracePriv {
-    pub(crate) control: Control<TimingsPriv, AccTimings>,
+    control: Control<TimingsPriv, AccTimings>,
     span_grouper: SpanGrouper,
-    hist_high: u64,
-    hist_sigfig: u8,
+    pub(crate) hist_high: u64,
+    pub(crate) hist_sigfig: u8,
 }
 
 impl LatencyTracePriv {

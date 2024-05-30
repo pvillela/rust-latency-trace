@@ -1,6 +1,10 @@
-//! Main public interface extension to the core library, including latency measurement methods.
+//! Main public interface of library.
 
-use crate::{default_span_grouper, LatencyTraceCfg, LatencyTracePriv, ProbedTrace, Timings};
+use crate::{
+    core_internals_post::{report_timings, Timings},
+    core_internals_pre::{LatencyTraceCfg, LatencyTracePriv},
+    default_span_grouper, ProbedTrace,
+};
 use std::{future::Future, sync::Arc, thread};
 use tracing::span::Attributes;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry};
@@ -79,7 +83,7 @@ impl LatencyTrace {
         Registry::default().with(ltp.clone()).init();
         f();
         let acc = ltp.take_acc_timings();
-        ltp.report_timings(acc)
+        report_timings(&ltp, acc)
     }
 
     /// Measures latencies of spans in async function `f` running on the *tokio* runtime.

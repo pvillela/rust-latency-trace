@@ -1,7 +1,13 @@
-use crate::{LatencyTracePriv, Timings};
+//! Provides the ability to obtain interim timing information before the target function terminates.
+
 use std::{
     sync::{Arc, Mutex},
     thread::JoinHandle,
+};
+
+use crate::{
+    core_internals_post::{report_timings, Timings},
+    core_internals_pre::LatencyTracePriv,
 };
 
 /// Represents an ongoing collection of latency information with the ability to be paused before completion.
@@ -27,7 +33,7 @@ impl ProbedTrace {
 
     pub fn probe_latencies(&self) -> Timings {
         let acc = self.ltp.probe_acc_timings();
-        self.ltp.report_timings(acc)
+        report_timings(&self.ltp, acc)
     }
 
     /// Blocks until the function being measured completes, and then returns the collected latency information.
@@ -39,6 +45,6 @@ impl ProbedTrace {
         let join_handle = self.join_handle.try_lock().unwrap().take().unwrap();
         join_handle.join().unwrap();
         let acc = self.ltp.take_acc_timings();
-        self.ltp.report_timings(acc)
+        report_timings(&self.ltp, acc)
     }
 }

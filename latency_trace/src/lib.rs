@@ -28,23 +28,17 @@
 //!
 #![doc = include_str!("../../readme2.md")]
 
-mod core_internals_common;
-pub use core_internals_common::*;
+mod core_internals_post;
+mod core_internals_pre;
 
 mod core_internals_pub;
 pub use core_internals_pub::*;
-
-mod core_internals_pre;
-pub(crate) use core_internals_pre::*;
-
-mod core_internals_post;
-pub(crate) use core_internals_post::*;
 
 mod span_groupers;
 pub use span_groupers::*;
 
 mod latency_trace;
-pub use crate::latency_trace::*;
+pub use latency_trace::*;
 
 mod summary_stats;
 pub use summary_stats::*;
