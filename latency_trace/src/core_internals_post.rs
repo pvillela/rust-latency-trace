@@ -3,8 +3,8 @@
 
 use crate::{
     core_internals_pre::{
-        new_timing, AccTimings, CallsiteInfoPrivPath, LatencyTracePriv, Props, SpanGroupPriv,
-        Timing, TimingsPriv,
+        new_timing, op_r, AccTimings, CallsiteInfoPriv, LatencyTracePriv, Props, RawTracePriv,
+        SpanGroupPriv, Timing,
     },
     Wrapper,
 };
@@ -17,6 +17,8 @@ use std::{
     hash::Hash,
     sync::Arc,
 };
+
+pub type CallsiteInfoPrivPath = Vec<Arc<CallsiteInfoPriv>>;
 
 //=================
 // SpanGroup
@@ -199,22 +201,32 @@ impl Timings {
     }
 }
 
+//=================
+// Post-processing
+
 /// Intermediate form of latency information collected for span groups, used during post-processing while
 /// transforming [`SpanGroupPriv`] to [`SpanGroup`].
 type TimingsTemp = HashMap<SpanGroupTemp, Timing>;
 
 /// Part of post-processing.
 /// Moves callsite info in [TimingsPriv] values into the keys in [TimingsTemp].
-fn move_callsite_info_to_key(timings_priv: TimingsPriv) -> TimingsTemp {
+fn move_callsite_info_to_key(trace_priv: RawTracePriv) -> TimingsTemp {
     log::trace!("entering `move_callsite_info_to_key`");
+    let RawTracePriv {
+        timings: timings_priv,
+        callsite_infos,
+    } = trace_priv;
     timings_priv
         .into_iter()
-        .map(|(k, v)| {
-            let callsite_priv = v.callsite_info_priv_path;
-            let hist = v.hist;
+        .map(|(span_group_priv, hist)| {
+            let callsite_info_priv_path: CallsiteInfoPrivPath = span_group_priv
+                .callsite_id_path
+                .iter()
+                .map(|id| callsite_infos.get(id).unwrap().clone().into())
+                .collect();
             let sgt = SpanGroupTemp {
-                span_group_priv: k,
-                callsite_info_priv_path: callsite_priv,
+                span_group_priv,
+                callsite_info_priv_path,
             };
             (sgt, hist)
         })
@@ -284,22 +296,24 @@ fn grow_sgt_to_sg(sgt: &SpanGroupTemp, sgt_to_sg: &mut HashMap<SpanGroupTemp, Sp
 
 /// Part of post-processing.
 /// Reduces acc to TimingsPriv.
-fn reduce_acc_to_timings_priv(acc: AccTimings) -> TimingsPriv {
+fn reduce_acc_to_timings_priv(acc: AccTimings) -> RawTracePriv {
     log::trace!("entering `reduce_acc_to_timings_priv`");
-    let mut timings_priv: TimingsPriv = TimingsPriv::new();
-    for m in acc.into_iter() {
-        for (k, v) in m {
-            let tp = timings_priv.get_mut(&k);
-            match tp {
-                Some(tp) => tp.hist.add(v.hist).unwrap(),
-                None => {
-                    timings_priv.insert(k, v);
-                }
-            }
-        }
-    }
-    log::trace!("exiting `reduce_acc_to_timings_priv`");
-    timings_priv
+    acc.into_iter().fold(RawTracePriv::new(), op_r)
+
+    // let mut timings_priv: RawTracePriv = RawTracePriv::new();
+    // for m in acc.into_iter() {
+    //     for (k, v) in m {
+    //         let tp = timings_priv.get_mut(&k);
+    //         match tp {
+    //             Some(tp) => tp.hist.add(v.hist).unwrap(),
+    //             None => {
+    //                 timings_priv.insert(k, v);
+    //             }
+    //         }
+    //     }
+    // }
+    // log::trace!("exiting `reduce_acc_to_timings_priv`");
+    // timings_priv
 }
 
 /// Post-processing orchestration of the above functions.
@@ -308,7 +322,7 @@ fn reduce_acc_to_timings_priv(acc: AccTimings) -> TimingsPriv {
 pub(crate) fn report_timings(ltp: &LatencyTracePriv, acc: AccTimings) -> Timings {
     log::trace!("entering `report_timings`");
     // Reduces acc to TimingsPriv
-    let timings_priv: TimingsPriv = reduce_acc_to_timings_priv(acc);
+    let timings_priv: RawTracePriv = reduce_acc_to_timings_priv(acc);
 
     // Transform TimingsPriv into TimingsTemp and sgt_to_sg.
     let timings_temp = move_callsite_info_to_key(timings_priv);

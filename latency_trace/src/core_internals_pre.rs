@@ -23,6 +23,7 @@ pub(crate) struct CallsiteInfoPriv {
     pub(crate) name: &'static str,
     pub(crate) file: Option<String>,
     pub(crate) line: Option<u32>,
+    pub(crate) parent: Option<Identifier>,
 }
 
 //=================
@@ -31,7 +32,7 @@ pub(crate) struct CallsiteInfoPriv {
 // Types used in span groups or to support data collection.
 
 type CallsiteIdPath = Vec<Identifier>;
-pub(crate) type CallsiteInfoPrivPath = Vec<Arc<CallsiteInfoPriv>>;
+// pub(crate) type CallsiteInfoPrivPath = Vec<Arc<CallsiteInfoPriv>>;
 pub(crate) type Props = Vec<(String, String)>;
 type PropsPath = Vec<Arc<Props>>;
 
@@ -72,31 +73,46 @@ pub(crate) fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
     hist
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct TimingPriv {
-    pub(crate) hist: Timing,
-    pub(crate) callsite_info_priv_path: CallsiteInfoPrivPath,
-}
+// #[derive(Debug, Clone)]
+// pub(crate) struct TimingPriv {
+//     pub(crate) hist: Timing,
+//     pub(crate) callsite_info_priv_path: CallsiteInfoPrivPath,
+// }
 
-impl TimingPriv {
-    fn new(hist_high: u64, hist_sigfig: u8, callsite_info_priv_path: CallsiteInfoPrivPath) -> Self {
-        let hist = new_timing(hist_high, hist_sigfig);
-        Self {
-            hist,
-            callsite_info_priv_path,
-        }
-    }
-}
+// impl TimingPriv {
+//     fn new(hist_high: u64, hist_sigfig: u8, callsite_info_priv_path: CallsiteInfoPrivPath) -> Self {
+//         let hist = new_timing(hist_high, hist_sigfig);
+//         Self {
+//             hist,
+//             callsite_info_priv_path,
+//         }
+//     }
+// }
 
 /// Type of latency information internally collected for span groups. The key is [SpanGroupPriv], which is as
 /// light as possible to minimize processing overhead when accessing the map. Therefore, part of the information
 /// required to produce the ultimate results is kept in the map's values as the `callsite_info_priv_path` field
 /// in [TimingsPriv].
-pub(crate) type TimingsPriv = HashMap<SpanGroupPriv, TimingPriv>;
+// pub(crate) type TimingsPriv = HashMap<SpanGroupPriv, TimingPriv>;
+#[derive(Clone)]
+pub(crate) struct RawTracePriv {
+    pub(crate) timings: HashMap<SpanGroupPriv, Timing>,
+    pub(crate) callsite_infos: HashMap<Identifier, CallsiteInfoPriv>,
+}
+
+impl RawTracePriv {
+    pub(crate) fn new() -> Self {
+        Self {
+            timings: HashMap::new(),
+            callsite_infos: HashMap::new(),
+        }
+    }
+}
 
 /// Type of accumulator of thread-local values, prior to transforming the collected information to a [`Timings`].
 /// Used to minimize the time holding the control lock during post-processing.
-pub(crate) type AccTimings = Vec<HashMap<SpanGroupPriv, TimingPriv>>;
+// pub(crate) type AccTimings = Vec<HashMap<SpanGroupPriv, TimingPriv>>;
+pub(crate) type AccTimings = Vec<RawTracePriv>;
 
 //=================
 // SpanTiming
@@ -104,14 +120,32 @@ pub(crate) type AccTimings = Vec<HashMap<SpanGroupPriv, TimingPriv>>;
 /// Information about a span stored in the registry.
 #[derive(Debug)]
 struct SpanTiming {
-    callsite_info_priv_path: CallsiteInfoPrivPath,
+    // callsite_info_priv_path: CallsiteInfoPrivPath,
+    callsite_id_path: CallsiteIdPath,
     props_path: PropsPath,
     created_at: Instant,
 }
 
-fn op(timings: TimingsPriv, acc: &mut AccTimings, tid: ThreadId) {
+fn op(timings: RawTracePriv, acc: &mut AccTimings, tid: ThreadId) {
     log::debug!("executing `op` for {:?}", tid);
     acc.push(timings);
+}
+
+pub(crate) fn op_r(acc1: RawTracePriv, acc2: RawTracePriv) -> RawTracePriv {
+    let timings: HashMap<SpanGroupPriv, Timing> = acc1
+        .timings
+        .into_iter()
+        .chain(acc2.timings.into_iter())
+        .collect();
+    let callsite_infos: HashMap<Identifier, CallsiteInfoPriv> = acc1
+        .callsite_infos
+        .into_iter()
+        .chain(acc2.callsite_infos.into_iter())
+        .collect();
+    RawTracePriv {
+        timings,
+        callsite_infos,
+    }
 }
 
 //=================
@@ -138,7 +172,7 @@ pub(crate) type SpanGrouper =
 /// This is the central struct in this framework's implementation.
 #[derive(Clone)]
 pub(crate) struct LatencyTracePriv {
-    control: Control<TimingsPriv, AccTimings>,
+    control: Control<RawTracePriv, AccTimings>,
     span_grouper: SpanGrouper,
     pub(crate) hist_high: u64,
     pub(crate) hist_sigfig: u8,
@@ -147,7 +181,7 @@ pub(crate) struct LatencyTracePriv {
 impl LatencyTracePriv {
     pub(crate) fn new(config: LatencyTraceCfg) -> LatencyTracePriv {
         LatencyTracePriv {
-            control: Control::new(&LOCAL_INFO, AccTimings::new(), TimingsPriv::new, op),
+            control: Control::new(&LOCAL_INFO, AccTimings::new(), RawTracePriv::new, op),
             span_grouper: config.span_grouper,
             hist_high: config.hist_high,
             hist_sigfig: config.hist_sigfig,
@@ -155,15 +189,10 @@ impl LatencyTracePriv {
     }
 
     /// Updates timings for the given span group. Called by [Layer] impl.
-    fn update_timings(
-        &self,
-        span_group_priv: &SpanGroupPriv,
-        callsite_info_priv_path: &CallsiteInfoPrivPath,
-        f: impl Fn(&mut TimingPriv),
-    ) {
-        self.control.with_data_mut(|timings| {
+    fn update_timings(&self, span_group_priv: &SpanGroupPriv, f: impl FnOnce(&mut Timing)) {
+        self.control.with_data_mut(|timings_priv| {
             let timing = {
-                if let Some(timing) = timings.get_mut(span_group_priv) {
+                if let Some(timing) = timings_priv.timings.get_mut(span_group_priv) {
                     timing
                 } else {
                     log::trace!(
@@ -171,15 +200,11 @@ impl LatencyTracePriv {
                         span_group_priv,
                         thread::current().id()
                     );
-                    timings.insert(
+                    timings_priv.timings.insert(
                         span_group_priv.clone(),
-                        TimingPriv::new(
-                            self.hist_high,
-                            self.hist_sigfig,
-                            callsite_info_priv_path.clone(),
-                        ),
+                        new_timing(self.hist_high, self.hist_sigfig),
                     );
-                    timings.get_mut(span_group_priv).unwrap()
+                    timings_priv.timings.get_mut(span_group_priv).unwrap()
                 }
             };
 
@@ -190,6 +215,20 @@ impl LatencyTracePriv {
                 span_group_priv,
                 thread::current().id()
             );
+        });
+    }
+
+    /// Updates callsite info for the given callsite [`Identifier`].
+    fn update_callsite_infos(
+        &self,
+        callsite_id: Identifier,
+        callsite_info: impl FnOnce() -> CallsiteInfoPriv,
+    ) {
+        self.control.with_data_mut(|timings_priv| {
+            let callsite_infos = &mut timings_priv.callsite_infos;
+            if callsite_infos.get(&callsite_id).is_none() {
+                callsite_infos.insert(callsite_id, callsite_info());
+            }
         });
     }
 
@@ -214,34 +253,46 @@ where
     fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
         let span = ctx.span(id).unwrap();
         log::trace!("`on_new_span` start: name={}, id={:?}", span.name(), id);
+        let meta = span.metadata();
+        let callsite_id = meta.callsite();
         let parent_span = span.parent();
 
-        let meta = span.metadata();
-        let callsite_info = CallsiteInfoPriv {
-            name: span.name(),
-            callsite_id: meta.callsite(),
-            file: meta.file().map(|s| s.to_owned()),
-            line: meta.line(),
-        };
         let props = (self.span_grouper)(attrs);
-        let (callsite_info_path, props_path) = match parent_span {
-            None => (vec![Arc::new(callsite_info)], vec![Arc::new(props)]),
+        let (callsite_id_path, props_path) = match &parent_span {
+            None => (vec![callsite_id.clone()], vec![Arc::new(props)]),
             Some(parent_span) => {
                 let ext = parent_span.extensions();
                 let pst = ext.get::<SpanTiming>().unwrap();
-                let mut callsite_info_path = pst.callsite_info_priv_path.clone();
-                callsite_info_path.push(callsite_info.into());
+                let mut callsite_id_path = pst.callsite_id_path.clone();
+                callsite_id_path.push(callsite_id.clone());
                 let mut props_path = pst.props_path.clone();
                 props_path.push(Arc::new(props));
-                (callsite_info_path, props_path)
+                (callsite_id_path, props_path)
             }
         };
 
         span.extensions_mut().insert(SpanTiming {
-            callsite_info_priv_path: callsite_info_path,
+            callsite_id_path: callsite_id_path,
             props_path,
             created_at: Instant::now(),
         });
+
+        let callsite_info = {
+            let callsite_id = callsite_id.clone();
+            let span = &span;
+            move || CallsiteInfoPriv {
+                callsite_id,
+                name: span.name(),
+                file: meta.file().map(|s| s.to_owned()),
+                line: meta.line(),
+                parent: parent_span
+                    .iter()
+                    .map(|parent_ref| parent_ref.metadata().callsite())
+                    .next(),
+            }
+        };
+
+        self.update_callsite_infos(callsite_id, callsite_info);
 
         log::trace!("`on_new_span` end: name={}, id={:?}", span.name(), id);
     }
@@ -258,23 +309,14 @@ where
         let span_timing = ext.get::<SpanTiming>().unwrap();
 
         let span_group_priv = SpanGroupPriv {
-            callsite_id_path: span_timing
-                .callsite_info_priv_path
-                .iter()
-                .map(|x| x.callsite_id.clone())
-                .collect::<Vec<_>>(),
+            callsite_id_path: span_timing.callsite_id_path.clone(),
             props_path: span_timing.props_path.clone(),
         };
 
-        self.update_timings(
-            &span_group_priv,
-            &span_timing.callsite_info_priv_path,
-            |tp| {
-                tp.hist
-                    .record((Instant::now() - span_timing.created_at).as_micros() as u64)
-                    .unwrap();
-            },
-        );
+        self.update_timings(&span_group_priv, |hist| {
+            hist.record((Instant::now() - span_timing.created_at).as_micros() as u64)
+                .unwrap();
+        });
 
         log::trace!(
             "`on_close` completed call to update_timings: name={}, id={:?}",
@@ -291,5 +333,5 @@ where
 
 thread_local! {
     // static LOCAL_INFO: Holder<TimingsPriv, AccTimings> = Holder::new(TimingsPriv::new);
-    static LOCAL_INFO: Holder<TimingsPriv, AccTimings> = Holder::new();
+    static LOCAL_INFO: Holder<RawTracePriv, AccTimings> = Holder::new();
 }
