@@ -132,16 +132,23 @@ fn op(timings: RawTracePriv, acc: &mut AccTimings, tid: ThreadId) {
 }
 
 pub(crate) fn op_r(acc1: RawTracePriv, acc2: RawTracePriv) -> RawTracePriv {
-    let timings: HashMap<SpanGroupPriv, Timing> = acc1
-        .timings
-        .into_iter()
-        .chain(acc2.timings.into_iter())
-        .collect();
+    let mut timings = acc1.timings;
+    for (k, v) in acc2.timings {
+        let hist = timings.get_mut(&k);
+        match hist {
+            Some(hist) => hist.add(v).unwrap(),
+            None => {
+                timings.insert(k, v);
+            }
+        }
+    }
+
     let callsite_infos: HashMap<Identifier, CallsiteInfoPriv> = acc1
         .callsite_infos
         .into_iter()
         .chain(acc2.callsite_infos.into_iter())
         .collect();
+
     RawTracePriv {
         timings,
         callsite_infos,
