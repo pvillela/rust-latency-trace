@@ -1,4 +1,4 @@
-use hdrhistogram::Histogram;
+use crate::Timing;
 
 /// Common summary statistics useful in latency testing/benchmarking.
 #[derive(Debug, Clone)]
@@ -21,7 +21,7 @@ pub struct SummaryStats {
 
 impl SummaryStats {
     /// Computes summary statistics from the given histogram.
-    pub fn new(hist: &Histogram<u64>) -> Self {
+    pub fn new(hist: &Timing) -> Self {
         Self {
             count: hist.len(),
             mean: hist.mean(),
@@ -41,7 +41,7 @@ impl SummaryStats {
     }
 }
 
-/// Computes a [`SummaryStats`] from a [`Histogram`].
-pub fn summary_stats(hist: &Histogram<u64>) -> SummaryStats {
+/// Computes a [`SummaryStats`] from a [`Timing`].
+pub fn summary_stats(hist: &Timing) -> SummaryStats {
     SummaryStats::new(hist)
 }

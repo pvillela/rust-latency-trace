@@ -13,9 +13,9 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry
 /// [tracing](https://crates.io/crates/tracing) library.
 ///
 /// Its configuration encapsulates a span grouper function
-/// (`impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static`)
+/// (`impl Fn(&`[`Attributes`]`) -> Vec<(String, String)> + Send + Sync + 'static`)
 /// to define [SpanGroup](crate::SpanGroup)s, as well as the histogram configuration parameters
-/// [hdrhistogram::Histogram::high] and [hdrhistogram::Histogram::sigfig].
+/// [`hdrhistogram::Histogram::high`] and [`hdrhistogram::Histogram::sigfig`].
 pub struct LatencyTrace(LatencyTraceCfg);
 
 impl Default for LatencyTrace {
@@ -75,7 +75,7 @@ impl LatencyTrace {
         Self(cfg)
     }
 
-    /// Measures latencies of spans in `f`.
+    /// Executes the instrumented function `f` and, after `f` completes, returns the observed latencies.
     ///
     /// # Panics
     /// If this function or any of the other `Self::measure_latencies*` functions have been
@@ -88,7 +88,8 @@ impl LatencyTrace {
         report_timings(&ltp, acc)
     }
 
-    /// Measures latencies of spans in async function `f` running on the *tokio* runtime.
+    /// Executes the instrumented async function `f`, running on the `tokio` runtime; after `f` completes,
+    /// returns the observed latencies.
     ///
     /// # Panics
     /// If this function or any of the other `Self::measure_latencies*` functions have been
@@ -106,8 +107,8 @@ impl LatencyTrace {
         })
     }
 
-    /// Measures latencies of spans in `f`, returning a [`ProbedTrace`] that allows measurements to be
-    /// paused and reported before `f` completes.
+    /// Executes the instrumented function `f`, returning a [`ProbedTrace`] that allows partial latencies to be
+    /// reported before `f` completes.
     ///
     /// # Panics
     /// If this function or any of the other `Self::measure_latencies*` functions have been
@@ -121,8 +122,8 @@ impl LatencyTrace {
         pt
     }
 
-    /// Measures latencies of spans in `f`, returning a [`ProbedTrace`] that allows measurements to be
-    /// paused and reported before `f` completes.
+    /// Executes the instrumented async function `f`, running on the `tokio` runtime; returns a [`ProbedTrace`]
+    /// that allows partial latencies to be reported before `f` completes.
     ///
     /// # Panics
     /// If this function or any of the other `Self::measure_latencies*` functions have been

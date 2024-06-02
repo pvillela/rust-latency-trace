@@ -27,6 +27,7 @@
 //! ```
 //!
 #![doc = include_str!("../../readme2.md")]
+#![deny(clippy::unwrap_used)]
 
 mod core_internals_post;
 mod core_internals_pre;

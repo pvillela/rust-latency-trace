@@ -26,7 +26,7 @@ pub type CallsiteInfoPrivPath = Vec<Arc<CallsiteInfoPriv>>;
 /// Represents a set of [tracing::Span]s for which latency information should be collected as a group. It is
 /// the unit of latency information collection.
 ///
-/// Spans are defined in the code using macros and functions from the Rust [tracing](https://crates.io/crates/tracing) library which define span ***callsite***s, i.e., the places in the code where spans are defined. As the code is executed, a span definition in the code may be executed multiple times -- each such execution is a span instance. Span instances arising from the same span definition are grouped into [`SpanGroup`]s for latency information collection. Latencies are collected using [Histogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/struct.Histogram.html)s from the [hdrhistogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/) library.
+/// Span definitions are created in the code using macros and functions from the Rust [tracing](https://crates.io/crates/tracing) library which define span ***callsite***s, i.e., the places in the code where spans are defined. As the code is executed, a span definition in the code may be executed multiple times -- each such execution is a span instance. Span instances arising from the same span definition are grouped into [`SpanGroup`]s for latency information collection. Latencies are collected using [Histogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/struct.Histogram.html)s from the [hdrhistogram](https://docs.rs/hdrhistogram/latest/hdrhistogram/) library.
 ///
 /// The grouping of spans for latency collection is not exactly based on the span definitions in the code. Spans at runtime are structured as a set of [span trees](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships) that correspond to the nesting of spans from code execution paths. The grouping of runtime spans for latency collection should respect the runtime parent-child relationships among spans.
 ///
@@ -35,21 +35,21 @@ pub type CallsiteInfoPrivPath = Vec<Arc<CallsiteInfoPriv>>;
 /// The coarsest-grained grouping of spans is characterized by a ***callsite path*** -- a callsite and the (possibly empty) list of its ancestor callsites based on the different runtime execution paths (see [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships)). This is the default `SpanGroup` definition. Finer-grained groupings of spans can differentiate groups of spans with the same callsite path by taking into account values computed at runtime from the spans' runtime [Attributes](https://docs.rs/tracing/0.1.37/tracing/span/struct.Attributes.html).
 ///
 /// This struct holds the following information:
-/// - its [`name`](Self::name)
+/// - the name [`name`](Self::name) of the span definition that applies to all the spas in the span group
 /// - an [`id`](Self::id) that, together with its `name`, uniquely identifies the span group
-/// - a [`props`](Self::props) field that contains the span group's list of name-value pairs (which may be empty)
-/// - a [`code_line`](Self::code_line) field that contains the file name and line number where the span was defined *or*,
-///   in case debug information is not available, the callsite `Identifier`.
+/// - a [`props`](Self::props) field that contains the list of name-value pairs (which may be empty) which is common to all the spans in the group
+/// - a [`code_line`](Self::code_line) field that contains the file name and line number where all the spans in the group were defined *or*,
+///   in case debug information is not available, the corresponding [`tracing::callsite::Identifier`].
 /// - a [`parent_id`](Self::parent_id) that is the `id` field of the parent span group, if any.
 /// - its [`depth`](Self::depth) that is the number of ancestor span groups this span group has
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
-    pub name: &'static str,
-    pub id: Arc<str>,
-    pub code_line: Arc<str>,
-    pub props: Arc<Props>,
-    pub parent_id: Option<Arc<str>>,
-    pub depth: usize,
+    pub(crate) name: &'static str,
+    pub(crate) id: Arc<str>,
+    pub(crate) code_line: Arc<str>,
+    pub(crate) props: Arc<Props>,
+    pub(crate) parent_id: Option<Arc<str>>,
+    pub(crate) depth: usize,
 }
 
 impl SpanGroup {
@@ -80,6 +80,7 @@ impl SpanGroup {
         self.parent_id.iter().map(|x| x.as_ref()).next()
     }
 
+    /// Returns the number of ancestor span groups this span group has.
     pub fn depth(&self) -> usize {
         self.depth
     }

@@ -10,7 +10,8 @@ use crate::{
     core_internals_pre::LatencyTracePriv,
 };
 
-/// Represents an ongoing collection of latency information with the ability to be paused before completion.
+/// Represents an ongoing collection of latency information with the ability to report on partial latencies
+/// before the instrumented function completes.
 #[derive(Clone)]
 pub struct ProbedTrace {
     ltp: LatencyTracePriv,
@@ -31,6 +32,7 @@ impl ProbedTrace {
         *jh = Some(join_handle);
     }
 
+    /// Returns partial latencies collected when the call is made.
     pub fn probe_latencies(&self) -> Timings {
         let acc = self.ltp.probe_acc_timings();
         report_timings(&self.ltp, acc)
@@ -38,7 +40,7 @@ impl ProbedTrace {
 
     /// Blocks until the function being measured completes, and then returns the collected latency information.
     ///
-    /// Should only be called once, from main thread. May panic otherwise.
+    /// Should only be called at most once, from main thread. May panic otherwise.
     pub fn wait_and_report(&self) -> Timings {
         // try_lock() below should always succeed because this function is the only one that should be joining
         // the handle and it should only be called once from the main thread.
