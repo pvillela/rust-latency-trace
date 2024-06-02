@@ -76,7 +76,9 @@ impl LatencyTrace {
     }
 
     /// Measures latencies of spans in `f`.
-    /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
+    ///
+    /// # Panics
+    /// If this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
     pub fn measure_latencies(self, f: impl FnOnce() + Send + 'static) -> Timings {
         let ltp = LatencyTracePriv::new(self.0);
@@ -87,7 +89,9 @@ impl LatencyTrace {
     }
 
     /// Measures latencies of spans in async function `f` running on the *tokio* runtime.
-    /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
+    ///
+    /// # Panics
+    /// If this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
     pub fn measure_latencies_tokio<F>(self, f: impl FnOnce() -> F + Send + 'static) -> Timings
     where
@@ -104,7 +108,9 @@ impl LatencyTrace {
 
     /// Measures latencies of spans in `f`, returning a [`ProbedTrace`] that allows measurements to be
     /// paused and reported before `f` completes.
-    /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
+    ///
+    /// # Panics
+    /// If this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
     pub fn measure_latencies_probed(self, f: impl FnOnce() + Send + 'static) -> ProbedTrace {
         let ltp = LatencyTracePriv::new(self.0);
@@ -117,7 +123,9 @@ impl LatencyTrace {
 
     /// Measures latencies of spans in `f`, returning a [`ProbedTrace`] that allows measurements to be
     /// paused and reported before `f` completes.
-    /// Will panic if this function or any of the other `Self::measure_latencies*` functions have been
+    ///
+    /// # Panics
+    /// If this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
     pub fn measure_latencies_probed_tokio<F>(
         self,

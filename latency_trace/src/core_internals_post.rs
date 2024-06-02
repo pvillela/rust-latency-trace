@@ -39,7 +39,7 @@ pub type CallsiteInfoPrivPath = Vec<Arc<CallsiteInfoPriv>>;
 /// - an [`id`](Self::id) that, together with its `name`, uniquely identifies the span group
 /// - a [`props`](Self::props) field that contains the span group's list of name-value pairs (which may be empty)
 /// - a [`code_line`](Self::code_line) field that contains the file name and line number where the span was defined *or*,
-///   in case debug information is not available, the callsite [`Identifier`].
+///   in case debug information is not available, the callsite `Identifier`.
 /// - a [`parent_id`](Self::parent_id) that is the `id` field of the parent span group, if any.
 /// - its [`depth`](Self::depth) that is the number of ancestor span groups this span group has
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]

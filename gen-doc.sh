@@ -1,5 +1,6 @@
 #!/bin/bash
 
+rm -r target/doc
 pushd latency_trace
 cargo makedocs \
     -e log \
