@@ -116,6 +116,28 @@ impl SpanGroupTemp {
 pub type TimingsView<K> = Wrapper<BTreeMap<K, Timing>>;
 
 impl<K> TimingsView<K> {
+    /// Combines histogram values according to sets of keys that yield the same value when `f`
+    /// is applied.
+    pub fn aggregate<G>(&self, f: impl Fn(&K) -> G) -> TimingsView<G>
+    where
+        G: Ord,
+    {
+        let mut res: BTreeMap<G, Histogram<u64>> = BTreeMap::new();
+        for (k, v) in self.iter() {
+            // Construct aggregation map.
+            let g = f(k);
+            let hist = match res.get_mut(&g) {
+                Some(hist) => hist,
+                None => {
+                    res.insert(g, Histogram::new_from(v));
+                    res.get_mut(&f(k)).unwrap()
+                }
+            };
+            hist.add(v).unwrap();
+        }
+        res.into()
+    }
+
     pub fn add(&mut self, mut other: TimingsView<K>)
     where
         K: Ord,
@@ -139,48 +161,32 @@ impl<K> TimingsView<K> {
 pub type Timings = TimingsView<SpanGroup>;
 
 impl Timings {
-    /// Combines histograms of span groups according to sets of span groups that yield the same value when `f`
-    /// is applied. The values resulting from applying `f` to span groups are called ***aggregate key***s and
-    /// the sets of span groups corresponding to each *aggregate key* are called ***aggregates***.
+    /// Checks whether an aggregation function `f` used in [`Self::aggregate`] is consistent according to the following
+    /// definition:
+    /// - the values resulting from applying `f` to span groups are called ***aggregate key***s
+    /// - the sets of span groups corresponding to each *aggregate key* are called ***aggregates***.
     ///
-    /// An aggregation is consistent if and only if, for each *aggregate*, all the span groups in the *aggregate*
-    /// have the same callsite.
-    ///
-    /// This function returns a pair with the following components:
-    /// - a [BTreeMap] that associates each *aggregate key* to its aggregated histogram;
-    /// - a boolean that is `true` if the aggregation is consistent, `false` otherwise.
-    pub fn aggregate<G>(&self, f: impl Fn(&SpanGroup) -> G) -> (BTreeMap<G, Timing>, bool)
+    /// An aggregation function is consistent if and only if, for each *aggregate*, all the span groups in the
+    /// *aggregate* have the same callsite.
+    pub fn aggregator_is_consistent<G>(&self, f: impl Fn(&SpanGroup) -> G) -> bool
     where
-        G: Ord + Clone,
+        G: Ord,
     {
-        let mut res: BTreeMap<G, Histogram<u64>> = BTreeMap::new();
         let mut aggregates: BTreeMap<G, Arc<str>> = BTreeMap::new();
-        let mut aggregates_are_consistent = true;
-        for (k, v) in self.iter() {
-            // Construct aggregation map.
+        let mut is_consistent = true;
+        for k in self.keys() {
             let g = f(k);
-            let hist = match res.get_mut(&g) {
-                Some(hist) => hist,
-                None => {
-                    res.insert(g.clone(), Histogram::new_from(v));
-                    res.get_mut(&g).unwrap()
-                }
-            };
-            hist.add(v).unwrap();
-
-            // Check aggregation consistency.
-            if aggregates_are_consistent {
-                aggregates_are_consistent = match aggregates.get(&g) {
+            if is_consistent {
+                is_consistent = match aggregates.get(&g) {
                     Some(code_line) => code_line.as_ref() == k.code_line(),
                     None => {
-                        aggregates.insert(g.clone(), k.code_line.clone());
+                        aggregates.insert(g, k.code_line.clone());
                         true
                     }
                 };
             }
         }
-
-        (res, aggregates_are_consistent)
+        is_consistent
     }
 
     /// Returns a map from span group ID to [`SpanGroup`].

@@ -1,5 +1,5 @@
 use dev_utils::test_support::{f64_are_close, SpanNameTestSpec, TestSpec};
-use latency_trace::Timings;
+use latency_trace::{SpanGroup, Timings};
 use std::collections::HashSet;
 
 pub fn run_test(tmgs: &Timings, test_spec: TestSpec) {
@@ -19,8 +19,12 @@ pub fn run_test(tmgs: &Timings, test_spec: TestSpec) {
         tmgs.keys()
     );
 
-    let (agg_timings, consistent_timings) = tmgs.aggregate(|sg| sg.name());
+    let aggregator = |sg: &SpanGroup| sg.name();
+
+    let consistent_timings = tmgs.aggregator_is_consistent(aggregator);
     assert!(consistent_timings, "consistent_timings");
+
+    let agg_timings = tmgs.aggregate(aggregator);
     assert_eq!(
         agg_timings.len(),
         span_name_test_specs.len(),
