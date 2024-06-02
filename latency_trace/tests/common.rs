@@ -9,8 +9,7 @@ pub fn run_test(tmgs: &Timings, test_spec: TestSpec) {
         span_name_test_specs,
     } = test_spec;
 
-    let expected_name_set: HashSet<&'static str> =
-        span_name_test_specs.keys().map(|s| *s).collect();
+    let expected_name_set: HashSet<&'static str> = span_name_test_specs.keys().copied().collect();
     let mut name_set: HashSet<&'static str> = HashSet::new();
 
     assert_eq!(
@@ -59,7 +58,7 @@ pub fn run_test(tmgs: &Timings, test_spec: TestSpec) {
         let mut props_set: HashSet<Vec<(String, String)>> = HashSet::new();
 
         let expected_parent_name_set: HashSet<&'static str> =
-            expected_parent_names.iter().map(|name| *name).collect();
+            expected_parent_names.iter().copied().collect();
         let mut parent_name_set: HashSet<&'static str> = HashSet::new();
 
         let expected_parent_props_set: HashSet<Vec<(String, String)>> = expected_parent_props

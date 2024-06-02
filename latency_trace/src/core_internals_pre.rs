@@ -146,7 +146,7 @@ pub(crate) fn op_r(acc1: RawTracePriv, acc2: RawTracePriv) -> RawTracePriv {
     let callsite_infos: HashMap<Identifier, CallsiteInfoPriv> = acc1
         .callsite_infos
         .into_iter()
-        .chain(acc2.callsite_infos.into_iter())
+        .chain(acc2.callsite_infos)
         .collect();
 
     RawTracePriv {
@@ -279,7 +279,7 @@ where
         };
 
         span.extensions_mut().insert(SpanTiming {
-            callsite_id_path: callsite_id_path,
+            callsite_id_path,
             props_path,
             created_at: Instant::now(),
         });

@@ -2,7 +2,6 @@
 //! [latency_trace::group_by_given_fields].
 
 use dev_utils::target_fns::target_fn;
-use env_logger;
 use latency_trace::{group_by_given_fields, LatencyTrace};
 use std::env::set_var;
 

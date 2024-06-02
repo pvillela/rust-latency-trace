@@ -14,6 +14,7 @@ use latency_trace::LatencyTrace;
 use std::collections::BTreeMap;
 
 #[test]
+#[allow(clippy::identity_op)]
 fn test_default_grouping() {
     let latencies = LatencyTrace::default().measure_latencies_tokio(target_fn);
 

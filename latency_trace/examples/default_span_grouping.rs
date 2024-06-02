@@ -1,7 +1,6 @@
 //! Example showing latency measurement of [dev_utils::target_fns::target_fn] with default span grouping.
 
 use dev_utils::target_fns::target_fn;
-use env_logger;
 use latency_trace::LatencyTrace;
 use std::env::set_var;
 

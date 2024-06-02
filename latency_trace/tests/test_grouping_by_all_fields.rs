@@ -14,6 +14,7 @@ use latency_trace::{group_by_all_fields, LatencyTrace};
 use std::collections::BTreeMap;
 
 #[test]
+#[allow(clippy::identity_op)]
 fn test_grouping_by_all_fields() {
     let latencies = LatencyTrace::default()
         .with_span_grouper(group_by_all_fields)

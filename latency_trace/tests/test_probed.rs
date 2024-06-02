@@ -17,6 +17,7 @@ use latency_trace::LatencyTrace;
 use std::{collections::BTreeMap, sync::Arc};
 
 #[tokio::test]
+#[allow(clippy::identity_op)]
 async fn test_probed() {
     std::env::set_var("RUST_LOG", "latency_trace=trace,thread_local_collect=trace");
     // _ = env_logger::try_init();

@@ -9,7 +9,7 @@ use std::{
 /// Returns command line argument or default
 fn arg() -> u64 {
     match std::env::args().nth(1) {
-        Some(v) => u64::from_str_radix(&v, 10).expect("argument must be integer"),
+        Some(v) => v.parse::<u64>().expect("argument must be integer"),
         None => 2000,
     }
 }
@@ -35,7 +35,7 @@ fn main() {
     f();
     println!(
         "\n=== {} {} ===========================================================",
-        std::env::args().nth(0).unwrap(),
+        std::env::args().next().unwrap(),
         arg()
     );
     println!("Elapsed time: {:?}", Instant::now().duration_since(start));
