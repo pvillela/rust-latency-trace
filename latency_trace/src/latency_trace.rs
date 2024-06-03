@@ -16,7 +16,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry
 /// (`impl Fn(&`[`Attributes`]`) -> Vec<(String, String)> + Send + Sync + 'static`)
 /// to define [SpanGroup](crate::SpanGroup)s, as well as the histogram configuration parameters
 /// [`hdrhistogram::Histogram::high`] and [`hdrhistogram::Histogram::sigfig`].
-pub struct LatencyTrace(LatencyTraceCfg);
+pub struct LatencyTrace(pub(crate) LatencyTraceCfg);
 
 impl Default for LatencyTrace {
     /// Instantiates a [LatencyTrace] with default configuration. The defaults are:
@@ -82,7 +82,8 @@ impl LatencyTrace {
     /// previously called in the same process.
     pub fn measure_latencies(self, f: impl FnOnce() + Send + 'static) -> Timings {
         let ltp = LatencyTracePriv::new(self.0);
-        Registry::default().with(ltp.clone()).init();
+        let reg = Registry::default().with(ltp.clone());
+        let _guard = tracing::subscriber::set_default(reg);
         f();
         let acc = ltp.take_acc_timings();
         report_timings(&ltp, acc)

@@ -2,7 +2,7 @@ mod common;
 
 use common::run_test;
 use dev_utils::{
-    target_fns::target_fn,
+    elab_fns::elab_fn_async,
     test_support::{
         span_name_test_spec_f, span_name_test_spec_inner_async_span,
         span_name_test_spec_outer_async_span, span_name_test_spec_root_async_1,
@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 fn test_grouping_by_given_fields() {
     let latencies = LatencyTrace::default()
         .with_span_grouper(group_by_given_fields(&["foo"]))
-        .measure_latencies_tokio(target_fn);
+        .measure_latencies_tokio(elab_fn_async);
 
     // Number of span groups by name
     let n_root_async_1: u64 = 1;

@@ -49,3 +49,6 @@ pub use probed_trace::*;
 
 mod wrapper;
 pub use wrapper::*;
+
+#[doc(hidden)]
+pub mod bench_support;

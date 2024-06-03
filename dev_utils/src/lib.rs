@@ -1,6 +1,7 @@
 //! Utilities to support development of examples and tests.
 
+pub mod elab_fns;
 pub mod gater;
 pub mod gen_random;
-pub mod target_fns;
+pub mod simple_fns;
 pub mod test_support;

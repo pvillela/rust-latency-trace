@@ -2,10 +2,11 @@ mod common;
 
 use common::run_test;
 use dev_utils::{
-    gater::Gater,
-    target_fns::{
-        target_fn_gated, PROBE_GATE_F1_PROBE_READY, PROBE_GATE_F2_PROBE_READY, PROBE_GATE_F_PROCEED,
+    elab_fns::{
+        elab_fn_async_gated, PROBE_GATE_F1_PROBE_READY, PROBE_GATE_F2_PROBE_READY,
+        PROBE_GATE_F_PROCEED,
     },
+    gater::Gater,
     test_support::{
         span_name_test_spec_f, span_name_test_spec_inner_async_span,
         span_name_test_spec_outer_async_span, span_name_test_spec_root_async_1,
@@ -26,7 +27,7 @@ async fn test_probed() {
 
     let probed = LatencyTrace::default().measure_latencies_probed_tokio({
         let probe_gater = probe_gater.clone();
-        || target_fn_gated(Some(probe_gater))
+        || elab_fn_async_gated(Some(probe_gater))
     });
 
     // Number of span groups by name

@@ -1,3 +1,5 @@
+//! Elaborate functions for tests and examples.
+
 #![allow(clippy::disallowed_names)]
 
 use crate::gater::Gater;
@@ -45,7 +47,7 @@ async fn f(f_instance: u8, probe_gater: Option<Arc<Gater>>) {
     }
 }
 
-pub async fn target_fn_gated(probe_gater: Option<Arc<Gater>>) {
+pub async fn elab_fn_async_gated(probe_gater: Option<Arc<Gater>>) {
     let h1 = {
         let probe_gater = probe_gater.clone();
         tokio::spawn(
@@ -61,6 +63,6 @@ pub async fn target_fn_gated(probe_gater: Option<Arc<Gater>>) {
     h2.await.unwrap();
 }
 
-pub async fn target_fn() {
-    target_fn_gated(None).await
+pub async fn elab_fn_async() {
+    elab_fn_async_gated(None).await
 }
