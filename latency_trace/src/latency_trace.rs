@@ -7,7 +7,11 @@ use crate::{
 };
 use std::{future::Future, sync::Arc, thread};
 use tracing::span::Attributes;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Registry};
+use tracing_subscriber::{
+    layer::{Layered, SubscriberExt},
+    util::SubscriberInitExt,
+    Registry,
+};
 
 /// Provides the ability to measure latencies for code (both sync and async) instrumented with the
 /// [tracing](https://crates.io/crates/tracing) library.
@@ -82,8 +86,13 @@ impl LatencyTrace {
     /// previously called in the same process.
     pub fn measure_latencies(self, f: impl FnOnce() + Send + 'static) -> Timings {
         let ltp = LatencyTracePriv::new(self.0);
-        let reg = Registry::default().with(ltp.clone());
-        let _guard = tracing::subscriber::set_default(reg);
+        let reg: tracing_subscriber::layer::Layered<LatencyTracePriv, Registry> =
+            Registry::default().with(ltp.clone());
+        let default_dispatch_exists =
+            tracing::dispatcher::get_default(|d| d.is::<Layered<LatencyTracePriv, Registry>>());
+        if !default_dispatch_exists {
+            reg.init();
+        }
         f();
         let acc = ltp.take_acc_timings();
         report_timings(&ltp, acc)
@@ -117,7 +126,13 @@ impl LatencyTrace {
     pub fn measure_latencies_probed(self, f: impl FnOnce() + Send + 'static) -> ProbedTrace {
         let ltp = LatencyTracePriv::new(self.0);
         let pt = ProbedTrace::new(ltp.clone());
-        Registry::default().with(ltp).init();
+        let reg: tracing_subscriber::layer::Layered<LatencyTracePriv, Registry> =
+            Registry::default().with(ltp.clone());
+        let default_dispatch_exists =
+            tracing::dispatcher::get_default(|d| d.is::<Layered<LatencyTracePriv, Registry>>());
+        if !default_dispatch_exists {
+            reg.init();
+        }
         let jh = thread::spawn(f);
         pt.set_join_handle(jh);
         pt

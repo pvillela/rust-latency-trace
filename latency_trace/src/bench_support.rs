@@ -2,21 +2,35 @@
 
 use crate::{core_internals_pre::LatencyTracePriv, latency_trace::LatencyTrace};
 use std::{future::Future, hint::black_box};
-use tracing_subscriber::{layer::SubscriberExt, Registry};
+use tracing_subscriber::{
+    layer::{Layered, SubscriberExt},
+    util::SubscriberInitExt,
+    Registry,
+};
 
 /// Set-up for measurement of latencies.
 pub fn measure_latencies1(lt: LatencyTrace) {
     let ltp = LatencyTracePriv::new(lt.0);
-    let reg = Registry::default().with(ltp.clone());
-    let _guard = tracing::subscriber::set_default(reg);
+    let reg: tracing_subscriber::layer::Layered<LatencyTracePriv, Registry> =
+        Registry::default().with(ltp.clone());
+    let default_dispatch_exists =
+        tracing::dispatcher::get_default(|d| d.is::<Layered<LatencyTracePriv, Registry>>());
+    if !default_dispatch_exists {
+        reg.init();
+    }
     black_box(ltp);
 }
 
 /// Executes tracing up to completion of instrumnted function, before final collection and aggregation.
 pub fn measure_latencies2(lt: LatencyTrace, f: impl FnOnce() + Send + 'static) {
     let ltp = LatencyTracePriv::new(lt.0);
-    let reg = Registry::default().with(ltp.clone());
-    let _guard = tracing::subscriber::set_default(reg);
+    let reg: tracing_subscriber::layer::Layered<LatencyTracePriv, Registry> =
+        Registry::default().with(ltp.clone());
+    let default_dispatch_exists =
+        tracing::dispatcher::get_default(|d| d.is::<Layered<LatencyTracePriv, Registry>>());
+    if !default_dispatch_exists {
+        reg.init();
+    }
     f();
     black_box(ltp);
 }
