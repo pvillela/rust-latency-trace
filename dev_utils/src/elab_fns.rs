@@ -16,7 +16,7 @@ pub fn elab_fn_sync_gated(probe_gater: Option<Arc<Gater>>) {
         let mut foo: u64 = 1;
 
         for i in 0..8 {
-            log::trace!("Before outer_sync_span");
+            log::trace!("Before outer_span");
 
             if i == 4 {
                 if let Some(probe_gater) = probe_gater.clone() {
@@ -25,17 +25,17 @@ pub fn elab_fn_sync_gated(probe_gater: Option<Arc<Gater>>) {
                 }
             }
 
-            trace_span!("outer_sync_span", foo = i % 2, bar = i % 4).in_scope(|| {
-                trace_span!("sync_span_1").in_scope(|| {
+            trace_span!("outer_span", foo = i % 2, bar = i % 4).in_scope(|| {
+                trace_span!("span_1").in_scope(|| {
                     thread::sleep(Duration::from_millis(13));
                 });
                 thread::sleep(Duration::from_millis(100));
                 foo += 1;
-                log::trace!("Before inner_sync_span");
+                log::trace!("Before inner_span");
                 {
-                    trace_span!("inner_sync_span", foo = i % 2).in_scope(|| {
+                    trace_span!("inner_span", foo = i % 2).in_scope(|| {
                         {
-                            let span = trace_span!("sync_span_2");
+                            let span = trace_span!("span_2");
                             let _enter = span.enter();
                             thread::sleep(Duration::from_millis(12));
                         }
@@ -48,10 +48,10 @@ pub fn elab_fn_sync_gated(probe_gater: Option<Arc<Gater>>) {
 
     let h1 = {
         let probe_gater = probe_gater.clone();
-        thread::spawn(|| trace_span!("root_sync_1", foo = 1).in_scope(|| f(1, probe_gater)))
+        thread::spawn(|| trace_span!("root_1", foo = 1).in_scope(|| f(1, probe_gater)))
     };
     let h2 =
-        { thread::spawn(|| trace_span!("root_sync_2", bar = 2).in_scope(|| f(2, probe_gater))) };
+        { thread::spawn(|| trace_span!("root_2", bar = 2).in_scope(|| f(2, probe_gater))) };
     h1.join().unwrap();
     h2.join().unwrap();
 }
@@ -66,7 +66,7 @@ pub async fn elab_fn_async_gated(probe_gater: Option<Arc<Gater>>) {
         let mut foo: u64 = 1;
 
         for i in 0..8 {
-            log::trace!("Before outer_async_span");
+            log::trace!("Before outer_span");
 
             if i == 4 {
                 if let Some(probe_gater) = probe_gater.clone() {
@@ -76,24 +76,24 @@ pub async fn elab_fn_async_gated(probe_gater: Option<Arc<Gater>>) {
             }
 
             async {
-                trace_span!("sync_span_1").in_scope(|| {
+                trace_span!("span_1").in_scope(|| {
                     thread::sleep(Duration::from_millis(13));
                 });
                 tokio::time::sleep(Duration::from_millis(100)).await;
                 foo += 1;
-                log::trace!("Before inner_async_span");
+                log::trace!("Before inner_span");
                 async {
                     {
-                        let span = trace_span!("sync_span_2");
+                        let span = trace_span!("span_2");
                         let _enter = span.enter();
                         thread::sleep(Duration::from_millis(12));
                     }
                     tokio::time::sleep(Duration::from_millis(25)).await;
                 }
-                .instrument(trace_span!("inner_async_span", foo = i % 2))
+                .instrument(trace_span!("inner_span", foo = i % 2))
                 .await;
             }
-            .instrument(trace_span!("outer_async_span", foo = i % 2, bar = i % 4))
+            .instrument(trace_span!("outer_span", foo = i % 2, bar = i % 4))
             .await
         }
     }
@@ -101,12 +101,12 @@ pub async fn elab_fn_async_gated(probe_gater: Option<Arc<Gater>>) {
     let h1 = {
         let probe_gater = probe_gater.clone();
         tokio::spawn(
-            async { f(1, probe_gater).await }.instrument(trace_span!("root_async_1", foo = 1)),
+            async { f(1, probe_gater).await }.instrument(trace_span!("root_1", foo = 1)),
         )
     };
     let h2 = {
         tokio::spawn(
-            async { f(2, probe_gater).await }.instrument(trace_span!("root_async_2", bar = 2)),
+            async { f(2, probe_gater).await }.instrument(trace_span!("root_2", bar = 2)),
         )
     };
     h1.await.unwrap();
