@@ -6,7 +6,7 @@ use crate::{
         new_timing, op_r, AccTimings, CallsiteInfoPriv, LatencyTracePriv, Props, RawTracePriv,
         SpanGroupPriv, Timing,
     },
-    Wrapper,
+    summary_stats, SummaryStats, Wrapper,
 };
 use base64ct::{Base64, Encoding};
 use hdrhistogram::Histogram;
@@ -138,6 +138,7 @@ impl<K> TimingsView<K> {
         res.into()
     }
 
+    /// Combines the histograms of `self` with those of another [`TimingsView`].
     pub fn add(&mut self, mut other: TimingsView<K>)
     where
         K: Ord,
@@ -154,6 +155,14 @@ impl<K> TimingsView<K> {
         for (k, h) in other.0.into_iter() {
             self.insert(k, h);
         }
+    }
+
+    /// Produces a map whose values are the [`SummaryStats`] of `self`'s histogram values.
+    pub fn summary_stats(&self) -> Wrapper<BTreeMap<K, SummaryStats>>
+    where
+        K: Ord + Clone,
+    {
+        self.map_values(|hist| summary_stats(hist))
     }
 }
 
