@@ -1,13 +1,12 @@
 //! Provides the ability to obtain interim timing information before the target function terminates.
 
-use std::{
-    sync::{Arc, Mutex},
-    thread::JoinHandle,
-};
-
 use crate::{
     core_internals_post::{report_timings, Timings},
     core_internals_pre::LatencyTracePriv,
+};
+use std::{
+    sync::{Arc, Mutex},
+    thread::JoinHandle,
 };
 
 /// Represents an ongoing collection of latency information with the ability to report on partial latencies

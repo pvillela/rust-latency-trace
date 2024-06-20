@@ -18,7 +18,7 @@ use tracing_subscriber::{
 ///
 /// Its configuration encapsulates a span grouper function
 /// (`impl Fn(&`[`Attributes`]`) -> Vec<(String, String)> + Send + Sync + 'static`)
-/// to define [SpanGroup](crate::SpanGroup)s, as well as the histogram configuration parameters
+/// to define [`SpanGroup`](crate::SpanGroup)s, as well as the histogram configuration parameters
 /// [`hdrhistogram::Histogram::high`] and [`hdrhistogram::Histogram::sigfig`].
 pub struct LatencyTrace(pub(crate) LatencyTraceCfg);
 

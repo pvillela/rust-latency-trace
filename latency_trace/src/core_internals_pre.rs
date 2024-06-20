@@ -18,7 +18,7 @@ use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
 /// Provides information about where the tracing span was defined.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub(crate) struct CallsiteInfoPriv {
+pub(crate) struct CallsiteInfo {
     pub(crate) callsite_id: Identifier,
     pub(crate) name: &'static str,
     pub(crate) file: Option<String>,
@@ -32,11 +32,10 @@ pub(crate) struct CallsiteInfoPriv {
 // Types used in span groups or to support data collection.
 
 type CallsiteIdPath = Vec<Identifier>;
-// pub(crate) type CallsiteInfoPrivPath = Vec<Arc<CallsiteInfoPriv>>;
 pub(crate) type Props = Vec<(String, String)>;
 type PropsPath = Vec<Arc<Props>>;
 
-/// Private form of [`SpanGroup`] used during trace collection, more efficient than [`SpanGroup`] for trace
+/// Private form of [`crate::SpanGroup`] used during trace collection, more efficient than [`crate::SpanGroup`] for trace
 /// data collection.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub(crate) struct SpanGroupPriv {
@@ -73,34 +72,16 @@ pub(crate) fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
     hist
 }
 
-// #[derive(Debug, Clone)]
-// pub(crate) struct TimingPriv {
-//     pub(crate) hist: Timing,
-//     pub(crate) callsite_info_priv_path: CallsiteInfoPrivPath,
-// }
-
-// impl TimingPriv {
-//     fn new(hist_high: u64, hist_sigfig: u8, callsite_info_priv_path: CallsiteInfoPrivPath) -> Self {
-//         let hist = new_timing(hist_high, hist_sigfig);
-//         Self {
-//             hist,
-//             callsite_info_priv_path,
-//         }
-//     }
-// }
-
 /// Type of latency information internally collected for span groups. The key is [SpanGroupPriv], which is as
 /// light as possible to minimize processing overhead when accessing the map. Therefore, part of the information
-/// required to produce the ultimate results is kept in the map's values as the `callsite_info_priv_path` field
-/// in [TimingsPriv].
-// pub(crate) type TimingsPriv = HashMap<SpanGroupPriv, TimingPriv>;
+/// required to produce the ultimate results is kept as a separate `callsite_infos` map keyed by [`Identifier`].
 #[derive(Clone)]
-pub(crate) struct RawTracePriv {
+pub(crate) struct RawTrace {
     pub(crate) timings: HashMap<SpanGroupPriv, Timing>,
-    pub(crate) callsite_infos: HashMap<Identifier, CallsiteInfoPriv>,
+    pub(crate) callsite_infos: HashMap<Identifier, CallsiteInfo>,
 }
 
-impl RawTracePriv {
+impl RawTrace {
     pub(crate) fn new() -> Self {
         Self {
             timings: HashMap::new(),
@@ -109,10 +90,11 @@ impl RawTracePriv {
     }
 }
 
-/// Type of accumulator of thread-local values, prior to transforming the collected information to a [`Timings`].
+/// Type of accumulator of thread-local values, prior to transforming the collected information to a [`crate::Timings`].
 /// Used to minimize the time holding the control lock during post-processing.
+/// The downside is that more memory is used when there are many threads.
 // pub(crate) type AccTimings = Vec<HashMap<SpanGroupPriv, TimingPriv>>;
-pub(crate) type AccTimings = Vec<RawTracePriv>;
+pub(crate) type AccRawTrace = Vec<RawTrace>;
 
 //=================
 // SpanTiming
@@ -126,12 +108,12 @@ struct SpanTiming {
     created_at: Instant,
 }
 
-fn op(timings: RawTracePriv, acc: &mut AccTimings, tid: ThreadId) {
+fn op(raw_trace: RawTrace, acc: &mut AccRawTrace, tid: ThreadId) {
     log::debug!("executing `op` for {:?}", tid);
-    acc.push(timings);
+    acc.push(raw_trace);
 }
 
-pub(crate) fn op_r(acc1: RawTracePriv, acc2: RawTracePriv) -> RawTracePriv {
+pub(crate) fn op_r(acc1: RawTrace, acc2: RawTrace) -> RawTrace {
     let mut timings = acc1.timings;
     for (k, v) in acc2.timings {
         let hist = timings.get_mut(&k);
@@ -143,13 +125,13 @@ pub(crate) fn op_r(acc1: RawTracePriv, acc2: RawTracePriv) -> RawTracePriv {
         }
     }
 
-    let callsite_infos: HashMap<Identifier, CallsiteInfoPriv> = acc1
+    let callsite_infos: HashMap<Identifier, CallsiteInfo> = acc1
         .callsite_infos
         .into_iter()
         .chain(acc2.callsite_infos)
         .collect();
 
-    RawTracePriv {
+    RawTrace {
         timings,
         callsite_infos,
     }
@@ -158,7 +140,7 @@ pub(crate) fn op_r(acc1: RawTracePriv, acc2: RawTracePriv) -> RawTracePriv {
 //=================
 // LatencyTraceCfg
 
-/// Configuration information used by both [`LatencyTracePriv`] and [`LatencyTrace`](super::LatencyTrace).
+/// Configuration information used by both [`LatencyTracePriv`] and [`crate::LatencyTrace`].
 pub(crate) struct LatencyTraceCfg {
     pub(crate) span_grouper: SpanGrouper,
     pub(crate) hist_high: u64,
@@ -169,17 +151,16 @@ pub(crate) struct LatencyTraceCfg {
 // SpanGrouper
 
 /// Internal type of span groupers.
-pub(crate) type SpanGrouper =
-    Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>;
+type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>;
 
 //=================
 // LatencyTracePriv
 
-/// Implements [Layer] and provides access to [Timings] containing the latencies collected for different span groups.
+/// Implements [Layer] and provides access to [`RawTrace`] containing the latencies collected for different span groups.
 /// This is the central struct in this framework's implementation.
 #[derive(Clone)]
 pub(crate) struct LatencyTracePriv {
-    control: Control<RawTracePriv, AccTimings>,
+    control: Control<RawTrace, AccRawTrace>,
     span_grouper: SpanGrouper,
     pub(crate) hist_high: u64,
     pub(crate) hist_sigfig: u8,
@@ -188,14 +169,14 @@ pub(crate) struct LatencyTracePriv {
 impl LatencyTracePriv {
     pub(crate) fn new(config: LatencyTraceCfg) -> LatencyTracePriv {
         LatencyTracePriv {
-            control: Control::new(&LOCAL_INFO, AccTimings::new(), RawTracePriv::new, op),
+            control: Control::new(&LOCAL_INFO, AccRawTrace::new(), RawTrace::new, op),
             span_grouper: config.span_grouper,
             hist_high: config.hist_high,
             hist_sigfig: config.hist_sigfig,
         }
     }
 
-    /// Updates timings for the given span group. Called by [Layer] impl.
+    /// Updates timings for the given span group. Called by [`Layer`] impl.
     fn update_timings(&self, span_group_priv: &SpanGroupPriv, f: impl FnOnce(&mut Timing)) {
         self.control.with_data_mut(|timings_priv| {
             let timing = {
@@ -229,7 +210,7 @@ impl LatencyTracePriv {
     fn update_callsite_infos(
         &self,
         callsite_id: Identifier,
-        callsite_info: impl FnOnce() -> CallsiteInfoPriv,
+        callsite_info: impl FnOnce() -> CallsiteInfo,
     ) {
         self.control.with_data_mut(|timings_priv| {
             let callsite_infos = &mut timings_priv.callsite_infos;
@@ -240,13 +221,13 @@ impl LatencyTracePriv {
     }
 
     /// Extracts the accumulated timings.
-    pub(crate) fn take_acc_timings(&self) -> AccTimings {
+    pub(crate) fn take_acc_timings(&self) -> AccRawTrace {
         log::trace!("entering `take_acc_timings`");
         self.control.take_tls();
-        self.control.take_acc(AccTimings::new())
+        self.control.take_acc(AccRawTrace::new())
     }
 
-    pub(crate) fn probe_acc_timings(&self) -> AccTimings {
+    pub(crate) fn probe_acc_timings(&self) -> AccRawTrace {
         log::trace!("entering `take_acc_timings`");
         self.control.probe_tls()
     }
@@ -287,7 +268,7 @@ where
         let callsite_info = {
             let callsite_id = callsite_id.clone();
             let span = &span;
-            move || CallsiteInfoPriv {
+            move || CallsiteInfo {
                 callsite_id,
                 name: span.name(),
                 file: meta.file().map(|s| s.to_owned()),
@@ -339,6 +320,5 @@ where
 // Thread-locals
 
 thread_local! {
-    // static LOCAL_INFO: Holder<TimingsPriv, AccTimings> = Holder::new(TimingsPriv::new);
-    static LOCAL_INFO: Holder<RawTracePriv, AccTimings> = Holder::new();
+    static LOCAL_INFO: Holder<RawTrace, AccRawTrace> = Holder::new();
 }
