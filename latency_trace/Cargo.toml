@@ -6,8 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# thread_local_collect = { git = "https://github.com/pvillela/rust-thread-local-collect", tag = "v0.5.0" }
-thread_local_collect = { path = "../../thread-local-collect" }
+thread_local_collect = "0.5.2"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 
@@ -18,9 +17,6 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
     "ansi",
     "std",
 ] }
-
-# Below line replaced by above
-# tracing-subscriber = "0.3"
 
 hdrhistogram = "7.5"
 log = "0.4"
