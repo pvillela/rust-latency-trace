@@ -1,4 +1,4 @@
-#![doc = include_str!("../../readme0.md")]
+#![doc = include_str!("../readme0.md")]
 //!
 //! ## Example usage
 //!
@@ -26,7 +26,7 @@
 #![doc = include_str!("../examples/doc_async_probed.rs")]
 //! ```
 //!
-#![doc = include_str!("../../readme2.md")]
+#![doc = include_str!("../readme2.md")]
 #![deny(clippy::unwrap_used)]
 
 mod core_internals_post;

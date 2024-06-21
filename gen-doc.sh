@@ -1,7 +1,11 @@
 #!/bin/bash
 
 rm -r target/doc
+
 pushd latency_trace
+
+cat readme0.md readme1.md readme2.md > ../README.md
+
 cargo makedocs \
     -e log \
     -e thread_local_collect \
@@ -13,10 +17,9 @@ cargo makedocs \
     # -e hdrhistogram \
     # -e tracing \
     # -e tracing-core
+
 popd
 
 cargo doc -p latency_trace --no-deps
-
-cat readme0.md readme1.md readme2.md > README.md
 
 git status

@@ -1,7 +1,15 @@
 [package]
 name = "latency_trace"
-version = "0.1.0"
+version = "0.5.0"
 edition = "2021"
+license = "MIT"
+description = "supports latency measurement for functions and code blocks, both sync and async."
+repository = "https://github.com/pvillela/rust-latency-trace/tree/v0.5.0"
+readme = "../README.md"
+keywords = ["latency", "observability", "measurement", "tracing", "performance"]
+categories = ["development-tools::profiling"]
+include = ["src", "examples/doc*.rs", "benches", "Cargo.toml", "*.md"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
