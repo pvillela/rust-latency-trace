@@ -6,10 +6,6 @@ use tracing::{instrument, trace_span, Instrument};
 async fn f() {
     for _ in 0..1000 {
         async {
-            trace_span!("empty").in_scope(|| {
-                // Empty span used to show some of the tracing overhead.
-            });
-
             // Simulated work
             tokio::time::sleep(Duration::from_micros(1200)).await;
 

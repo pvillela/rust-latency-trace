@@ -19,10 +19,6 @@ fn arg() -> u64 {
 fn f() {
     for _ in 0..1000 {
         trace_span!("loop_body").in_scope(|| {
-            trace_span!("empty").in_scope(|| {
-                // Empty span used to show some of the tracing overhead.
-            });
-
             // Simulated work
             thread::sleep(Duration::from_micros(arg() * 3));
 

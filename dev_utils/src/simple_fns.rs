@@ -18,10 +18,6 @@ pub fn simple_fn_sync(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
         trace_span!("f").in_scope(|| {
             for i in 0..nrepeats {
                 trace_span!("loop_body", foo = i % 2).in_scope(|| {
-                    trace_span!("empty").in_scope(|| {
-                        // Empty span used to show some of the tracing overhead.
-                    });
-
                     // Simulated work
                     thread::sleep(Duration::from_micros(sleep_micros * 3));
 
@@ -74,10 +70,6 @@ pub async fn simple_fn_async(nrepeats: usize, ntasks: usize, sleep_micros: u64) 
         async move {
             for i in 0..nrepeats {
                 async {
-                    trace_span!("empty").in_scope(|| {
-                        // Empty span used to show some of the tracing overhead.
-                    });
-
                     // Simulated work
                     thread::sleep(Duration::from_micros(sleep_micros * 3));
 
