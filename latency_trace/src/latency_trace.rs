@@ -46,6 +46,10 @@ impl Default for LatencyTrace {
 
 impl LatencyTrace {
     /// Creates a new [`LatencyTrace`] configured the same as `self` but with the given `span_grouper`.
+    ///
+    /// If a [`LatencyTrace`] has been previously initialized in the same process with the same `hist_high` and
+    /// `hist_sigfic` but a different `span_grouper` then the previous `span_grouper` will be used instead of
+    /// the new one.
     pub fn with_span_grouper(
         &self,
         span_grouper: impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static,
@@ -59,6 +63,9 @@ impl LatencyTrace {
 
     /// Creates a new [`LatencyTrace`] configured the same as `self` but with the given `hist_high`
     /// (see [hdrhistogram::Histogram::high]).
+    ///
+    /// If a [`LatencyTrace`] has been previously initialized in the same process with different `hist_high` then
+    /// this instance will panic when it is initialized.
     pub fn with_hist_high(&self, hist_high: u64) -> Self {
         let cfg = LatencyTraceCfg {
             span_grouper: self.0.span_grouper.clone(),
@@ -70,6 +77,9 @@ impl LatencyTrace {
 
     /// Creates a new [`LatencyTrace`] configured the same as `self` but with the given `hist_sigfig`
     /// (see [hdrhistogram::Histogram::sigfig]).
+    ///
+    /// If a [`LatencyTrace`] has been previously initialized in the same process with different `hist_sigfic` then
+    /// this instance will panic when it is initialized.
     pub fn with_hist_sigfig(&self, hist_sigfig: u8) -> Self {
         let cfg = LatencyTraceCfg {
             span_grouper: self.0.span_grouper.clone(),
@@ -79,24 +89,30 @@ impl LatencyTrace {
         Self(cfg)
     }
 
-    /// Executes the instrumented function `f` and, after `f` completes, returns the observed latencies.
+    /// Initializes `self` and executes the closure `g` in the context of `self`.
+    ///
+    /// If a [`LatencyTrace`] has been previously initialized in the same process with the same `hist_high` and
+    /// `hist_sigfic` but a different `span_grouper` then the previous `span_grouper` will be used instead of
+    /// the new one.
     ///
     /// # Panics
-    /// ***Below is not true:***
     ///
-    /// If this function or any of the other `Self::measure_latencies*` functions have been
-    /// previously called in the same process.
-    pub fn measure_latencies(self, f: impl Fn() + Send + 'static) -> Timings {
-        let default_dispatch_exists =
-            tracing::dispatcher::get_default(|d| d.is::<Layered<LatencyTracePriv, Registry>>());
+    /// If a global default [`tracing::Subscriber`] not provided by this package has been been previously set.
+    ///
+    /// If a [`LatencyTrace`] has been previously initialized in the same process with different `hist_high` or
+    /// different `hist_sigfic`.
+    pub(crate) fn init_and_run<T>(self, g: impl Fn(&LatencyTracePriv) -> T + Send + 'static) -> T {
         let ltp_new = LatencyTracePriv::new(self.0);
         let new_config = (ltp_new.hist_high, ltp_new.hist_sigfig);
+        let default_dispatch_exists = tracing::dispatcher::get_default(|disp| {
+            disp.is::<Layered<LatencyTracePriv, Registry>>()
+        });
         if !default_dispatch_exists {
             let reg: tracing_subscriber::layer::Layered<LatencyTracePriv, Registry> =
                 Registry::default().with(ltp_new);
             reg.init();
         }
-        let timings = tracing::dispatcher::get_default(|disp| {
+        tracing::dispatcher::get_default(|disp| {
             let ltp: &LatencyTracePriv = disp
                 .downcast_ref()
                 .expect("existing dispatcher must be of type `LatencyTracePriv`");
@@ -107,11 +123,24 @@ impl LatencyTrace {
                 curr_config, new_config,
                 "New and existing LatencyTrace configuration settings must be identical."
             );
+            g(ltp)
+        })
+    }
+
+    /// Executes the instrumented function `f` and, after `f` completes, returns the observed latencies.
+    ///
+    /// # Panics
+    /// ***Below is not true:***
+    ///
+    /// If this function or any of the other `Self::measure_latencies*` functions have been
+    /// previously called in the same process.
+    pub fn measure_latencies(self, f: impl Fn() + Send + 'static) -> Timings {
+        let g = move |ltp: &LatencyTracePriv| -> Timings {
             f();
             let acc = ltp.take_acc_timings();
             report_timings(&ltp, acc)
-        });
-        timings
+        };
+        self.init_and_run(g)
     }
 
     /// Executes the instrumented async function `f`, running on the `tokio` runtime; after `f` completes,
@@ -140,15 +169,7 @@ impl LatencyTrace {
     /// If this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
     pub fn measure_latencies_probed(self, f: impl FnOnce() + Send + 'static) -> ProbedTrace {
-        let ltp = LatencyTracePriv::new(self.0);
-        let pt = ProbedTrace::new(ltp.clone());
-        let reg: tracing_subscriber::layer::Layered<LatencyTracePriv, Registry> =
-            Registry::default().with(ltp.clone());
-        let default_dispatch_exists =
-            tracing::dispatcher::get_default(|d| d.is::<Layered<LatencyTracePriv, Registry>>());
-        if !default_dispatch_exists {
-            reg.init();
-        }
+        let pt = self.init_and_run(|ltp| ProbedTrace::new(ltp.clone()));
         let jh = thread::spawn(f);
         pt.set_join_handle(jh);
         pt
