@@ -1,11 +1,9 @@
-//! Executes benchmarks.
+//! Executes benchmarks with [`dev_utils::simple_fns`].
 
 use std::fmt::Display;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use dev_utils::simple_fns::{
-    simple_fn_async, simple_fn_async_un, simple_fn_sync, simple_fn_sync_un,
-};
+use dev_utils::simple_fns::{simple_async, simple_async_un, simple_sync, simple_sync_un};
 use latency_trace::bench_support::{
     measure_latencies1, measure_latencies2, measure_latencies2_tokio,
 };
@@ -18,28 +16,27 @@ fn set_up_bench() {
 
 fn sync_completion_bench(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     let lt = LatencyTrace::default();
-    measure_latencies2(lt, move || simple_fn_sync(nrepeats, ntasks, sleep_micros));
+    measure_latencies2(lt, move || simple_sync(nrepeats, ntasks, sleep_micros));
 }
 
 fn sync_all_in_bench(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     let lt = LatencyTrace::default();
-    let timings = lt.measure_latencies(move || simple_fn_sync(nrepeats, ntasks, sleep_micros));
+    let timings = lt.measure_latencies(move || simple_sync(nrepeats, ntasks, sleep_micros));
     black_box(timings);
 }
 
 fn sync_un_bench(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
-    simple_fn_sync_un(nrepeats, ntasks, sleep_micros);
+    simple_sync_un(nrepeats, ntasks, sleep_micros);
 }
 
 fn async_completion_bench(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     let lt = LatencyTrace::default();
-    measure_latencies2_tokio(lt, move || simple_fn_async(nrepeats, ntasks, sleep_micros));
+    measure_latencies2_tokio(lt, move || simple_async(nrepeats, ntasks, sleep_micros));
 }
 
 fn async_all_in_bench(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     let lt = LatencyTrace::default();
-    let timings =
-        lt.measure_latencies_tokio(move || simple_fn_async(nrepeats, ntasks, sleep_micros));
+    let timings = lt.measure_latencies_tokio(move || simple_async(nrepeats, ntasks, sleep_micros));
     black_box(timings);
 }
 
@@ -48,7 +45,7 @@ fn async_un_bench(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
         .enable_all()
         .build()
         .unwrap()
-        .block_on(simple_fn_async_un(nrepeats, ntasks, sleep_micros));
+        .block_on(simple_async_un(nrepeats, ntasks, sleep_micros));
 }
 
 struct Params {

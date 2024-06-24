@@ -14,9 +14,10 @@ include = ["src", "examples/doc*.rs", "benches", "Cargo.toml", "*.md"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thread_local_collect = "0.5"
+thread_local_collect = { path = "../../thread-local-collect" }
+# thread_local_collect = "0.5"
 tokio = { version = "1", features = ["full"] }
-tracing = "0.1"
+tracing = { version = "0.1", features = ["max_level_off"] }
 
 # Removed "log" feature to prevent `tracng-log` from being pulled in and causing issues with `env_logger`
 tracing-subscriber = { version = "0.3", default-features = false, features = [
@@ -36,7 +37,21 @@ dev_utils = { path = "../dev_utils" }
 env_logger = "0.11"
 rand = "0.8"
 criterion = { version = "0.5", features = ["html_reports"] }
+divan = "0.1.14"
+
 
 [[bench]]
-name = "benchmark"
+name = "bench_simple_criterion"
+harness = false
+
+[[bench]]
+name = "bench_deep_criterion"
+harness = false
+
+[[bench]]
+name = "bench_simple_divan"
+harness = false
+
+[[bench]]
+name = "bench_deep_divan"
 harness = false

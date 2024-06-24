@@ -82,20 +82,36 @@ impl LatencyTrace {
     /// Executes the instrumented function `f` and, after `f` completes, returns the observed latencies.
     ///
     /// # Panics
+    /// ***Below is not true:***
+    ///
     /// If this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
-    pub fn measure_latencies(self, f: impl FnOnce() + Send + 'static) -> Timings {
-        let ltp = LatencyTracePriv::new(self.0);
-        let reg: tracing_subscriber::layer::Layered<LatencyTracePriv, Registry> =
-            Registry::default().with(ltp.clone());
+    pub fn measure_latencies(self, f: impl Fn() + Send + 'static) -> Timings {
         let default_dispatch_exists =
             tracing::dispatcher::get_default(|d| d.is::<Layered<LatencyTracePriv, Registry>>());
+        let ltp_new = LatencyTracePriv::new(self.0);
+        let new_config = (ltp_new.hist_high, ltp_new.hist_sigfig);
         if !default_dispatch_exists {
+            let reg: tracing_subscriber::layer::Layered<LatencyTracePriv, Registry> =
+                Registry::default().with(ltp_new);
             reg.init();
         }
-        f();
-        let acc = ltp.take_acc_timings();
-        report_timings(&ltp, acc)
+        let timings = tracing::dispatcher::get_default(|disp| {
+            let ltp: &LatencyTracePriv = disp
+                .downcast_ref()
+                .expect("existing dispatcher must be of type `LatencyTracePriv`");
+            let curr_config = (ltp.hist_high, ltp.hist_sigfig);
+            // Note: below assertion does not cover the `LatencyTracePriv` `span_grouper` field as it is not
+            // possible to check equality of functions.
+            assert_eq!(
+                curr_config, new_config,
+                "New and existing LatencyTrace configuration settings must be identical."
+            );
+            f();
+            let acc = ltp.take_acc_timings();
+            report_timings(&ltp, acc)
+        });
+        timings
     }
 
     /// Executes the instrumented async function `f`, running on the `tokio` runtime; after `f` completes,
@@ -104,11 +120,11 @@ impl LatencyTrace {
     /// # Panics
     /// If this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
-    pub fn measure_latencies_tokio<F>(self, f: impl FnOnce() -> F + Send + 'static) -> Timings
+    pub fn measure_latencies_tokio<F>(self, f: impl Fn() -> F + Send + 'static) -> Timings
     where
         F: Future<Output = ()> + Send,
     {
-        self.measure_latencies(|| {
+        self.measure_latencies(move || {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()

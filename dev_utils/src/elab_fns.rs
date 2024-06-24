@@ -10,7 +10,7 @@ pub const PROBE_GATE_F_PROCEED: u8 = 0;
 pub const PROBE_GATE_F1_PROBE_READY: u8 = 1;
 pub const PROBE_GATE_F2_PROBE_READY: u8 = 2;
 
-pub fn elab_fn_sync_gated(probe_gater: Option<Arc<Gater>>) {
+pub fn elab_sync_gated(probe_gater: Option<Arc<Gater>>) {
     #[instrument(level = "trace", skip(f_instance, probe_gater))]
     fn f(f_instance: u8, probe_gater: Option<Arc<Gater>>) {
         let mut foo: u64 = 1;
@@ -50,17 +50,16 @@ pub fn elab_fn_sync_gated(probe_gater: Option<Arc<Gater>>) {
         let probe_gater = probe_gater.clone();
         thread::spawn(|| trace_span!("root_1", foo = 1).in_scope(|| f(1, probe_gater)))
     };
-    let h2 =
-        { thread::spawn(|| trace_span!("root_2", bar = 2).in_scope(|| f(2, probe_gater))) };
+    let h2 = { thread::spawn(|| trace_span!("root_2", bar = 2).in_scope(|| f(2, probe_gater))) };
     h1.join().unwrap();
     h2.join().unwrap();
 }
 
-pub fn elab_fn_sync() {
-    elab_fn_sync_gated(None)
+pub fn elab_sync() {
+    elab_sync_gated(None)
 }
 
-pub async fn elab_fn_async_gated(probe_gater: Option<Arc<Gater>>) {
+pub async fn elab_async_gated(probe_gater: Option<Arc<Gater>>) {
     #[instrument(level = "trace", skip(f_instance, probe_gater))]
     async fn f(f_instance: u8, probe_gater: Option<Arc<Gater>>) {
         let mut foo: u64 = 1;
@@ -100,19 +99,15 @@ pub async fn elab_fn_async_gated(probe_gater: Option<Arc<Gater>>) {
 
     let h1 = {
         let probe_gater = probe_gater.clone();
-        tokio::spawn(
-            async { f(1, probe_gater).await }.instrument(trace_span!("root_1", foo = 1)),
-        )
+        tokio::spawn(async { f(1, probe_gater).await }.instrument(trace_span!("root_1", foo = 1)))
     };
     let h2 = {
-        tokio::spawn(
-            async { f(2, probe_gater).await }.instrument(trace_span!("root_2", bar = 2)),
-        )
+        tokio::spawn(async { f(2, probe_gater).await }.instrument(trace_span!("root_2", bar = 2)))
     };
     h1.await.unwrap();
     h2.await.unwrap();
 }
 
-pub async fn elab_fn_async() {
-    elab_fn_async_gated(None).await
+pub async fn elab_async() {
+    elab_async_gated(None).await
 }

@@ -3,7 +3,7 @@ mod common;
 use common::run_test;
 use dev_utils::{
     elab_fns::{
-        elab_fn_sync_gated, PROBE_GATE_F1_PROBE_READY, PROBE_GATE_F2_PROBE_READY,
+        elab_sync_gated, PROBE_GATE_F1_PROBE_READY, PROBE_GATE_F2_PROBE_READY,
         PROBE_GATE_F_PROCEED,
     },
     gater::Gater,
@@ -26,7 +26,7 @@ async fn test_probed() {
 
     let probed = LatencyTrace::default().measure_latencies_probed({
         let probe_gater = probe_gater.clone();
-        || elab_fn_sync_gated(Some(probe_gater))
+        || elab_sync_gated(Some(probe_gater))
     });
 
     // Number of span groups by name

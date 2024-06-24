@@ -6,7 +6,7 @@ use tracing::{instrument, trace_span, Instrument};
 
 /// Instrumented simple sync function
 #[instrument(level = "trace", skip(nrepeats, sleep_micros))]
-pub fn simple_fn_sync(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
+pub fn simple_sync(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     #[instrument(level = "trace", skip(sleep_micros))]
     fn g_sync(i: usize, sleep_micros: u64) {
         // Simulated work
@@ -33,7 +33,7 @@ pub fn simple_fn_sync(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
 }
 
 /// Uninstrumented simple sync function
-pub fn simple_fn_sync_un(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
+pub fn simple_sync_un(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     fn g_sync_un(i: usize, sleep_micros: u64) {
         // Simulated work
         thread::sleep(Duration::from_micros(sleep_micros * 2));
@@ -58,7 +58,7 @@ pub fn simple_fn_sync_un(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
 
 /// Instrumented simple async function
 #[instrument(level = "trace", skip(nrepeats, sleep_micros))]
-pub async fn simple_fn_async(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
+pub async fn simple_async(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     #[instrument(level = "trace", skip(sleep_micros))]
     async fn g_async(i: usize, sleep_micros: u64) {
         // Simulated work
@@ -88,7 +88,7 @@ pub async fn simple_fn_async(nrepeats: usize, ntasks: usize, sleep_micros: u64) 
 }
 
 /// Uninstrumented simple async function
-pub async fn simple_fn_async_un(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
+pub async fn simple_async_un(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     async fn g_async_un(i: usize, sleep_micros: u64) {
         // Simulated work
         tokio::time::sleep(Duration::from_micros(sleep_micros * 2)).await;

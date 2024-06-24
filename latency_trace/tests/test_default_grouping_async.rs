@@ -2,7 +2,7 @@ mod common;
 
 use common::run_test;
 use dev_utils::{
-    elab_fns::elab_fn_async,
+    elab_fns::elab_async,
     test_support::{
         span_name_test_spec_f, span_name_test_spec_inner_span, span_name_test_spec_outer_span,
         span_name_test_spec_root_1, span_name_test_spec_root_2, span_name_test_spec_span_1,
@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 #[test]
 #[allow(clippy::identity_op)]
 fn test_default_grouping() {
-    let latencies = LatencyTrace::default().measure_latencies_tokio(elab_fn_async);
+    let latencies = LatencyTrace::default().measure_latencies_tokio(elab_async);
 
     // Number of span groups by name
     let n_root_1: u64 = 1;

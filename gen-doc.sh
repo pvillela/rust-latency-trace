@@ -4,7 +4,7 @@ rm -r target/doc
 
 pushd latency_trace
 
-cat readme0.md readme1.md readme2.md > ../README.md
+cat README.md > ../README.md
 
 cargo makedocs \
     -e log \
