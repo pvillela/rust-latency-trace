@@ -7,7 +7,7 @@
 
 use criterion::black_box;
 use dev_utils::deep_fns::deep_sync;
-use latency_trace::{summary_stats, LatencyTrace};
+use latency_trace::LatencyTrace;
 use std::time::Instant;
 
 fn sync_all_in_bench(nrepeats: usize, ntasks: usize) {
