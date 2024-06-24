@@ -14,10 +14,6 @@ fn set_up() {
     measure_latencies1(lt);
 }
 
-fn sync_direct(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
-    simple_sync(nrepeats, ntasks, sleep_micros);
-}
-
 fn sync_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     let lt = LatencyTrace::default();
     measure_latencies2(lt, move || simple_sync(nrepeats, ntasks, sleep_micros));
@@ -42,14 +38,6 @@ fn sync_un_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) -> Timings 
     let lt = LatencyTrace::default();
     let timings = lt.measure_latencies(move || simple_sync(nrepeats, ntasks, sleep_micros));
     black_box(timings)
-}
-
-fn async_direct(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(simple_async(nrepeats, ntasks, sleep_micros));
 }
 
 fn async_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
@@ -144,16 +132,6 @@ fn set_up_bench() {
 }
 
 #[divan::bench(args = index_range(&ARR_PARAMS))]
-fn sync_direct_bench(idx: usize) {
-    let Params {
-        nrepeats,
-        ntasks,
-        sleep_micros,
-    } = ARR_PARAMS[idx];
-    sync_direct(nrepeats, ntasks, sleep_micros)
-}
-
-#[divan::bench(args = index_range(&ARR_PARAMS))]
 fn sync_completion_bench(idx: usize) {
     let Params {
         nrepeats,
@@ -201,16 +179,6 @@ fn sync_un_all_in_bench(idx: usize) {
         sleep_micros,
     } = ARR_PARAMS[idx];
     sync_un_all_in(nrepeats, ntasks, sleep_micros);
-}
-
-#[divan::bench(args = index_range(&ARR_PARAMS))]
-fn async_direct_bench(idx: usize) {
-    let Params {
-        nrepeats,
-        ntasks,
-        sleep_micros,
-    } = ARR_PARAMS[idx];
-    async_direct(nrepeats, ntasks, sleep_micros)
 }
 
 #[divan::bench(args = index_range(&ARR_PARAMS))]

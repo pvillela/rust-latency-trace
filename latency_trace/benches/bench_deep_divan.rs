@@ -10,10 +10,6 @@ fn set_up() {
     measure_latencies1(lt);
 }
 
-fn sync_direct(nrepeats: usize, ntasks: usize) {
-    deep_sync(nrepeats, ntasks);
-}
-
 fn sync_completion(nrepeats: usize, ntasks: usize) {
     let lt = LatencyTrace::default();
     measure_latencies2(lt, move || deep_sync(nrepeats, ntasks));
@@ -101,14 +97,6 @@ const fn index_range<T, const N: usize>(_arr: &[T; N]) -> Range<usize> {
 #[divan::bench]
 fn set_up_bench() {
     set_up()
-}
-
-#[divan::bench(args = index_range(&ARR_PARAMS))]
-fn sync_direct_bench(idx: usize) {
-    let Params {
-        nrepeats, ntasks, ..
-    } = ARR_PARAMS[idx];
-    sync_direct(nrepeats, ntasks)
 }
 
 #[divan::bench(args = index_range(&ARR_PARAMS))]
