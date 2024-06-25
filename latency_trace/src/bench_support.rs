@@ -1,7 +1,7 @@
 //! Undocumented functions to support benchmarks.]
 
 use crate::{core_internals_pre::LatencyTracePriv, latency_trace::LatencyTrace};
-use std::{future::Future, hint::black_box};
+use std::{future::Future, hint::black_box, thread};
 
 /// Set-up for measurement of latencies.
 pub fn measure_latencies1(lt: LatencyTrace) {
@@ -9,9 +9,11 @@ pub fn measure_latencies1(lt: LatencyTrace) {
 }
 
 /// Executes tracing up to completion of instrumnted function, before final collection and aggregation.
-pub fn measure_latencies2(lt: LatencyTrace, f: impl Fn() + Send + 'static) {
+pub fn measure_latencies2(lt: LatencyTrace, f: impl Fn() + Send + Sync + 'static) {
     let g = move |ltp: &LatencyTracePriv| {
-        f();
+        thread::scope(|s| {
+            s.spawn(|| f()).join().unwrap();
+        });
         black_box(ltp);
     };
     lt.init_and_run(g);

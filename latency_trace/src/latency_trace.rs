@@ -134,9 +134,11 @@ impl LatencyTrace {
     ///
     /// If this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
-    pub fn measure_latencies(self, f: impl Fn() + Send + 'static) -> Timings {
+    pub fn measure_latencies(self, f: impl Fn() + Send + Sync + 'static) -> Timings {
         let g = move |ltp: &LatencyTracePriv| -> Timings {
-            f();
+            thread::scope(|s| {
+                s.spawn(|| f()).join().unwrap();
+            });
             let acc = ltp.take_acc_timings();
             report_timings(&ltp, acc)
         };
@@ -149,7 +151,7 @@ impl LatencyTrace {
     /// # Panics
     /// If this function or any of the other `Self::measure_latencies*` functions have been
     /// previously called in the same process.
-    pub fn measure_latencies_tokio<F>(self, f: impl Fn() -> F + Send + 'static) -> Timings
+    pub fn measure_latencies_tokio<F>(self, f: impl Fn() -> F + Send + Sync + 'static) -> Timings
     where
         F: Future<Output = ()> + Send,
     {
