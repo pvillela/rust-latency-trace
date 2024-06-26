@@ -1,83 +1,33 @@
 //! Executes benchmarks with [`dev_utils::deep_fns`].
 
-use std::fmt::Display;
+mod common_deep;
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use dev_utils::deep_fns::{deep_sync, deep_sync_un};
-use latency_trace::bench_support::{measure_latencies1, measure_latencies2};
-use latency_trace::LatencyTrace;
-
-fn set_up_bench() {
-    let lt = LatencyTrace::default();
-    measure_latencies1(lt);
-}
-
-fn sync_completion_bench(nrepeats: usize, ntasks: usize) {
-    let lt = LatencyTrace::default();
-    measure_latencies2(lt, move || deep_sync(nrepeats, ntasks));
-}
-
-fn sync_all_in_bench(nrepeats: usize, ntasks: usize) {
-    let lt = LatencyTrace::default();
-    let timings = lt.measure_latencies(move || deep_sync(nrepeats, ntasks));
-    black_box(timings);
-}
-
-fn sync_un_bench(nrepeats: usize, ntasks: usize) {
-    deep_sync_un(nrepeats, ntasks);
-}
-
-struct Params {
-    nrepeats: usize,
-    ntasks: usize,
-}
-
-impl Display for Params {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Params { nrepeats, ntasks } = self;
-        f.write_fmt(format_args!("(nrepeats={nrepeats}, ntasks={ntasks})"))
-    }
-}
+#[allow(unused)]
+use common_deep::sync_completion;
+use common_deep::{set_up, sync_all_in, sync_un_direct, Params, ARR_PARAMS};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function(&format!("set-up"), |b| b.iter(set_up_bench));
+    c.bench_function(&format!("set-up"), |b| b.iter(set_up));
 
-    for params in [
-        Params {
-            nrepeats: 10,
-            ntasks: 0,
-        },
-        Params {
-            nrepeats: 20,
-            ntasks: 0,
-        },
-        Params {
-            nrepeats: 100,
-            ntasks: 0,
-        },
-        Params {
-            nrepeats: 10,
-            ntasks: 5,
-        },
-        Params {
-            nrepeats: 20,
-            ntasks: 5,
-        },
-        Params {
-            nrepeats: 100,
-            ntasks: 5,
-        },
-    ] {
-        let Params { nrepeats, ntasks } = params;
+    for params in ARR_PARAMS {
+        let Params {
+            nrepeats,
+            ntasks,
+            span_count,
+        } = params;
 
-        c.bench_function(&format!("sync_completion({params})"), |b| {
-            b.iter(|| sync_completion_bench(nrepeats, ntasks))
-        });
+        // Below commented-out because it crashes when ntasks > 0. It may be something with `std::hint::black_box` which
+        // is used in `sync_completion` instead of `criterion::black_box`.
+        // c.bench_function(&format!("sync_completion({params})"), |b| {
+        //     b.iter(|| sync_completion(nrepeats, ntasks))
+        // });
+
         c.bench_function(&format!("sync_all_in({params})"), |b| {
-            b.iter(|| sync_all_in_bench(nrepeats, ntasks))
+            b.iter(|| sync_all_in(nrepeats, ntasks, span_count))
         });
-        c.bench_function(&format!("sync_un({params})"), |b| {
-            b.iter(|| sync_un_bench(nrepeats, ntasks))
+        c.bench_function(&format!("sync_un_direct({params})"), |b| {
+            b.iter(|| sync_un_direct(nrepeats, ntasks))
         });
     }
 }
