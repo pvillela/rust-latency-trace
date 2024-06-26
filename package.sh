@@ -1,5 +1,5 @@
 #!/bin/bash
 
 pushd latency_trace
-cargo package
+cargo package $1
 popd

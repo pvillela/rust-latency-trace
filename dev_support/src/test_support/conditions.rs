@@ -8,11 +8,6 @@ fn safe_div(x1: u64, x2: u64) -> u64 {
     }
 }
 
-pub fn f64_are_close(left: f64, right: f64, pct: f64) -> bool {
-    let avg_abs = (left.abs() + right.abs()) / 2.0;
-    (left - right).abs() <= avg_abs * pct
-}
-
 #[derive(Debug)]
 pub struct SpanNameTestSpec {
     pub expected_props: Vec<Vec<(&'static str, &'static str)>>,
