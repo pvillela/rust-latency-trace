@@ -10,7 +10,8 @@ pub fn set_up() {
 
 pub fn sync_completion(nrepeats: usize, ntasks: usize) {
     let lt = LatencyTrace::default();
-    measure_latencies2(lt, move || deep_sync(nrepeats, ntasks));
+    let nthreads = measure_latencies2(lt, move || deep_sync(nrepeats, ntasks));
+    assert_eq!(nthreads, ntasks + 1, "nthreads == ntasks+1");
 }
 
 pub fn sync_all_in(nrepeats: usize, ntasks: usize, exp_span_count: u64) -> Timings {

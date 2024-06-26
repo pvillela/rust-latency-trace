@@ -17,11 +17,9 @@ fn criterion_benchmark(c: &mut Criterion) {
             span_count,
         } = params;
 
-        // Below commented-out because it crashes when ntasks > 0. It may be something with `std::hint::black_box` which
-        // is used in `sync_completion` instead of `criterion::black_box`.
-        // c.bench_function(&format!("sync_completion({params})"), |b| {
-        //     b.iter(|| sync_completion(nrepeats, ntasks))
-        // });
+        c.bench_function(&format!("sync_completion({params})"), |b| {
+            b.iter(|| sync_completion(nrepeats, ntasks))
+        });
 
         c.bench_function(&format!("sync_all_in({params})"), |b| {
             b.iter(|| sync_all_in(nrepeats, ntasks, span_count))
