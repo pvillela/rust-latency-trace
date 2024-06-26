@@ -19,7 +19,7 @@ pub fn sync_all_in(nrepeats: usize, ntasks: usize, exp_span_count: u64) -> Timin
     let timings = lt.measure_latencies(move || deep_sync(nrepeats, ntasks));
     let span_count = timings.values().fold(0, |acc, hist| acc + hist.len());
     assert_eq!(span_count, exp_span_count, "span_count assertion");
-    black_box(timings)
+    timings
 }
 
 pub fn sync_un_direct(nrepeats: usize, ntasks: usize) {

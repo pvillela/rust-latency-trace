@@ -1,18 +1,18 @@
 //! Undocumented functions to support benchmarks.]
 
 use crate::{core_internals_pre::LatencyTracePriv, latency_trace::LatencyTrace};
-use std::future::Future;
+use std::{future::Future, hint::black_box};
 
 /// Set-up for measurement of latencies.
 pub fn measure_latencies1(lt: LatencyTrace) {
-    measure_latencies2(lt, || ());
+    black_box(measure_latencies2(lt, || ()));
 }
 
 /// Executes tracing up to completion of instrumnted function, before final collection and aggregation.
 pub fn measure_latencies2(lt: LatencyTrace, f: impl FnOnce()) -> usize {
     let ltp = LatencyTracePriv::initialized(lt.0);
     f();
-    ltp.take_acc_timings().len()
+    black_box(ltp.take_acc_timings().len())
 }
 
 /// Executes tracing up to completion of instrumnted async function, before final collection and aggregation.
