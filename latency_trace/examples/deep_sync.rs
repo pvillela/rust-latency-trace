@@ -6,7 +6,7 @@
 //! per span instance on my 2022 Dell Inspiron 16.
 
 use criterion::black_box;
-use dev_utils::deep_fns::deep_sync;
+use dev_support::deep_fns::deep_sync;
 use latency_trace::LatencyTrace;
 use std::time::Instant;
 

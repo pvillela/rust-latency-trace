@@ -1,4 +1,4 @@
-use dev_utils::deep_fns::{deep_sync, deep_sync_un};
+use dev_support::deep_fns::{deep_sync, deep_sync_un};
 use latency_trace::bench_support::{measure_latencies1, measure_latencies2};
 use latency_trace::{LatencyTrace, Timings};
 use std::{fmt::Display, hint::black_box, ops::Range};

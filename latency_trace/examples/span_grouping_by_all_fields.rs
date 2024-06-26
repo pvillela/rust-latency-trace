@@ -1,7 +1,7 @@
-//! Example showing latency measurement of [dev_utils::target_fns::target_fn] using the span grouper
+//! Example showing latency measurement of [dev_support::target_fns::target_fn] using the span grouper
 //! [latency_trace::group_by_all_fields].
 
-use dev_utils::elab_fns::elab_async;
+use dev_support::elab_fns::elab_async;
 use latency_trace::{group_by_all_fields, LatencyTrace};
 use std::env::set_var;
 

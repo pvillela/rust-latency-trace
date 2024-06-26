@@ -1,4 +1,4 @@
-//! Executes benchmarks with [`dev_utils::simple_fns`].
+//! Executes benchmarks with [`dev_support::simple_fns`].
 
 mod common_simple;
 

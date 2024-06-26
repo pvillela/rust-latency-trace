@@ -5,7 +5,7 @@
 //! provide visibility to the overhead of span creation and processing, which is ~0.5-1 microseconds
 //! per span instance on my 2022 Dell Inspiron 16.
 
-use dev_utils::deep_fns::deep_sync_un;
+use dev_support::deep_fns::deep_sync_un;
 use latency_trace::{summary_stats, LatencyTrace};
 use std::time::Instant;
 

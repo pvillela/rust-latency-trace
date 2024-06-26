@@ -1,4 +1,4 @@
-use dev_utils::simple_fns::{simple_async, simple_async_un, simple_sync, simple_sync_un};
+use dev_support::simple_fns::{simple_async, simple_async_un, simple_sync, simple_sync_un};
 use latency_trace::{
     bench_support::{measure_latencies1, measure_latencies2, measure_latencies2_tokio},
     LatencyTrace, Timings,

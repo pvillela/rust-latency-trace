@@ -33,7 +33,7 @@ sha2 = "0.10"
 base64ct = { version = "1", features = ["alloc"] }
 
 [dev-dependencies]
-dev_utils = { path = "../dev_utils" }
+dev_support = { path = "../dev_support" }
 env_logger = "0.11"
 rand = "0.8"
 criterion = { version = "0.5", features = ["html_reports"] }

@@ -1,10 +1,9 @@
 mod common;
 
 use common::run_test;
-use dev_utils::{
+use dev_support::{
     elab_fns::{
-        elab_sync_gated, PROBE_GATE_F1_PROBE_READY, PROBE_GATE_F2_PROBE_READY,
-        PROBE_GATE_F_PROCEED,
+        elab_sync_gated, PROBE_GATE_F1_PROBE_READY, PROBE_GATE_F2_PROBE_READY, PROBE_GATE_F_PROCEED,
     },
     gater::Gater,
     test_support::{

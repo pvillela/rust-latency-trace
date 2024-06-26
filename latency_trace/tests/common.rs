@@ -1,4 +1,4 @@
-use dev_utils::test_support::{f64_are_close, SpanNameTestSpec, TestSpec};
+use dev_support::test_support::{f64_are_close, SpanNameTestSpec, TestSpec};
 use latency_trace::{SpanGroup, Timings};
 use std::collections::HashSet;
 

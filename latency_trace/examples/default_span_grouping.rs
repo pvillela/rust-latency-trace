@@ -1,6 +1,6 @@
-//! Example showing latency measurement of [dev_utils::target_fns::target_fn] with default span grouping.
+//! Example showing latency measurement of [dev_support::target_fns::target_fn] with default span grouping.
 
-use dev_utils::elab_fns::elab_async;
+use dev_support::elab_fns::elab_async;
 use latency_trace::LatencyTrace;
 use std::env::set_var;
 

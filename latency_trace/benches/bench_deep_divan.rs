@@ -1,4 +1,4 @@
-//! Executes benchmarks with [`dev_utils::deep_fns`].
+//! Executes benchmarks with [`dev_support::deep_fns`].
 
 mod common_deep;
 
