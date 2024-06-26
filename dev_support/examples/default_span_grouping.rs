@@ -1,11 +1,8 @@
 //! Example showing latency measurement of [dev_support::target_fns::target_fn] with default span grouping.
 
-use dev_support::elab_fns::elab_async;
+use dev_support::{elab_fns::elab_async, examples_support::print_summary};
 use latency_trace::LatencyTrace;
 use std::env::set_var;
-
-mod examples_support;
-use examples_support::print_summary;
 
 fn main() {
     // Set below value to "trace" to enable full library tracing.

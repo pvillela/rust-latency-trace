@@ -1,15 +1,12 @@
-mod common;
-
-use common::run_test;
 use dev_support::{
     elab_fns::{
         elab_sync_gated, PROBE_GATE_F1_PROBE_READY, PROBE_GATE_F2_PROBE_READY, PROBE_GATE_F_PROCEED,
     },
     gater::Gater,
     test_support::{
-        span_name_test_spec_f, span_name_test_spec_inner_span, span_name_test_spec_outer_span,
-        span_name_test_spec_root_1, span_name_test_spec_root_2, span_name_test_spec_span_1,
-        span_name_test_spec_span_2, SpanNameTestSpec, TestSpec, E,
+        run_test, span_name_test_spec_f, span_name_test_spec_inner_span,
+        span_name_test_spec_outer_span, span_name_test_spec_root_1, span_name_test_spec_root_2,
+        span_name_test_spec_span_1, span_name_test_spec_span_2, SpanNameTestSpec, TestSpec, E,
     },
 };
 use latency_trace::LatencyTrace;

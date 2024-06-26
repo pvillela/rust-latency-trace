@@ -1,10 +1,11 @@
 //! Executes benchmarks with [`dev_support::deep_fns`].
 
-mod common_deep;
-
-use common_deep::{
-    index_range, set_up, sync_all_in, sync_completion, sync_un_all_in, sync_un_completion,
-    sync_un_direct, Params, ARR_PARAMS,
+use dev_support::bench_support::{
+    common::index_range,
+    deep::{
+        set_up, sync_all_in, sync_completion, sync_un_all_in, sync_un_completion, sync_un_direct,
+        Params, ARR_PARAMS,
+    },
 };
 
 #[divan::bench]

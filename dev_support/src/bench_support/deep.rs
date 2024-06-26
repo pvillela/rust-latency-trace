@@ -1,7 +1,7 @@
-use dev_support::deep_fns::{deep_sync, deep_sync_un};
+use crate::deep_fns::{deep_sync, deep_sync_un};
 use latency_trace::bench_support::{measure_latencies1, measure_latencies2};
 use latency_trace::{LatencyTrace, Timings};
-use std::{fmt::Display, hint::black_box, ops::Range};
+use std::{fmt::Display, hint::black_box};
 
 pub fn set_up() {
     let lt = LatencyTrace::default();
@@ -26,13 +26,11 @@ pub fn sync_un_direct(nrepeats: usize, ntasks: usize) {
     deep_sync_un(nrepeats, ntasks);
 }
 
-#[allow(unused)]
 pub fn sync_un_completion(nrepeats: usize, ntasks: usize) {
     let lt = LatencyTrace::default();
     measure_latencies2(lt, move || deep_sync_un(nrepeats, ntasks));
 }
 
-#[allow(unused)]
 pub fn sync_un_all_in(nrepeats: usize, ntasks: usize) -> Timings {
     let lt = LatencyTrace::default();
     let timings = lt.measure_latencies(move || deep_sync_un(nrepeats, ntasks));
@@ -90,8 +88,3 @@ pub const ARR_PARAMS: [Params; 6] = [
         span_count: 5419,
     },
 ];
-
-#[allow(unused)]
-pub const fn index_range<T, const N: usize>(_arr: &[T; N]) -> Range<usize> {
-    Range { start: 0, end: N }
-}

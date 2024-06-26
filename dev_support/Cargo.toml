@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
 log = "0.4"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
@@ -13,3 +14,26 @@ rand = "0.8"
 # thread_local_collect = { git = "https://github.com/pvillela/rust-thread-local-collect", tag = "v0.5.0" }
 thread_local_collect = { path = "../../thread-local-collect" }
 futures = "0.3"
+
+latency_trace = { path = "../latency_trace", version = "0.5", features = [
+    "dev",
+] }
+env_logger = "0.11"
+criterion = { version = "0.5", features = ["html_reports"] }
+divan = "0.1.14"
+
+[[bench]]
+name = "bench_simple_criterion"
+harness = false
+
+[[bench]]
+name = "bench_deep_criterion"
+harness = false
+
+[[bench]]
+name = "bench_simple_divan"
+harness = false
+
+[[bench]]
+name = "bench_deep_divan"
+harness = false

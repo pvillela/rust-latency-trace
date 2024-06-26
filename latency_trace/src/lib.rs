@@ -50,5 +50,6 @@ pub use probed_trace::*;
 mod wrapper;
 pub use wrapper::*;
 
+#[cfg(feature = "dev")]
 #[doc(hidden)]
 pub mod bench_support;

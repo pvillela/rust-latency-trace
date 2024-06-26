@@ -5,10 +5,9 @@
 //! provide visibility to the overhead of span creation and processing, which is ~0.5-1 microseconds
 //! per span instance on my 2022 Dell Inspiron 16.
 
-use criterion::black_box;
 use dev_support::deep_fns::deep_sync;
 use latency_trace::LatencyTrace;
-use std::time::Instant;
+use std::{hint::black_box, time::Instant};
 
 fn sync_all_in_bench(nrepeats: usize, ntasks: usize) {
     let lt = LatencyTrace::default();

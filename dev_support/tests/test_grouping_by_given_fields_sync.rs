@@ -1,12 +1,9 @@
-mod common;
-
-use common::run_test;
 use dev_support::{
     elab_fns::elab_sync,
     test_support::{
-        span_name_test_spec_f, span_name_test_spec_inner_span, span_name_test_spec_outer_span,
-        span_name_test_spec_root_1, span_name_test_spec_root_2, span_name_test_spec_span_1,
-        span_name_test_spec_span_2, TestSpec, E,
+        run_test, span_name_test_spec_f, span_name_test_spec_inner_span,
+        span_name_test_spec_outer_span, span_name_test_spec_root_1, span_name_test_spec_root_2,
+        span_name_test_spec_span_1, span_name_test_spec_span_2, TestSpec, E,
     },
 };
 use latency_trace::{group_by_given_fields, LatencyTrace};

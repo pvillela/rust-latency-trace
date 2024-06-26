@@ -1,13 +1,11 @@
 //! Executes benchmarks with [`dev_support::simple_fns`].
 
-mod common_simple;
-
-#[allow(unused_imports)]
-use common_simple::{
-    async_all_in, async_completion, async_un_direct, set_up, sync_all_in, sync_completion,
-    sync_un_direct, Params, ARR_PARAMS,
-};
 use criterion::{criterion_group, criterion_main, Criterion};
+#[allow(unused)]
+use dev_support::bench_support::simple::{async_all_in, async_completion, async_un_direct};
+use dev_support::bench_support::simple::{
+    set_up, sync_all_in, sync_completion, sync_un_direct, Params, ARR_PARAMS,
+};
 
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function(&format!("set-up"), |b| b.iter(set_up));

@@ -1,11 +1,9 @@
 //! Executes benchmarks with [`dev_support::deep_fns`].
 
-mod common_deep;
-
-#[allow(unused)]
-use common_deep::sync_completion;
-use common_deep::{set_up, sync_all_in, sync_un_direct, Params, ARR_PARAMS};
 use criterion::{criterion_group, criterion_main, Criterion};
+use dev_support::bench_support::deep::{
+    set_up, sync_all_in, sync_completion, sync_un_direct, Params, ARR_PARAMS,
+};
 
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function(&format!("set-up"), |b| b.iter(set_up));

@@ -1,6 +1,11 @@
-use dev_support::test_support::{f64_are_close, SpanNameTestSpec, TestSpec};
+use crate::test_support::{SpanNameTestSpec, TestSpec};
 use latency_trace::{SpanGroup, Timings};
 use std::collections::HashSet;
+
+fn f64_are_close(left: f64, right: f64, pct: f64) -> bool {
+    let avg_abs = (left.abs() + right.abs()) / 2.0;
+    (left - right).abs() <= avg_abs * pct
+}
 
 pub fn run_test(tmgs: &Timings, test_spec: TestSpec) {
     let TestSpec {

@@ -1,11 +1,12 @@
 //! Executes benchmarks with [`dev_support::simple_fns`].
 
-mod common_simple;
-
-use common_simple::{
-    async_all_in, async_completion, async_un_all_in, async_un_completion, async_un_direct,
-    index_range, set_up, sync_all_in, sync_completion, sync_un_all_in, sync_un_completion,
-    sync_un_direct, Params, ARR_PARAMS,
+use dev_support::bench_support::{
+    common::index_range,
+    simple::{
+        async_all_in, async_completion, async_un_all_in, async_un_completion, async_un_direct,
+        set_up, sync_all_in, sync_completion, sync_un_all_in, sync_un_completion, sync_un_direct,
+        Params, ARR_PARAMS,
+    },
 };
 
 #[divan::bench]

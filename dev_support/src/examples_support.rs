@@ -16,6 +16,3 @@ pub fn print_summary(latencies: &Timings) {
         println!("  * {:?}, {:?}", span_group, summary);
     }
 }
-
-#[allow(unused)]
-fn main() {}

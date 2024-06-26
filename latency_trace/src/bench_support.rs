@@ -1,4 +1,4 @@
-//! Undocumented functions to support benchmarks.]
+//! Undocumented functions to support benchmarks in `dev_support` crate.]
 
 use crate::{core_internals_pre::LatencyTracePriv, latency_trace::LatencyTrace};
 use std::{future::Future, hint::black_box};
