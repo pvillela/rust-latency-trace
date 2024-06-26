@@ -9,19 +9,14 @@ pub fn measure_latencies1(lt: LatencyTrace) {
 }
 
 /// Executes tracing up to completion of instrumnted function, before final collection and aggregation.
-pub fn measure_latencies2(lt: LatencyTrace, f: impl Fn() + Send + 'static) -> usize {
-    let g = move |ltp: &LatencyTracePriv| {
-        f();
-        ltp.take_acc_timings().len()
-    };
-    lt.init_and_run(g)
+pub fn measure_latencies2(lt: LatencyTrace, f: impl FnOnce()) -> usize {
+    let ltp = LatencyTracePriv::initialized(lt.0);
+    f();
+    ltp.take_acc_timings().len()
 }
 
 /// Executes tracing up to completion of instrumnted async function, before final collection and aggregation.
-pub fn measure_latencies2_tokio<F>(
-    lt: LatencyTrace,
-    f: impl Fn() -> F + Send + Sync + 'static,
-) -> usize
+pub fn measure_latencies2_tokio<F>(lt: LatencyTrace, f: impl FnOnce() -> F) -> usize
 where
     F: Future<Output = ()> + Send,
 {

@@ -11,7 +11,12 @@ use std::{
 };
 use thread_local_collect::tlm::probed::{Control, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
-use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
+use tracing_subscriber::{
+    layer::{Context, Layered, SubscriberExt},
+    registry::LookupSpan,
+    util::SubscriberInitExt,
+    Layer, Registry,
+};
 
 //=================
 // Callsite
@@ -167,13 +172,54 @@ pub(crate) struct LatencyTracePriv {
 }
 
 impl LatencyTracePriv {
-    pub(crate) fn new(config: LatencyTraceCfg) -> LatencyTracePriv {
+    fn new(config: LatencyTraceCfg) -> LatencyTracePriv {
         LatencyTracePriv {
             control: Control::new(&LOCAL_INFO, AccRawTrace::new(), RawTrace::new, op),
             span_grouper: config.span_grouper,
             hist_high: config.hist_high,
             hist_sigfig: config.hist_sigfig,
         }
+    }
+
+    /// Returns an initialized instance of `Self`.
+    ///
+    /// If a [`LatencyTracePriv`] has been previously initialized in the same process with the same `hist_high` and
+    /// `hist_sigfic` but a different `span_grouper` then the previous `span_grouper` will be used instead of
+    /// the new one.
+    ///
+    /// # Panics
+    ///
+    /// If a global default [`tracing::Subscriber`] not provided by this package has been been previously set.
+    ///
+    /// If a [`LatencyTracePriv`] has been previously initialized in the same process with different `hist_high` or
+    /// different `hist_sigfic`.
+    pub(crate) fn initialized(config: LatencyTraceCfg) -> LatencyTracePriv {
+        let ltp_new = LatencyTracePriv::new(config);
+        let new_config = (ltp_new.hist_high, ltp_new.hist_sigfig);
+        let default_dispatch_exists = tracing::dispatcher::get_default(|disp| {
+            disp.is::<Layered<LatencyTracePriv, Registry>>()
+        });
+        let ltp = if !default_dispatch_exists {
+            let reg: tracing_subscriber::layer::Layered<LatencyTracePriv, Registry> =
+                Registry::default().with(ltp_new.clone());
+            reg.init();
+            ltp_new
+        } else {
+            tracing::dispatcher::get_default(|disp| {
+                let ltp: &LatencyTracePriv = disp
+                    .downcast_ref()
+                    .expect("existing dispatcher must be of type `LatencyTracePriv`");
+                let curr_config = (ltp.hist_high, ltp.hist_sigfig);
+                // Note: below assertion does not cover the `LatencyTracePriv` `span_grouper` field as it is not
+                // possible to check equality of functions.
+                assert_eq!(
+                    curr_config, new_config,
+                    "New and existing LatencyTrace configuration settings must be identical."
+                );
+                ltp.clone()
+            })
+        };
+        ltp
     }
 
     /// Updates timings for the given span group. Called by [`Layer`] impl.
