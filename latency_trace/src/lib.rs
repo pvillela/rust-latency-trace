@@ -1,7 +1,5 @@
 #![doc = include_str!("lib1.md")]
 //!
-//! ## Example usage
-//!
 //! ### Simple sync example
 //!
 //! ```rust

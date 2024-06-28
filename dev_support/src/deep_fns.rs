@@ -4,7 +4,7 @@
 //! provide visibility to the overhead of span creation and processing.
 
 use std::{hint::black_box, thread, time::Duration};
-use tracing::{instrument, trace_span};
+use tracing::{instrument, trace_span, Span};
 
 #[instrument(level = "trace")]
 pub fn deep_sync(nrepeats: usize, ntasks: usize) {
@@ -41,8 +41,20 @@ pub fn deep_sync(nrepeats: usize, ntasks: usize) {
         });
     };
 
-    let hs = (0..ntasks).map(|_| thread::spawn(f)).collect::<Vec<_>>();
+    let current_span = Span::current();
+
+    let hs = (0..ntasks)
+        .map(|_| {
+            let parent_span = current_span.clone();
+            thread::spawn(move || {
+                let _enter = parent_span.enter();
+                f()
+            })
+        })
+        .collect::<Vec<_>>();
+
     f();
+
     hs.into_iter().for_each(|h| h.join().unwrap());
 }
 

@@ -34,7 +34,7 @@ This framework uses [`hdrhistogram`](https://docs.rs/hdrhistogram/latest/hdrhist
 Two other design choices support the low overhead goal.
 
 - The _tracing_ library's [`Registry`](https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/registry/struct.Registry.html#) is used to store temporary timing data at runtime. As noted in the documentation, "This registry is implemented using a [lock-free sharded slab](https://docs.rs/sharded-slab/0.1.4/x86_64-unknown-linux-gnu/sharded_slab/index.html), and is highly optimized for concurrent access."
-- Runtime data collection takes place independently on each thread, overwhelmingly without the need for inter-thread coordination. The only inter-thread coordination involved is one mutex lock request per thread for the entire duration of the measurement, regardless of the number of spans executed. _After_ the test execution has completed, information is extracted from the various threads, with zero impact on the latency measurements. The [thread-local-collect] framework is used to support this design approach.
+- Runtime data collection takes place independently on each thread, overwhelmingly without the need for inter-thread coordination. The only inter-thread coordination involved is one mutex lock request per thread for the entire duration of the measurement, regardless of the number of spans executed. _After_ the test execution has completed, information is extracted from the various threads, with zero impact on the latency measurements. The [thread_local_collect](https://crates.io/crates/thread_local_collect) library is used to support this design approach.
 
 ## Usage modes
 
@@ -48,3 +48,12 @@ The following modes of latency information reporting are supported:
 ## Async runtimes
 
 This framework supports [tokio](https://crates.io/crates/tokio) out-of-the-box (see [`LatencyTrace::measure_latencies_tokio`] and [`LatencyTrace::measure_latencies_probed_tokio`]) but other async runtimes can be used as well by simply wrapping the async code with the chosen async runtime and using one of the sync methods ([`LatencyTrace::measure_latencies`] or [`LatencyTrace::measure_latencies_probed`]). The source code for the above-mentioned _tokio_ variants shows exactly how to do it.
+
+## Usage
+
+Include this library as a dependency in your Cargo.toml:
+
+```toml
+[dependencies]
+latency_trace = "1.0"
+```

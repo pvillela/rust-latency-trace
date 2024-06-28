@@ -2,7 +2,7 @@
 
 use futures::future::join_all;
 use std::{hint::black_box, thread, time::Duration};
-use tracing::{instrument, trace_span, Instrument};
+use tracing::{instrument, trace_span, Instrument, Span};
 
 /// Instrumented simple sync function
 #[instrument(level = "trace", skip(nrepeats, sleep_micros))]
@@ -27,8 +27,20 @@ pub fn simple_sync(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
         });
     };
 
-    let hs = (0..ntasks).map(|_| thread::spawn(f)).collect::<Vec<_>>();
+    let current_span = Span::current();
+
+    let hs = (0..ntasks)
+        .map(|_| {
+            let parent_span = current_span.clone();
+            thread::spawn(move || {
+                let _enter = parent_span.enter();
+                f()
+            })
+        })
+        .collect::<Vec<_>>();
+
     f();
+
     hs.into_iter().for_each(|h| h.join().unwrap());
 }
 

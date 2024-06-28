@@ -16,3 +16,26 @@ pub fn print_summary(latencies: &Timings) {
         println!("  * {:?}, {:?}", span_group, summary);
     }
 }
+
+/// Returns command line arguments (`nrepeats`, `ntasks`, `sleep_micros`) for use by example functions.
+pub fn cmd_line_args() -> Option<(usize, usize, Option<u64>)> {
+    let nrepeats = match std::env::args().nth(1) {
+        Some(v) => v
+            .parse::<usize>()
+            .expect("1st argument, if provided, must be integer"),
+        None => return None,
+    };
+
+    let ntasks = std::env::args()
+        .nth(2)
+        .expect("2nd argument must be provided")
+        .parse::<usize>()
+        .expect("2nd argument must be an integer");
+
+    let sleep_micros = std::env::args().nth(3).map(|v| {
+        v.parse::<u64>()
+            .expect("3rd argument, if provided, must be integer")
+    });
+
+    Some((nrepeats, ntasks, sleep_micros))
+}

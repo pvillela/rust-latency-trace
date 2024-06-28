@@ -1,4 +1,4 @@
-//! Example showing latency measurement of [dev_support::target_fns::target_fn] with default span grouping.
+//! Example showing latency measurement of [dev_support::elab_fns::elab_async] with default span grouping.
 
 use dev_support::{elab_fns::elab_async, examples_support::print_summary};
 use latency_trace::LatencyTrace;
