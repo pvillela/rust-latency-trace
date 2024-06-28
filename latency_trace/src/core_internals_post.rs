@@ -130,10 +130,11 @@ impl<K> TimingsView<K> {
                 Some(hist) => hist,
                 None => {
                     res.insert(g, Histogram::new_from(v));
-                    res.get_mut(&f(k)).unwrap()
+                    res.get_mut(&f(k))
+                        .expect("key `g == f(k)` was just inserted in `res`")
                 }
             };
-            hist.add(v).unwrap();
+            hist.add(v).expect("hdrhistogram::Histogram AdditionError");
         }
         res.into()
     }
@@ -147,7 +148,8 @@ impl<K> TimingsView<K> {
         for (k, h) in self.iter_mut() {
             let other_h = other.remove(k);
             if let Some(other_h) = other_h {
-                h.add(other_h).unwrap();
+                h.add(other_h)
+                    .expect("hdrhistogram::Histogram AdditionError");
             }
         }
 
@@ -162,7 +164,7 @@ impl<K> TimingsView<K> {
     where
         K: Ord + Clone,
     {
-        self.map_values(|hist| summary_stats(hist))
+        self.map_values(summary_stats)
     }
 }
 
@@ -210,7 +212,12 @@ impl Timings {
         let id_to_sg = self.id_to_span_group();
         self.keys()
             .map(|sg| {
-                let parent = sg.parent_id().map(|pid| id_to_sg.get(pid).unwrap().clone());
+                let parent = sg.parent_id().map(|pid| {
+                    id_to_sg
+                        .get(pid)
+                        .expect("`id_to_sg` must have key `pid` by construction")
+                        .clone()
+                });
                 (sg.clone(), parent)
             })
             .collect()
@@ -245,7 +252,13 @@ fn move_callsite_info_to_key(raw_trace: RawTrace) -> TimingsTemp {
             let callsite_info_priv_path: CallsiteInfoPath = span_group_priv
                 .callsite_id_path
                 .iter()
-                .map(|id| callsite_infos.get(id).unwrap().clone().into())
+                .map(|id| {
+                    callsite_infos
+                        .get(id)
+                        .expect("`callsite_infos` must have key `id` by construction")
+                        .clone()
+                        .into()
+                })
                 .collect();
             let sgt = SpanGroupTemp {
                 span_group_priv,
@@ -274,12 +287,19 @@ fn grow_sgt_to_sg(sgt: &SpanGroupTemp, sgt_to_sg: &mut HashMap<SpanGroupTemp, Sp
             Some(sg) => sg.id.clone(),
             None => {
                 grow_sgt_to_sg(parent_sgp, sgt_to_sg);
-                sgt_to_sg.get(parent_sgp).unwrap().id.clone()
+                sgt_to_sg
+                    .get(parent_sgp)
+                    .expect("key `parent_sgp` must exist in `sgt_to_sg` by construction")
+                    .id
+                    .clone()
             }
         })
         .next();
 
-    let callsite_info = sgt.callsite_info_priv_path.last().unwrap();
+    let callsite_info = sgt
+        .callsite_info_priv_path
+        .last()
+        .expect("sgt.callsite_info_priv_path can't be empty by construction");
 
     let code_line = callsite_info
         .file
@@ -288,7 +308,12 @@ fn grow_sgt_to_sg(sgt: &SpanGroupTemp, sgt_to_sg: &mut HashMap<SpanGroupTemp, Sp
         .map(|(file, line)| format!("{}:{}", file, line))
         .unwrap_or_else(|| format!("{:?}", callsite_info.callsite_id));
 
-    let props = sgt.span_group_priv.props_path.last().unwrap().clone();
+    let props = sgt
+        .span_group_priv
+        .props_path
+        .last()
+        .expect("sgt.span_group_priv.props_path can't be empty by construction")
+        .clone();
 
     let mut hasher = Sha256::new();
     if let Some(parent_id) = parent_id.clone() {
@@ -327,7 +352,14 @@ fn timings_from_timings_temp_and_spt_to_sg(
     // Transform `timings_temp` into `timings` by changing keys from sgt to sg, and remove those keys from `sgt_to_sg`.
     let mut timings: Timings = timings_temp
         .into_iter()
-        .map(|(sgt, timing)| (sgt_to_sg.remove(&sgt).unwrap(), timing))
+        .map(|(sgt, timing)| {
+            (
+                sgt_to_sg
+                    .remove(&sgt)
+                    .expect("impossible: sgt key not found in sgt_to_sg"),
+                timing,
+            )
+        })
         .collect::<BTreeMap<SpanGroup, Timing>>()
         .into();
 

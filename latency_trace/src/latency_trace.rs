@@ -124,7 +124,7 @@ impl LatencyTrace {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
-                .unwrap()
+                .expect("Tokio runtime error")
                 .block_on(f());
         })
     }
@@ -174,7 +174,7 @@ impl LatencyTrace {
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
-                .unwrap()
+                .expect("Tokio runtime error")
                 .block_on(f());
         })
     }

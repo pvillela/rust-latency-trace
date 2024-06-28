@@ -6,7 +6,7 @@ use dev_support::bench_support::deep::{
 };
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function(&format!("set-up"), |b| b.iter(set_up));
+    c.bench_function("set-up", |b| b.iter(set_up));
 
     for params in ARR_PARAMS {
         let Params {

@@ -72,7 +72,8 @@ pub type Timing = Histogram<u64>;
 
 /// Constructs a [`Timing`]. The arguments correspond to [Histogram::high] and [Histogram::sigfig].
 pub(crate) fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
-    let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig).unwrap();
+    let mut hist = Histogram::<u64>::new_with_bounds(1, hist_high, hist_sigfig)
+        .expect("hdrhistogram::Histogram CreationError");
     hist.auto(true);
     hist
 }
@@ -123,7 +124,7 @@ pub(crate) fn op_r(acc1: RawTrace, acc2: RawTrace) -> RawTrace {
     for (k, v) in acc2.timings {
         let hist = timings.get_mut(&k);
         match hist {
-            Some(hist) => hist.add(v).unwrap(),
+            Some(hist) => hist.add(v).expect("hdrhistogram::Histogram AdditionError"),
             None => {
                 timings.insert(k, v);
             }
@@ -238,7 +239,10 @@ impl LatencyTracePriv {
                         span_group_priv.clone(),
                         new_timing(self.hist_high, self.hist_sigfig),
                     );
-                    timings_priv.timings.get_mut(span_group_priv).unwrap()
+                    timings_priv
+                        .timings
+                        .get_mut(span_group_priv)
+                        .expect("impossible: span_group_priv key was just inserted")
                 }
             };
 
@@ -285,7 +289,9 @@ where
     S: for<'lookup> LookupSpan<'lookup>,
 {
     fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
-        let span = ctx.span(id).unwrap();
+        let span = ctx
+            .span(id)
+            .expect("impossible: there is no span with the given id");
         log::trace!("`on_new_span` start: name={}, id={:?}", span.name(), id);
         let meta = span.metadata();
         let callsite_id = meta.callsite();
@@ -296,7 +302,9 @@ where
             None => (vec![callsite_id.clone()], vec![Arc::new(props)]),
             Some(parent_span) => {
                 let ext = parent_span.extensions();
-                let pst = ext.get::<SpanTiming>().unwrap();
+                let pst = ext
+                    .get::<SpanTiming>()
+                    .expect("span extensions does not contain SpanTiming record");
                 let mut callsite_id_path = pst.callsite_id_path.clone();
                 callsite_id_path.push(callsite_id.clone());
                 let mut props_path = pst.props_path.clone();
@@ -336,11 +344,15 @@ where
     // No need for fn on_exit(&self, id: &Id, ctx: Context<'_, S>)
 
     fn on_close(&self, id: Id, ctx: Context<'_, S>) {
-        let span = ctx.span(&id).unwrap();
+        let span = ctx
+            .span(&id)
+            .expect("impossible: there is no span with the given id");
         log::trace!("`on_close` start: name={}, id={:?}", span.name(), id);
 
         let ext = span.extensions();
-        let span_timing = ext.get::<SpanTiming>().unwrap();
+        let span_timing = ext
+            .get::<SpanTiming>()
+            .expect("span extensions does not contain SpanTiming record");
 
         let span_group_priv = SpanGroupPriv {
             callsite_id_path: span_timing.callsite_id_path.clone(),
@@ -349,7 +361,7 @@ where
 
         self.update_timings(&span_group_priv, |hist| {
             hist.record((Instant::now() - span_timing.created_at).as_micros() as u64)
-                .unwrap();
+                .expect("hdrhistogram::Histogram RecordError");
         });
 
         log::trace!(

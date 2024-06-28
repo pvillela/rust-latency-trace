@@ -27,7 +27,9 @@ impl ProbedTrace {
 
     pub(crate) fn set_join_handle(&self, join_handle: JoinHandle<()>) {
         let mut lock = self.join_handle.lock();
-        let jh = lock.as_deref_mut().unwrap();
+        let jh = lock
+            .as_deref_mut()
+            .expect("ProbedTrace join_handle Mutex poisoned");
         *jh = Some(join_handle);
     }
 
@@ -43,8 +45,15 @@ impl ProbedTrace {
     pub fn wait_and_report(&self) -> Timings {
         // try_lock() below should always succeed because this function is the only one that should be joining
         // the handle and it should only be called once from the main thread.
-        let join_handle = self.join_handle.try_lock().unwrap().take().unwrap();
-        join_handle.join().unwrap();
+        let join_handle = self
+            .join_handle
+            .try_lock()
+            .expect("ProbedTrace lock should not be contended")
+            .take()
+            .expect("`join_handle` set by constructor, may only be taken once");
+        join_handle
+            .join()
+            .expect("ProbedTrace execution thread exited abnormally");
         let acc = self.ltp.take_acc_timings();
         report_timings(&self.ltp, acc)
     }

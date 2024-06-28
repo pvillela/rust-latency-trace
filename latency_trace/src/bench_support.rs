@@ -24,7 +24,7 @@ where
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
-            .unwrap()
+            .expect("tokio runtime error on bench_support::measure_latencies_2")
             .block_on(f());
     })
 }
