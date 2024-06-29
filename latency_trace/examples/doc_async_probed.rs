@@ -23,7 +23,9 @@ async fn g() {
 }
 
 fn main() {
-    let probed = LatencyTrace::default().measure_latencies_probed_tokio(f);
+    let probed = LatencyTrace::default()
+        .measure_latencies_probed_tokio(f)
+        .unwrap();
     thread::sleep(Duration::from_micros(48000));
     let latencies1 = probed.probe_latencies();
     let latencies2 = probed.wait_and_report();

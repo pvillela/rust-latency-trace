@@ -14,7 +14,8 @@ use std::collections::BTreeMap;
 fn test_grouping_by_all_fields() {
     let latencies = LatencyTrace::default()
         .with_span_grouper(group_by_all_fields)
-        .measure_latencies(elab_sync);
+        .measure_latencies(elab_sync)
+        .unwrap();
 
     // Number of span groups by name
     let n_root_1: u64 = 1;

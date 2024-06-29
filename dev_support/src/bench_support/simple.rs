@@ -17,7 +17,9 @@ pub fn sync_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
 
 pub fn sync_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) -> Timings {
     let lt = LatencyTrace::default();
-    let timings = lt.measure_latencies(move || simple_sync(nrepeats, ntasks, sleep_micros));
+    let timings = lt
+        .measure_latencies(move || simple_sync(nrepeats, ntasks, sleep_micros))
+        .unwrap();
     black_box(timings)
 }
 
@@ -32,7 +34,9 @@ pub fn sync_un_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
 
 pub fn sync_un_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) -> Timings {
     let lt = LatencyTrace::default();
-    let timings = lt.measure_latencies(move || simple_sync(nrepeats, ntasks, sleep_micros));
+    let timings = lt
+        .measure_latencies(move || simple_sync(nrepeats, ntasks, sleep_micros))
+        .unwrap();
     black_box(timings)
 }
 
@@ -43,7 +47,9 @@ pub fn async_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
 
 pub fn async_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     let lt = LatencyTrace::default();
-    let timings = lt.measure_latencies_tokio(move || simple_async(nrepeats, ntasks, sleep_micros));
+    let timings = lt
+        .measure_latencies_tokio(move || simple_async(nrepeats, ntasks, sleep_micros))
+        .unwrap();
     black_box(timings);
 }
 
@@ -62,7 +68,9 @@ pub fn async_un_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
 
 pub fn async_un_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) -> Timings {
     let lt = LatencyTrace::default();
-    let timings = lt.measure_latencies(move || simple_sync(nrepeats, ntasks, sleep_micros));
+    let timings = lt
+        .measure_latencies(move || simple_sync(nrepeats, ntasks, sleep_micros))
+        .unwrap();
     black_box(timings)
 }
 

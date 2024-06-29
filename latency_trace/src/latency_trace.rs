@@ -3,8 +3,9 @@
 use crate::{
     core_internals_post::{report_timings, Timings},
     core_internals_pre::{LatencyTraceCfg, LatencyTracePriv},
-    default_span_grouper, ProbedTrace,
+    default_span_grouper, ProbedTrace, Timing,
 };
+use hdrhistogram::CreationError;
 use std::{future::Future, sync::Arc, thread};
 use tracing::span::Attributes;
 
@@ -84,6 +85,13 @@ impl LatencyTrace {
         Self(cfg)
     }
 
+    /// By validating the [`LatencyTraceCfg`] up-front, we avoid all potential [hdrhistogram::Histogram] errors
+    /// as our histograms are `u64`, have a `hist_low` of `1`, and are auto-resizable.
+    fn validate_hist_high_sigfig(&self) -> Result<(), CreationError> {
+        let _ = Timing::new_with_bounds(1, self.0.hist_high, self.0.hist_sigfig)?;
+        Ok(())
+    }
+
     /// Executes the instrumented function `f` and, after `f` completes, returns the observed latencies.
     ///
     /// If a [`LatencyTrace`] has been previously used in the same process with the same `hist_high` and
@@ -96,11 +104,12 @@ impl LatencyTrace {
     ///
     /// If a [`LatencyTrace`] has been previously used in the same process with different `hist_high` or
     /// different `hist_sigfic`.
-    pub fn measure_latencies(self, f: impl FnOnce()) -> Timings {
+    pub fn measure_latencies(self, f: impl FnOnce()) -> Result<Timings, CreationError> {
+        self.validate_hist_high_sigfig()?;
         let ltp = LatencyTracePriv::initialized(self.0);
         f();
         let acc = ltp.take_acc_timings();
-        report_timings(&ltp, acc)
+        Ok(report_timings(&ltp, acc))
     }
 
     /// Executes the instrumented async function `f`, running on the `tokio` runtime; after `f` completes,
@@ -116,7 +125,7 @@ impl LatencyTrace {
     ///
     /// If a [`LatencyTrace`] has been previously used in the same process with different `hist_high` or
     /// different `hist_sigfic`.
-    pub fn measure_latencies_tokio<F>(self, f: impl FnOnce() -> F) -> Timings
+    pub fn measure_latencies_tokio<F>(self, f: impl FnOnce() -> F) -> Result<Timings, CreationError>
     where
         F: Future<Output = ()> + Send,
     {
@@ -142,12 +151,16 @@ impl LatencyTrace {
     ///
     /// If a [`LatencyTrace`] has been previously used in the same process with different `hist_high` or
     /// different `hist_sigfic`.
-    pub fn measure_latencies_probed(self, f: impl FnOnce() + Send + 'static) -> ProbedTrace {
+    pub fn measure_latencies_probed(
+        self,
+        f: impl FnOnce() + Send + 'static,
+    ) -> Result<ProbedTrace, CreationError> {
+        self.validate_hist_high_sigfig()?;
         let ltp = LatencyTracePriv::initialized(self.0);
         let pt = ProbedTrace::new(ltp);
         let jh = thread::spawn(f);
         pt.set_join_handle(jh);
-        pt
+        Ok(pt)
     }
 
     /// Executes the instrumented async function `f`, running on the `tokio` runtime; returns a [`ProbedTrace`]
@@ -166,7 +179,7 @@ impl LatencyTrace {
     pub fn measure_latencies_probed_tokio<F>(
         self,
         f: impl FnOnce() -> F + Send + 'static,
-    ) -> ProbedTrace
+    ) -> Result<ProbedTrace, CreationError>
     where
         F: Future<Output = ()> + Send,
     {

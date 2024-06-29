@@ -24,7 +24,8 @@ fn main() {
     let start = Instant::now();
 
     let probed = LatencyTrace::default()
-        .measure_latencies_probed(move || simple_sync(nrepeats, ntasks, sleep_micros.unwrap()));
+        .measure_latencies_probed(move || simple_sync(nrepeats, ntasks, sleep_micros.unwrap()))
+        .unwrap();
 
     // Let the function run for some time before probing latencies.
     thread::sleep(Duration::from_micros(

@@ -21,7 +21,7 @@ fn g() {
 }
 
 fn main() {
-    let probed = LatencyTrace::default().measure_latencies_probed(f);
+    let probed = LatencyTrace::default().measure_latencies_probed(f).unwrap();
     thread::sleep(Duration::from_micros(48000));
     let latencies1 = probed.probe_latencies();
     let latencies2 = probed.wait_and_report();

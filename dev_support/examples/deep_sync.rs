@@ -22,7 +22,9 @@ fn main() {
     );
 
     let start = Instant::now();
-    let latencies = LatencyTrace::default().measure_latencies(|| deep_sync(nrepeats, ntasks));
+    let latencies = LatencyTrace::default()
+        .measure_latencies(|| deep_sync(nrepeats, ntasks))
+        .unwrap();
     println!("Elapsed time: {:?}", Instant::now().duration_since(start));
 
     println!("\nDebug print of `latencies.map_values(summary_stats)`:");

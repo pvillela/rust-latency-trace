@@ -17,7 +17,8 @@ fn main() {
             _ = env_logger::try_init();
 
             elab_async().await;
-        });
+        })
+        .unwrap();
 
     print_summary(&latencies);
 }

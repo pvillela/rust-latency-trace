@@ -12,7 +12,9 @@ use std::collections::BTreeMap;
 #[test]
 #[allow(clippy::identity_op)]
 fn test_default_grouping() {
-    let latencies = LatencyTrace::default().measure_latencies_tokio(elab_async);
+    let latencies = LatencyTrace::default()
+        .measure_latencies_tokio(elab_async)
+        .unwrap();
 
     // Number of span groups by name
     let n_root_1: u64 = 1;

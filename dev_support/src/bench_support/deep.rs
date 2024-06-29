@@ -16,7 +16,9 @@ pub fn sync_completion(nrepeats: usize, ntasks: usize) {
 
 pub fn sync_all_in(nrepeats: usize, ntasks: usize, exp_span_count: u64) -> Timings {
     let lt = LatencyTrace::default();
-    let timings = lt.measure_latencies(move || deep_sync(nrepeats, ntasks));
+    let timings = lt
+        .measure_latencies(move || deep_sync(nrepeats, ntasks))
+        .unwrap();
     let span_count = timings.values().fold(0, |acc, hist| acc + hist.len());
     assert_eq!(span_count, exp_span_count, "span_count assertion");
     timings
@@ -33,7 +35,9 @@ pub fn sync_un_completion(nrepeats: usize, ntasks: usize) {
 
 pub fn sync_un_all_in(nrepeats: usize, ntasks: usize) -> Timings {
     let lt = LatencyTrace::default();
-    let timings = lt.measure_latencies(move || deep_sync_un(nrepeats, ntasks));
+    let timings = lt
+        .measure_latencies(move || deep_sync_un(nrepeats, ntasks))
+        .unwrap();
     black_box(timings)
 }
 

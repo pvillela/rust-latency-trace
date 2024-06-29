@@ -21,10 +21,12 @@ async fn test_probed() {
 
     let probe_gater = Arc::new(Gater::new("probe_gater"));
 
-    let probed = LatencyTrace::default().measure_latencies_probed_tokio({
-        let probe_gater = probe_gater.clone();
-        || elab_async_gated(Some(probe_gater))
-    });
+    let probed = LatencyTrace::default()
+        .measure_latencies_probed_tokio({
+            let probe_gater = probe_gater.clone();
+            || elab_async_gated(Some(probe_gater))
+        })
+        .unwrap();
 
     // Number of span groups by name
     let n_root_1: u64 = 1;
