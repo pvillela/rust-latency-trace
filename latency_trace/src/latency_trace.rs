@@ -21,14 +21,14 @@ impl Default for LatencyTrace {
     /// Instantiates a [LatencyTrace] with default configuration. The defaults are:
     /// - Grouping of spans using the [`default_span_grouper`], which simply groups by the span's
     /// callsite information, which distills the *tracing* framework's Callsite concept
-    /// (see [Metadata and Callsite](https://docs.rs/tracing-core/0.1.31/tracing_core/)).
-    /// - Histograms use a `hist_high` of `20,000,000` (20 seconds) and a `hist_sigfig` of 2.
+    /// (see [Metadata and Callsite](https://docs.rs/tracing-core/0.1.31/tracing_core/)). This default can be
+    /// modified by using the [`Self::with_span_grouper`] method.
+    /// - The default `hist_high` of `20,000,000` (20 seconds) and a `hist_sigfig` of 2 can be modified with other
+    /// methods provided by this struct. See [hdrhistogram::Histogram::high] and [hdrhistogram::Histogram::sigfig]
+    /// for an explanation of these histogram configuration parameters.
     ///
-    /// See [hdrhistogram::Histogram::high] and [hdrhistogram::Histogram::sigfig] for an explanation of these
-    /// histogram configuration parameters.
-    ///
-    /// Once an instance with the default configuration is created, it can be modified with other methods provided
-    /// by this struct.
+    /// Note that the histograms used here are auto-resizable, which means [`hdrhistogram::Histogram::high`] is
+    /// automatically adjusted as needed (although resizing requires memory reallocation at runtime).
     fn default() -> Self {
         let cfg = LatencyTraceCfg {
             span_grouper: Arc::new(default_span_grouper),
