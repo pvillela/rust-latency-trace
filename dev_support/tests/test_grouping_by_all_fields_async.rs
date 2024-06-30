@@ -6,16 +6,16 @@ use dev_support::{
         span_name_test_spec_span_1, span_name_test_spec_span_2, TestSpec, E,
     },
 };
-use latency_trace::{group_by_all_fields, LatencyTraceOld};
+use latency_trace::{group_by_all_fields, LatencyTrace, LatencyTraceCfg};
 use std::collections::BTreeMap;
 
 #[test]
 #[allow(clippy::identity_op)]
 fn test_grouping_by_all_fields() {
-    let latencies = LatencyTraceOld::default()
-        .with_span_grouper(group_by_all_fields)
-        .measure_latencies_tokio(elab_async)
-        .unwrap();
+    let lt_cfg = LatencyTraceCfg::default().with_span_grouper(group_by_all_fields);
+    let latencies = LatencyTrace::activated(lt_cfg)
+        .unwrap()
+        .measure_latencies_tokio(elab_async);
 
     // Number of span groups by name
     let n_root_1: u64 = 1;

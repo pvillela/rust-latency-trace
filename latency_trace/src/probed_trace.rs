@@ -1,9 +1,6 @@
 //! Provides the ability to obtain interim timing information before the target function terminates.
 
-use crate::{
-    collect::LatencyTrace,
-    refine::{report_timings, Timings},
-};
+use crate::{collect::LatencyTrace, refine::Timings};
 use std::{
     sync::{Arc, Mutex},
     thread::JoinHandle,
@@ -36,7 +33,7 @@ impl ProbedTrace {
     /// Returns partial latencies collected when the call is made.
     pub fn probe_latencies(&self) -> Timings {
         let acc = self.ltp.probe_acc_timings();
-        report_timings(&self.ltp, acc)
+        self.ltp.report_timings(acc)
     }
 
     /// Blocks until the function being measured completes, and then returns the collected latency information.
@@ -55,6 +52,6 @@ impl ProbedTrace {
             .join()
             .expect("ProbedTrace execution thread exited abnormally");
         let acc = self.ltp.take_acc_timings();
-        report_timings(&self.ltp, acc)
+        self.ltp.report_timings(acc)
     }
 }

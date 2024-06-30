@@ -5,7 +5,7 @@
 //! provide visibility to the overhead of span creation and processing.
 
 use dev_support::{deep_fns::deep_sync, examples_support::cmd_line_args};
-use latency_trace::{summary_stats, LatencyTraceOld};
+use latency_trace::{summary_stats, LatencyTrace};
 use std::time::Instant;
 
 fn main() {
@@ -22,9 +22,9 @@ fn main() {
     );
 
     let start = Instant::now();
-    let latencies = LatencyTraceOld::default()
-        .measure_latencies(|| deep_sync(nrepeats, ntasks))
-        .unwrap();
+    let latencies = LatencyTrace::activated_default()
+        .unwrap()
+        .measure_latencies(|| deep_sync(nrepeats, ntasks));
     println!("Elapsed time: {:?}", Instant::now().duration_since(start));
 
     println!("\nDebug print of `latencies.map_values(summary_stats)`:");

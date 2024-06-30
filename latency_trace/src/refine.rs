@@ -225,168 +225,170 @@ impl Timings {
     }
 }
 
-//=================
-// Post-processing
-
 /// Intermediate form of latency information collected for span groups, used during post-processing while
 /// transforming [`SpanGroupPriv`] to [`SpanGroup`].
 type TimingsTemp = HashMap<SpanGroupTemp, Timing>;
 
-/// Part of post-processing.
-/// Reduces acc to TimingsPriv.
-fn reduce_acc_to_raw_trace(acc: AccRawTrace) -> RawTrace {
-    log::trace!("entering `reduce_acc_to_timings_priv`");
-    acc.into_iter().fold(RawTrace::new(), op_r)
-}
+//=================
+// Post-processing
 
-/// Part of post-processing.
-/// Moves callsite info in [`RawTrace`] values into the keys in [TimingsTemp].
-fn move_callsite_info_to_key(raw_trace: RawTrace) -> TimingsTemp {
-    log::trace!("entering `move_callsite_info_to_key`");
-    let RawTrace {
-        timings,
-        callsite_infos,
-    } = raw_trace;
-    timings
-        .into_iter()
-        .map(|(span_group_priv, hist)| {
-            let callsite_info_priv_path: CallsiteInfoPath = span_group_priv
-                .callsite_id_path
-                .iter()
-                .map(|id| {
-                    callsite_infos
-                        .get(id)
-                        .expect("`callsite_infos` must have key `id` by construction")
+impl LatencyTrace {
+    /// Part of post-processing.
+    /// Reduces acc to TimingsPriv.
+    fn reduce_acc_to_raw_trace(acc: AccRawTrace) -> RawTrace {
+        log::trace!("entering `reduce_acc_to_timings_priv`");
+        acc.into_iter().fold(RawTrace::new(), op_r)
+    }
+
+    /// Part of post-processing.
+    /// Moves callsite info in [`RawTrace`] values into the keys in [TimingsTemp].
+    fn move_callsite_info_to_key(raw_trace: RawTrace) -> TimingsTemp {
+        log::trace!("entering `move_callsite_info_to_key`");
+        let RawTrace {
+            timings,
+            callsite_infos,
+        } = raw_trace;
+        timings
+            .into_iter()
+            .map(|(span_group_priv, hist)| {
+                let callsite_info_priv_path: CallsiteInfoPath = span_group_priv
+                    .callsite_id_path
+                    .iter()
+                    .map(|id| {
+                        callsite_infos
+                            .get(id)
+                            .expect("`callsite_infos` must have key `id` by construction")
+                            .clone()
+                            .into()
+                    })
+                    .collect();
+                let sgt = SpanGroupTemp {
+                    span_group_priv,
+                    callsite_info_priv_path,
+                };
+                (sgt, hist)
+            })
+            .collect()
+    }
+
+    /// Part of post-processing.
+    /// Transforms a [SpanGroupTemp] into a [SpanGroup] and adds it to `sgt_to_sg`.
+    ///
+    /// This function serves two purposes:
+    /// - Generates span groups that have not yet received any timing information and therefore do not
+    ///   appear as keys in the thread-local TimingsPriv maps. This can happen for parent span groups
+    ///   when using [super::ProbedTrace].
+    /// - Generates the span group IDs, which are inherently recursive as a span group's ID is a hash that
+    ///   depends on its parent's ID.
+    fn grow_sgt_to_sg(sgt: &SpanGroupTemp, sgt_to_sg: &mut HashMap<SpanGroupTemp, SpanGroup>) {
+        log::trace!("entering `grow_sgt_to_sg`");
+        let parent_sgt = sgt.parent();
+        let parent_id: Option<Arc<str>> = parent_sgt
+            .iter()
+            .map(|parent_sgp| match sgt_to_sg.get(parent_sgp) {
+                Some(sg) => sg.id.clone(),
+                None => {
+                    Self::grow_sgt_to_sg(parent_sgp, sgt_to_sg);
+                    sgt_to_sg
+                        .get(parent_sgp)
+                        .expect("key `parent_sgp` must exist in `sgt_to_sg` by construction")
+                        .id
                         .clone()
-                        .into()
-                })
-                .collect();
-            let sgt = SpanGroupTemp {
-                span_group_priv,
-                callsite_info_priv_path,
-            };
-            (sgt, hist)
-        })
-        .collect()
-}
+                }
+            })
+            .next();
 
-/// Part of post-processing.
-/// Transforms a [SpanGroupTemp] into a [SpanGroup] and adds it to `sgt_to_sg`.
-///
-/// This function serves two purposes:
-/// - Generates span groups that have not yet received any timing information and therefore do not
-///   appear as keys in the thread-local TimingsPriv maps. This can happen for parent span groups
-///   when using [super::ProbedTrace].
-/// - Generates the span group IDs, which are inherently recursive as a span group's ID is a hash that
-///   depends on its parent's ID.
-fn grow_sgt_to_sg(sgt: &SpanGroupTemp, sgt_to_sg: &mut HashMap<SpanGroupTemp, SpanGroup>) {
-    log::trace!("entering `grow_sgt_to_sg`");
-    let parent_sgt = sgt.parent();
-    let parent_id: Option<Arc<str>> = parent_sgt
-        .iter()
-        .map(|parent_sgp| match sgt_to_sg.get(parent_sgp) {
-            Some(sg) => sg.id.clone(),
-            None => {
-                grow_sgt_to_sg(parent_sgp, sgt_to_sg);
-                sgt_to_sg
-                    .get(parent_sgp)
-                    .expect("key `parent_sgp` must exist in `sgt_to_sg` by construction")
-                    .id
-                    .clone()
-            }
-        })
-        .next();
+        let callsite_info = sgt
+            .callsite_info_priv_path
+            .last()
+            .expect("sgt.callsite_info_priv_path can't be empty by construction");
 
-    let callsite_info = sgt
-        .callsite_info_priv_path
-        .last()
-        .expect("sgt.callsite_info_priv_path can't be empty by construction");
+        let code_line = callsite_info
+            .file
+            .clone()
+            .zip(callsite_info.line)
+            .map(|(file, line)| format!("{}:{}", file, line))
+            .unwrap_or_else(|| format!("{:?}", callsite_info.callsite_id));
 
-    let code_line = callsite_info
-        .file
-        .clone()
-        .zip(callsite_info.line)
-        .map(|(file, line)| format!("{}:{}", file, line))
-        .unwrap_or_else(|| format!("{:?}", callsite_info.callsite_id));
+        let props = sgt
+            .span_group_priv
+            .props_path
+            .last()
+            .expect("sgt.span_group_priv.props_path can't be empty by construction")
+            .clone();
 
-    let props = sgt
-        .span_group_priv
-        .props_path
-        .last()
-        .expect("sgt.span_group_priv.props_path can't be empty by construction")
-        .clone();
-
-    let mut hasher = Sha256::new();
-    if let Some(parent_id) = parent_id.clone() {
-        hasher.update(parent_id.as_ref());
-    }
-    hasher.update(callsite_info.name);
-    hasher.update([0_u8; 1]);
-    hasher.update(code_line.clone());
-    for (k, v) in props.iter() {
+        let mut hasher = Sha256::new();
+        if let Some(parent_id) = parent_id.clone() {
+            hasher.update(parent_id.as_ref());
+        }
+        hasher.update(callsite_info.name);
         hasher.update([0_u8; 1]);
-        hasher.update(k);
-        hasher.update([0_u8; 1]);
-        hasher.update(v);
-    }
-    let hash = hasher.finalize();
-    let id = Base64::encode_string(&hash[0..8]);
+        hasher.update(code_line.clone());
+        for (k, v) in props.iter() {
+            hasher.update([0_u8; 1]);
+            hasher.update(k);
+            hasher.update([0_u8; 1]);
+            hasher.update(v);
+        }
+        let hash = hasher.finalize();
+        let id = Base64::encode_string(&hash[0..8]);
 
-    let sg = SpanGroup {
-        name: callsite_info.name,
-        id: id.into(),
-        code_line: code_line.into(),
-        props,
-        parent_id,
-        depth: sgt.callsite_info_priv_path.len(),
-    };
-    sgt_to_sg.insert(sgt.clone(), sg);
-}
-
-/// Part of post-processing.
-/// Transforms TimingsTemp and sgt_to_sg into Timings.
-fn timings_from_timings_temp_and_spt_to_sg(
-    ltp: &LatencyTrace,
-    timings_temp: TimingsTemp,
-    mut sgt_to_sg: HashMap<SpanGroupTemp, SpanGroup>,
-) -> Timings {
-    // Transform `timings_temp` into `timings` by changing keys from sgt to sg, and remove those keys from `sgt_to_sg`.
-    let mut timings: Timings = timings_temp
-        .into_iter()
-        .map(|(sgt, timing)| {
-            (
-                sgt_to_sg
-                    .remove(&sgt)
-                    .expect("impossible: sgt key not found in sgt_to_sg"),
-                timing,
-            )
-        })
-        .collect::<BTreeMap<SpanGroup, Timing>>()
-        .into();
-
-    // Add entries with empty histograms for span groups that are not already keys in `timings`.
-    for sg in sgt_to_sg.into_values() {
-        timings.insert(sg, new_timing(ltp.hist_high, ltp.hist_sigfig));
+        let sg = SpanGroup {
+            name: callsite_info.name,
+            id: id.into(),
+            code_line: code_line.into(),
+            props,
+            parent_id,
+            depth: sgt.callsite_info_priv_path.len(),
+        };
+        sgt_to_sg.insert(sgt.clone(), sg);
     }
 
-    timings
-}
+    /// Part of post-processing.
+    /// Transforms TimingsTemp and sgt_to_sg into Timings.
+    fn timings_from_timings_temp_and_spt_to_sg(
+        &self,
+        timings_temp: TimingsTemp,
+        mut sgt_to_sg: HashMap<SpanGroupTemp, SpanGroup>,
+    ) -> Timings {
+        // Transform `timings_temp` into `timings` by changing keys from sgt to sg, and remove those keys from `sgt_to_sg`.
+        let mut timings: Timings = timings_temp
+            .into_iter()
+            .map(|(sgt, timing)| {
+                (
+                    sgt_to_sg
+                        .remove(&sgt)
+                        .expect("impossible: sgt key not found in sgt_to_sg"),
+                    timing,
+                )
+            })
+            .collect::<BTreeMap<SpanGroup, Timing>>()
+            .into();
 
-/// Post-processing orchestration of the above functions.
-/// Generates the publicly accessible [`Timings`] in post-processing after all thread-local
-/// data has been accumulated.
-pub(crate) fn report_timings(ltp: &LatencyTrace, acc: AccRawTrace) -> Timings {
-    log::trace!("entering `report_timings`");
-    // Reduce acc to RawTrace
-    let raw_trace: RawTrace = reduce_acc_to_raw_trace(acc);
+        // Add entries with empty histograms for span groups that are not already keys in `timings`.
+        for sg in sgt_to_sg.into_values() {
+            timings.insert(sg, new_timing(self.hist_high, self.hist_sigfig));
+        }
 
-    // Transform RawTrace into TimingsTemp and sgt_to_sg.
-    let timings_temp = move_callsite_info_to_key(raw_trace);
-    let mut sgt_to_sg: HashMap<SpanGroupTemp, SpanGroup> = HashMap::new();
-    for sgt in timings_temp.keys() {
-        grow_sgt_to_sg(sgt, &mut sgt_to_sg);
+        timings
     }
 
-    // Transform TimingsTemp and sgt_to_sg into Timings.
-    timings_from_timings_temp_and_spt_to_sg(ltp, timings_temp, sgt_to_sg)
+    /// Post-processing orchestration of the above functions.
+    /// Generates the publicly accessible [`Timings`] in post-processing after all thread-local
+    /// data has been accumulated.
+    pub(crate) fn report_timings(&self, acc: AccRawTrace) -> Timings {
+        log::trace!("entering `report_timings`");
+        // Reduce acc to RawTrace
+        let raw_trace: RawTrace = Self::reduce_acc_to_raw_trace(acc);
+
+        // Transform RawTrace into TimingsTemp and sgt_to_sg.
+        let timings_temp = Self::move_callsite_info_to_key(raw_trace);
+        let mut sgt_to_sg: HashMap<SpanGroupTemp, SpanGroup> = HashMap::new();
+        for sgt in timings_temp.keys() {
+            Self::grow_sgt_to_sg(sgt, &mut sgt_to_sg);
+        }
+
+        // Transform TimingsTemp and sgt_to_sg into Timings.
+        self.timings_from_timings_temp_and_spt_to_sg(timings_temp, sgt_to_sg)
+    }
 }

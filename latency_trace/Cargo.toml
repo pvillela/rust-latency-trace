@@ -4,7 +4,7 @@ version = "0.5.0"
 edition = "2021"
 license = "MIT"
 description = "supports latency measurement for functions and code blocks, both sync and async."
-repository = "https://github.com/pvillela/rust-latency-trace/tree/v0.5.0"
+repository = "https://github.com/pvillela/rust-latency-trace/tree/main"
 readme = "README.md"
 keywords = ["latency", "observability", "measurement", "tracing", "performance"]
 categories = ["development-tools::profiling"]
@@ -14,7 +14,7 @@ exclude = ["src/bench_support.rs"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thread_local_collect = { path = "../../thread-local-collect", version = "0.5" }
+thread_local_collect = { path = "../../thread-local-collect", version = "1.0" }
 # thread_local_collect = "0.5"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"

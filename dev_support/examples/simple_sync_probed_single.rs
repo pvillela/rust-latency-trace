@@ -2,7 +2,7 @@
 //! but the default args set `ntasks = 0`.
 
 use dev_support::{examples_support::cmd_line_args, simple_fns::simple_sync};
-use latency_trace::{summary_stats, LatencyTraceOld};
+use latency_trace::{summary_stats, LatencyTrace};
 use std::{
     thread,
     time::{Duration, Instant},
@@ -23,7 +23,7 @@ fn main() {
 
     let start = Instant::now();
 
-    let probed = LatencyTraceOld::default()
+    let probed = LatencyTrace::activated_default().unwrap()
         .measure_latencies_probed(move || simple_sync(nrepeats, ntasks, sleep_micros.unwrap()))
         .unwrap();
 

@@ -36,9 +36,6 @@ pub use publish::*;
 mod span_groupers;
 pub use span_groupers::*;
 
-mod latency_trace_old;
-pub use latency_trace_old::*;
-
 mod summary_stats;
 pub use summary_stats::*;
 

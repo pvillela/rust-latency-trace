@@ -1,7 +1,7 @@
 //! Example of latency measurement for a simple sync function.
 
 use dev_support::{examples_support::cmd_line_args, simple_fns::simple_sync};
-use latency_trace::{summary_stats, LatencyTraceOld};
+use latency_trace::{summary_stats, LatencyTrace};
 use std::time::Instant;
 
 fn main() {
@@ -18,9 +18,9 @@ fn main() {
     );
 
     let start = Instant::now();
-    let latencies = LatencyTraceOld::default()
-        .measure_latencies(|| simple_sync(nrepeats, ntasks, sleep_micros.unwrap()))
-        .unwrap();
+    let latencies = LatencyTrace::activated_default()
+        .unwrap()
+        .measure_latencies(|| simple_sync(nrepeats, ntasks, sleep_micros.unwrap()));
     println!("Elapsed time: {:?}", Instant::now().duration_since(start));
 
     println!("\nDebug print of `latencies.map_values(summary_stats)`:");

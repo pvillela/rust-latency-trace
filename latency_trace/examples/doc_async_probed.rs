@@ -1,4 +1,4 @@
-use latency_trace::{summary_stats, LatencyTraceOld};
+use latency_trace::{summary_stats, LatencyTrace};
 use std::{thread, time::Duration};
 use tracing::{instrument, trace_span, Instrument};
 
@@ -23,7 +23,8 @@ async fn g() {
 }
 
 fn main() {
-    let probed = LatencyTraceOld::default()
+    let probed = LatencyTrace::activated_default()
+        .unwrap()
         .measure_latencies_probed_tokio(f)
         .unwrap();
     thread::sleep(Duration::from_micros(48000));

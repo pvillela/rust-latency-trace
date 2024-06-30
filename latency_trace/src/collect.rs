@@ -159,8 +159,13 @@ type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Syn
 //=================
 // LatencyTrace
 
-/// Implements [Layer] and provides access to [`RawTrace`] containing the latencies collected for different span groups.
+/// Implements [Layer] and provides access to the latencies collected for different span groups.
 /// This is the central struct in this framework's implementation.
+///
+/// There should be a single instance of [`LatencyTrace`] in a process. That instance is set
+/// (by method [`Self::activated`] or [`Self::activated_default`])
+/// as the global default [`tracing::Subscriber`], of which there can be only one and it can't be changed once
+/// it is set.
 #[derive(Clone)]
 pub struct LatencyTrace {
     control: Control<RawTrace, AccRawTrace>,
