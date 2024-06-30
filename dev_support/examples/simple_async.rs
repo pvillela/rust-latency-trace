@@ -1,7 +1,7 @@
 //! Example of latency measurement for a simple async function.
 
 use dev_support::{examples_support::cmd_line_args, simple_fns::simple_async};
-use latency_trace::{summary_stats, LatencyTrace};
+use latency_trace::{summary_stats, LatencyTraceOld};
 use std::time::Instant;
 
 fn main() {
@@ -18,7 +18,7 @@ fn main() {
     );
 
     let start = Instant::now();
-    let latencies = LatencyTrace::default()
+    let latencies = LatencyTraceOld::default()
         .measure_latencies_tokio(|| simple_async(nrepeats, ntasks, sleep_micros.unwrap()))
         .unwrap();
     println!("Elapsed time: {:?}", Instant::now().duration_since(start));

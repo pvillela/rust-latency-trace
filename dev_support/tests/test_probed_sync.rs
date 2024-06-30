@@ -9,7 +9,7 @@ use dev_support::{
         span_name_test_spec_span_1, span_name_test_spec_span_2, SpanNameTestSpec, TestSpec, E,
     },
 };
-use latency_trace::LatencyTrace;
+use latency_trace::LatencyTraceOld;
 use std::{collections::BTreeMap, sync::Arc};
 
 #[tokio::test]
@@ -20,7 +20,7 @@ async fn test_probed() {
 
     let probe_gater = Arc::new(Gater::new("probe_gater"));
 
-    let probed = LatencyTrace::default()
+    let probed = LatencyTraceOld::default()
         .measure_latencies_probed({
             let probe_gater = probe_gater.clone();
             || elab_sync_gated(Some(probe_gater))

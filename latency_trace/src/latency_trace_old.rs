@@ -1,10 +1,10 @@
 //! Main public interface of library.
 
 use crate::{
-    collect::{LatencyTraceCfg, LatencyTracePriv},
+    collect::{LatencyTrace, LatencyTraceCfg},
     default_span_grouper,
     refine::{report_timings, Timings},
-    ProbedTrace, Timing,
+    ProbedTrace,
 };
 use hdrhistogram::CreationError;
 use std::{future::Future, sync::Arc, thread};
@@ -17,9 +17,9 @@ use tracing::span::Attributes;
 /// (`impl Fn(&`[`Attributes`]`) -> Vec<(String, String)> + Send + Sync + 'static`)
 /// to define [`SpanGroup`](crate::SpanGroup)s, as well as the histogram configuration parameters
 /// [`hdrhistogram::Histogram::high`] and [`hdrhistogram::Histogram::sigfig`].
-pub struct LatencyTrace(pub(crate) LatencyTraceCfg);
+pub struct LatencyTraceOld(pub(crate) LatencyTraceCfg);
 
-impl Default for LatencyTrace {
+impl Default for LatencyTraceOld {
     /// Instantiates a [LatencyTrace] with default configuration. The defaults are:
     /// - Grouping of spans using the [`default_span_grouper`], which simply groups by the span's
     /// callsite information, which distills the *tracing* framework's Callsite concept
@@ -41,7 +41,7 @@ impl Default for LatencyTrace {
     }
 }
 
-impl LatencyTrace {
+impl LatencyTraceOld {
     /// Creates a new [`LatencyTrace`] configured the same as `self` but with the given `span_grouper`.
     ///
     /// If a [`LatencyTrace`] has been previously used in the same process with the same `hist_high` and
@@ -86,13 +86,6 @@ impl LatencyTrace {
         Self(cfg)
     }
 
-    /// By validating the [`LatencyTraceCfg`] up-front, we avoid all potential [hdrhistogram::Histogram] errors
-    /// as our histograms are `u64`, have a `hist_low` of `1`, and are auto-resizable.
-    fn validate_hist_high_sigfig(&self) -> Result<(), CreationError> {
-        let _ = Timing::new_with_bounds(1, self.0.hist_high, self.0.hist_sigfig)?;
-        Ok(())
-    }
-
     /// Executes the instrumented function `f` and, after `f` completes, returns the observed latencies.
     ///
     /// If a [`LatencyTrace`] has been previously used in the same process with the same `hist_high` and
@@ -106,8 +99,7 @@ impl LatencyTrace {
     /// If a [`LatencyTrace`] has been previously used in the same process with different `hist_high` or
     /// different `hist_sigfic`.
     pub fn measure_latencies(self, f: impl FnOnce()) -> Result<Timings, CreationError> {
-        self.validate_hist_high_sigfig()?;
-        let ltp = LatencyTracePriv::initialized(self.0);
+        let ltp = LatencyTrace::activated(self.0)?;
         f();
         let acc = ltp.take_acc_timings();
         Ok(report_timings(&ltp, acc))
@@ -156,8 +148,7 @@ impl LatencyTrace {
         self,
         f: impl FnOnce() + Send + 'static,
     ) -> Result<ProbedTrace, CreationError> {
-        self.validate_hist_high_sigfig()?;
-        let ltp = LatencyTracePriv::initialized(self.0);
+        let ltp = LatencyTrace::activated(self.0)?;
         let pt = ProbedTrace::new(ltp);
         let jh = thread::spawn(f);
         pt.set_join_handle(jh);

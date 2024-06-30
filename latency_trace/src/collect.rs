@@ -1,6 +1,6 @@
 //! Collection of timing information in an efficient way that is not convenient to display.
 
-use hdrhistogram::Histogram;
+use hdrhistogram::{CreationError, Histogram};
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -148,11 +148,20 @@ pub(crate) fn op_r(acc1: RawTrace, acc2: RawTrace) -> RawTrace {
 //=================
 // LatencyTraceCfg
 
-/// Configuration information used by both [`LatencyTracePriv`] and [`crate::LatencyTrace`].
-pub(crate) struct LatencyTraceCfg {
+/// Configuration information used by both [`LatencyTrace`] and [`crate::LatencyTrace`].
+pub struct LatencyTraceCfg {
     pub(crate) span_grouper: SpanGrouper,
     pub(crate) hist_high: u64,
     pub(crate) hist_sigfig: u8,
+}
+
+impl LatencyTraceCfg {
+    /// Validates that the configuration settings yield histograms that avoid all potential [hdrhistogram::Histogram] errors
+    /// as our histograms are `u64`, have a `hist_low` of `1`, and are auto-resizable.
+    fn validate_hist_high_sigfig(&self) -> Result<(), CreationError> {
+        let _ = Timing::new_with_bounds(1, self.hist_high, self.hist_sigfig)?;
+        Ok(())
+    }
 }
 
 //=================
@@ -162,21 +171,21 @@ pub(crate) struct LatencyTraceCfg {
 type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'static>;
 
 //=================
-// LatencyTracePriv
+// LatencyTrace
 
 /// Implements [Layer] and provides access to [`RawTrace`] containing the latencies collected for different span groups.
 /// This is the central struct in this framework's implementation.
 #[derive(Clone)]
-pub(crate) struct LatencyTracePriv {
+pub struct LatencyTrace {
     control: Control<RawTrace, AccRawTrace>,
     span_grouper: SpanGrouper,
     pub(crate) hist_high: u64,
     pub(crate) hist_sigfig: u8,
 }
 
-impl LatencyTracePriv {
-    fn new(config: LatencyTraceCfg) -> LatencyTracePriv {
-        LatencyTracePriv {
+impl LatencyTrace {
+    pub(crate) fn new(config: LatencyTraceCfg) -> LatencyTrace {
+        LatencyTrace {
             control: Control::new(&LOCAL_INFO, AccRawTrace::new(), RawTrace::new, op),
             span_grouper: config.span_grouper,
             hist_high: config.hist_high,
@@ -184,45 +193,39 @@ impl LatencyTracePriv {
         }
     }
 
-    /// Returns an initialized instance of `Self`.
+    /// Returns an activate instance of `Self`, activating a new one if necessary.
     ///
-    /// If a [`LatencyTracePriv`] has been previously initialized in the same process with the same `hist_high` and
-    /// `hist_sigfic` but a different `span_grouper` then the previous `span_grouper` will be used instead of
-    /// the new one.
+    /// If a [`LatencyTrace`] has been previously activated in the same process, the `config` passed to this
+    /// function will be ignored and the current active [`LatencyTrace`] will be returned.
+    ///
+    /// # Errors
+    /// - Returns a [`CreationError`] if the `config`'s `hist_high` and `hist_sigfig` would cause
+    /// [`Histogram::new_with_bounds`]`(1, hist_high, hist_sigfig)` to fail.
     ///
     /// # Panics
-    ///
-    /// If a global default [`tracing::Subscriber`] not provided by this package has been been previously set.
-    ///
-    /// If a [`LatencyTracePriv`] has been previously initialized in the same process with different `hist_high` or
-    /// different `hist_sigfic`.
-    pub(crate) fn initialized(config: LatencyTraceCfg) -> LatencyTracePriv {
-        let ltp_new = LatencyTracePriv::new(config);
-        let new_config = (ltp_new.hist_high, ltp_new.hist_sigfig);
-        let default_dispatch_exists = tracing::dispatcher::get_default(|disp| {
-            disp.is::<Layered<LatencyTracePriv, Registry>>()
-        });
-        let ltp = if !default_dispatch_exists {
-            let reg: tracing_subscriber::layer::Layered<LatencyTracePriv, Registry> =
-                Registry::default().with(ltp_new.clone());
+    /// - If a global default [`tracing::Subscriber`] that is not of type [`LatencyTrace`] has been been previously set.
+    pub fn activated(config: LatencyTraceCfg) -> Result<LatencyTrace, CreationError> {
+        config.validate_hist_high_sigfig()?;
+        let default_dispatch_exists =
+            tracing::dispatcher::get_default(|disp| disp.is::<Layered<LatencyTrace, Registry>>());
+        let lt = if !default_dispatch_exists {
+            let lt_new = LatencyTrace::new(config);
+            let reg: tracing_subscriber::layer::Layered<LatencyTrace, Registry> =
+                Registry::default().with(lt_new.clone());
             reg.init();
-            ltp_new
+            lt_new
         } else {
-            tracing::dispatcher::get_default(|disp| {
-                let ltp: &LatencyTracePriv = disp
-                    .downcast_ref()
-                    .expect("existing dispatcher must be of type `LatencyTracePriv`");
-                let curr_config = (ltp.hist_high, ltp.hist_sigfig);
-                // Note: below assertion does not cover the `LatencyTracePriv` `span_grouper` field as it is not
-                // possible to check equality of functions.
-                assert_eq!(
-                    curr_config, new_config,
-                    "New and existing LatencyTrace configuration settings must be identical."
-                );
-                ltp.clone()
-            })
+            Self::active().expect("`if` condition should ensure `else` Ok")
         };
-        ltp
+        Ok(lt)
+    }
+
+    /// Returns the active instance of `Self` if it exists.
+    pub fn active() -> Option<LatencyTrace> {
+        tracing::dispatcher::get_default(|disp| {
+            let lt: &LatencyTrace = disp.downcast_ref()?;
+            Some(lt.clone())
+        })
     }
 
     /// Updates timings for the given span group. Called by [`Layer`] impl.
@@ -285,7 +288,7 @@ impl LatencyTracePriv {
     }
 }
 
-impl<S> Layer<S> for LatencyTracePriv
+impl<S> Layer<S> for LatencyTrace
 where
     S: Subscriber,
     S: for<'lookup> LookupSpan<'lookup>,

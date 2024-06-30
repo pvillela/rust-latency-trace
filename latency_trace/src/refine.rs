@@ -3,8 +3,8 @@
 
 use crate::{
     collect::{
-        new_timing, op_r, AccRawTrace, CallsiteInfo, LatencyTracePriv, Props, RawTrace,
-        SpanGroupPriv, Timing,
+        new_timing, op_r, AccRawTrace, CallsiteInfo, LatencyTrace, Props, RawTrace, SpanGroupPriv,
+        Timing,
     },
     summary_stats, SummaryStats, Wrapper,
 };
@@ -346,7 +346,7 @@ fn grow_sgt_to_sg(sgt: &SpanGroupTemp, sgt_to_sg: &mut HashMap<SpanGroupTemp, Sp
 /// Part of post-processing.
 /// Transforms TimingsTemp and sgt_to_sg into Timings.
 fn timings_from_timings_temp_and_spt_to_sg(
-    ltp: &LatencyTracePriv,
+    ltp: &LatencyTrace,
     timings_temp: TimingsTemp,
     mut sgt_to_sg: HashMap<SpanGroupTemp, SpanGroup>,
 ) -> Timings {
@@ -375,7 +375,7 @@ fn timings_from_timings_temp_and_spt_to_sg(
 /// Post-processing orchestration of the above functions.
 /// Generates the publicly accessible [`Timings`] in post-processing after all thread-local
 /// data has been accumulated.
-pub(crate) fn report_timings(ltp: &LatencyTracePriv, acc: AccRawTrace) -> Timings {
+pub(crate) fn report_timings(ltp: &LatencyTrace, acc: AccRawTrace) -> Timings {
     log::trace!("entering `report_timings`");
     // Reduce acc to RawTrace
     let raw_trace: RawTrace = reduce_acc_to_raw_trace(acc);

@@ -1,22 +1,22 @@
 use crate::simple_fns::{simple_async, simple_async_un, simple_sync, simple_sync_un};
 use latency_trace::{
     bench_support::{measure_latencies1, measure_latencies2, measure_latencies2_tokio},
-    LatencyTrace, Timings,
+    LatencyTraceOld, Timings,
 };
 use std::{fmt::Display, hint::black_box};
 
 pub fn set_up() {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     measure_latencies1(lt);
 }
 
 pub fn sync_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     measure_latencies2(lt, move || simple_sync(nrepeats, ntasks, sleep_micros));
 }
 
 pub fn sync_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) -> Timings {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     let timings = lt
         .measure_latencies(move || simple_sync(nrepeats, ntasks, sleep_micros))
         .unwrap();
@@ -28,12 +28,12 @@ pub fn sync_un_direct(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
 }
 
 pub fn sync_un_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     measure_latencies2(lt, move || simple_sync(nrepeats, ntasks, sleep_micros));
 }
 
 pub fn sync_un_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) -> Timings {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     let timings = lt
         .measure_latencies(move || simple_sync(nrepeats, ntasks, sleep_micros))
         .unwrap();
@@ -41,12 +41,12 @@ pub fn sync_un_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) -> Timi
 }
 
 pub fn async_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     measure_latencies2_tokio(lt, move || simple_async(nrepeats, ntasks, sleep_micros));
 }
 
 pub fn async_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     let timings = lt
         .measure_latencies_tokio(move || simple_async(nrepeats, ntasks, sleep_micros))
         .unwrap();
@@ -62,12 +62,12 @@ pub fn async_un_direct(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
 }
 
 pub fn async_un_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     measure_latencies2(lt, move || simple_sync(nrepeats, ntasks, sleep_micros));
 }
 
 pub fn async_un_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) -> Timings {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     let timings = lt
         .measure_latencies(move || simple_sync(nrepeats, ntasks, sleep_micros))
         .unwrap();

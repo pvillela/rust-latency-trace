@@ -1,4 +1,4 @@
-use latency_trace::{summary_stats, LatencyTrace};
+use latency_trace::{summary_stats, LatencyTraceOld};
 use std::{thread, time::Duration};
 use tracing::{instrument, trace_span};
 
@@ -21,7 +21,7 @@ fn g() {
 }
 
 fn main() {
-    let latencies = LatencyTrace::default().measure_latencies(f).unwrap();
+    let latencies = LatencyTraceOld::default().measure_latencies(f).unwrap();
 
     println!("\nLatency stats below are in microseconds");
     for (span_group, stats) in latencies.map_values(summary_stats) {

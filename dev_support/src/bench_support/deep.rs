@@ -1,21 +1,21 @@
 use crate::deep_fns::{deep_sync, deep_sync_un};
 use latency_trace::bench_support::{measure_latencies1, measure_latencies2};
-use latency_trace::{LatencyTrace, Timings};
+use latency_trace::{LatencyTraceOld, Timings};
 use std::{fmt::Display, hint::black_box};
 
 pub fn set_up() {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     measure_latencies1(lt);
 }
 
 pub fn sync_completion(nrepeats: usize, ntasks: usize) {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     let nthreads = measure_latencies2(lt, move || deep_sync(nrepeats, ntasks));
     assert_eq!(nthreads, ntasks + 1, "nthreads == ntasks+1");
 }
 
 pub fn sync_all_in(nrepeats: usize, ntasks: usize, exp_span_count: u64) -> Timings {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     let timings = lt
         .measure_latencies(move || deep_sync(nrepeats, ntasks))
         .unwrap();
@@ -29,12 +29,12 @@ pub fn sync_un_direct(nrepeats: usize, ntasks: usize) {
 }
 
 pub fn sync_un_completion(nrepeats: usize, ntasks: usize) {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     measure_latencies2(lt, move || deep_sync_un(nrepeats, ntasks));
 }
 
 pub fn sync_un_all_in(nrepeats: usize, ntasks: usize) -> Timings {
-    let lt = LatencyTrace::default();
+    let lt = LatencyTraceOld::default();
     let timings = lt
         .measure_latencies(move || deep_sync_un(nrepeats, ntasks))
         .unwrap();

@@ -6,13 +6,13 @@ use dev_support::{
         span_name_test_spec_span_1, span_name_test_spec_span_2, TestSpec, E,
     },
 };
-use latency_trace::LatencyTrace;
+use latency_trace::LatencyTraceOld;
 use std::collections::BTreeMap;
 
 #[test]
 #[allow(clippy::identity_op)]
 fn test_default_grouping() {
-    let latencies = LatencyTrace::default()
+    let latencies = LatencyTraceOld::default()
         .measure_latencies(elab_sync)
         .unwrap();
 

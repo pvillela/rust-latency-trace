@@ -1,7 +1,7 @@
 //! Provides the ability to obtain interim timing information before the target function terminates.
 
 use crate::{
-    collect::LatencyTracePriv,
+    collect::LatencyTrace,
     refine::{report_timings, Timings},
 };
 use std::{
@@ -13,12 +13,12 @@ use std::{
 /// before the instrumented function completes.
 #[derive(Clone)]
 pub struct ProbedTrace {
-    ltp: LatencyTracePriv,
+    ltp: LatencyTrace,
     join_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 impl ProbedTrace {
-    pub(crate) fn new(ltp: LatencyTracePriv) -> Self {
+    pub(crate) fn new(ltp: LatencyTrace) -> Self {
         Self {
             ltp,
             join_handle: Mutex::new(None).into(),
