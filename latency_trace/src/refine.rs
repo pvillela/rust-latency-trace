@@ -1,8 +1,8 @@
-//! Post-processing of timing information collected by [`crate::core_internals_pre`] to produce
+//! Post-processing of timing information collected by [`crate::collect`] to produce
 //! information that is convenient to display.
 
 use crate::{
-    core_internals_pre::{
+    collect::{
         new_timing, op_r, AccRawTrace, CallsiteInfo, LatencyTracePriv, Props, RawTrace,
         SpanGroupPriv, Timing,
     },

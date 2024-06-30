@@ -1,9 +1,10 @@
 //! Main public interface of library.
 
 use crate::{
-    core_internals_post::{report_timings, Timings},
-    core_internals_pre::{LatencyTraceCfg, LatencyTracePriv},
-    default_span_grouper, ProbedTrace, Timing,
+    collect::{LatencyTraceCfg, LatencyTracePriv},
+    default_span_grouper,
+    refine::{report_timings, Timings},
+    ProbedTrace, Timing,
 };
 use hdrhistogram::CreationError;
 use std::{future::Future, sync::Arc, thread};

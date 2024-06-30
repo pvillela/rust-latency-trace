@@ -1,8 +1,8 @@
 //! Provides the ability to obtain interim timing information before the target function terminates.
 
 use crate::{
-    core_internals_post::{report_timings, Timings},
-    core_internals_pre::LatencyTracePriv,
+    collect::LatencyTracePriv,
+    refine::{report_timings, Timings},
 };
 use std::{
     sync::{Arc, Mutex},
