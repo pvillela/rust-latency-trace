@@ -7,4 +7,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.0] - 2024-06-XX
 
-Initial release.
+Initial release. Starts at v0.5.0 to reflect 8 months of development and almost 200 commits.

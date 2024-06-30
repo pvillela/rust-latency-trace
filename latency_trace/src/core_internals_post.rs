@@ -134,7 +134,8 @@ impl<K> TimingsView<K> {
                         .expect("key `g == f(k)` was just inserted in `res`")
                 }
             };
-            hist.add(v).expect("hdrhistogram::Histogram AdditionError");
+            hist.add(v)
+                .expect("should not happen given histogram construction");
         }
         res.into()
     }
@@ -149,7 +150,7 @@ impl<K> TimingsView<K> {
             let other_h = other.remove(k);
             if let Some(other_h) = other_h {
                 h.add(other_h)
-                    .expect("hdrhistogram::Histogram AdditionError");
+                    .expect("should not happen given histogram construction");
             }
         }
 
