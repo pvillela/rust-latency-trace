@@ -1,12 +1,9 @@
 //! Main public interface of library.
 
 use crate::{
-    collect::{LatencyTrace, LatencyTraceCfg},
-    default_span_grouper,
-    refine::{report_timings, Timings},
-    ProbedTrace,
+    default_span_grouper, refine::report_timings, ActivationError, LatencyTrace, LatencyTraceCfg,
+    ProbedTrace, Timings,
 };
-use hdrhistogram::CreationError;
 use std::{future::Future, sync::Arc, thread};
 use tracing::span::Attributes;
 
@@ -98,7 +95,7 @@ impl LatencyTraceOld {
     ///
     /// If a [`LatencyTrace`] has been previously used in the same process with different `hist_high` or
     /// different `hist_sigfic`.
-    pub fn measure_latencies(self, f: impl FnOnce()) -> Result<Timings, CreationError> {
+    pub fn measure_latencies(self, f: impl FnOnce()) -> Result<Timings, ActivationError> {
         let ltp = LatencyTrace::activated(self.0)?;
         f();
         let acc = ltp.take_acc_timings();
@@ -118,7 +115,10 @@ impl LatencyTraceOld {
     ///
     /// If a [`LatencyTrace`] has been previously used in the same process with different `hist_high` or
     /// different `hist_sigfic`.
-    pub fn measure_latencies_tokio<F>(self, f: impl FnOnce() -> F) -> Result<Timings, CreationError>
+    pub fn measure_latencies_tokio<F>(
+        self,
+        f: impl FnOnce() -> F,
+    ) -> Result<Timings, ActivationError>
     where
         F: Future<Output = ()> + Send,
     {
@@ -147,7 +147,7 @@ impl LatencyTraceOld {
     pub fn measure_latencies_probed(
         self,
         f: impl FnOnce() + Send + 'static,
-    ) -> Result<ProbedTrace, CreationError> {
+    ) -> Result<ProbedTrace, ActivationError> {
         let ltp = LatencyTrace::activated(self.0)?;
         let pt = ProbedTrace::new(ltp);
         let jh = thread::spawn(f);
@@ -171,7 +171,7 @@ impl LatencyTraceOld {
     pub fn measure_latencies_probed_tokio<F>(
         self,
         f: impl FnOnce() -> F + Send + 'static,
-    ) -> Result<ProbedTrace, CreationError>
+    ) -> Result<ProbedTrace, ActivationError>
     where
         F: Future<Output = ()> + Send,
     {

@@ -1,6 +1,6 @@
 //! Collection of timing information in an efficient way that is not convenient to display.
 
-use hdrhistogram::{CreationError, Histogram};
+use hdrhistogram::Histogram;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -11,12 +11,7 @@ use std::{
 };
 use thread_local_collect::tlm::probed::{Control, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
-use tracing_subscriber::{
-    layer::{Context, Layered, SubscriberExt},
-    registry::LookupSpan,
-    util::SubscriberInitExt,
-    Layer, Registry,
-};
+use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
 //=================
 // Callsite
@@ -155,15 +150,6 @@ pub struct LatencyTraceCfg {
     pub(crate) hist_sigfig: u8,
 }
 
-impl LatencyTraceCfg {
-    /// Validates that the configuration settings yield histograms that avoid all potential [hdrhistogram::Histogram] errors
-    /// as our histograms are `u64`, have a `hist_low` of `1`, and are auto-resizable.
-    fn validate_hist_high_sigfig(&self) -> Result<(), CreationError> {
-        let _ = Timing::new_with_bounds(1, self.hist_high, self.hist_sigfig)?;
-        Ok(())
-    }
-}
-
 //=================
 // SpanGrouper
 
@@ -191,41 +177,6 @@ impl LatencyTrace {
             hist_high: config.hist_high,
             hist_sigfig: config.hist_sigfig,
         }
-    }
-
-    /// Returns an activate instance of `Self`, activating a new one if necessary.
-    ///
-    /// If a [`LatencyTrace`] has been previously activated in the same process, the `config` passed to this
-    /// function will be ignored and the current active [`LatencyTrace`] will be returned.
-    ///
-    /// # Errors
-    /// - Returns a [`CreationError`] if the `config`'s `hist_high` and `hist_sigfig` would cause
-    /// [`Histogram::new_with_bounds`]`(1, hist_high, hist_sigfig)` to fail.
-    ///
-    /// # Panics
-    /// - If a global default [`tracing::Subscriber`] that is not of type [`LatencyTrace`] has been been previously set.
-    pub fn activated(config: LatencyTraceCfg) -> Result<LatencyTrace, CreationError> {
-        config.validate_hist_high_sigfig()?;
-        let default_dispatch_exists =
-            tracing::dispatcher::get_default(|disp| disp.is::<Layered<LatencyTrace, Registry>>());
-        let lt = if !default_dispatch_exists {
-            let lt_new = LatencyTrace::new(config);
-            let reg: tracing_subscriber::layer::Layered<LatencyTrace, Registry> =
-                Registry::default().with(lt_new.clone());
-            reg.init();
-            lt_new
-        } else {
-            Self::active().expect("`if` condition should ensure `else` Ok")
-        };
-        Ok(lt)
-    }
-
-    /// Returns the active instance of `Self` if it exists.
-    pub fn active() -> Option<LatencyTrace> {
-        tracing::dispatcher::get_default(|disp| {
-            let lt: &LatencyTrace = disp.downcast_ref()?;
-            Some(lt.clone())
-        })
     }
 
     /// Updates timings for the given span group. Called by [`Layer`] impl.
