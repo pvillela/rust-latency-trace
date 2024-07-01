@@ -25,7 +25,10 @@ fn main() {
         .unwrap()
         .measure_latencies_probed(f)
         .unwrap();
+
+    // Let the function run for some time before probing latencies.
     thread::sleep(Duration::from_micros(48000));
+
     let latencies1 = probed.probe_latencies();
     let latencies2 = probed.wait_and_report();
 

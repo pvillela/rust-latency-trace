@@ -1,15 +1,14 @@
-//! Post-processing of timing information collected by [`crate::collect`] to produce
+//! Post-processing of timing information collected by [`crate::lt_collect`] to produce
 //! information that is convenient to display.
 
 use crate::{
-    collect::{
+    lt_collect::{
         new_timing, op_r, AccRawTrace, CallsiteInfo, LatencyTrace, Props, RawTrace, SpanGroupPriv,
         Timing,
     },
-    summary_stats, SummaryStats, Wrapper,
+    Wrapper,
 };
 use base64ct::{Base64, Encoding};
-use hdrhistogram::Histogram;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -35,55 +34,21 @@ pub type CallsiteInfoPath = Vec<Arc<CallsiteInfo>>;
 /// The coarsest-grained grouping of spans is characterized by a ***callsite path*** -- a callsite and the (possibly empty) list of its ancestor callsites based on the different runtime execution paths (see [Span relationships](https://docs.rs/tracing/0.1.37/tracing/span/index.html#span-relationships)). This is the default `SpanGroup` definition. Finer-grained groupings of spans can differentiate groups of spans with the same callsite path by taking into account values computed at runtime from the spans' runtime [Attributes](https://docs.rs/tracing/0.1.37/tracing/span/struct.Attributes.html).
 ///
 /// This struct holds the following information:
-/// - the name [`name`](Self::name) of the span definition that applies to all the spas in the span group
+/// - the [`name`](Self::name) of the span definition that applies to all the spans in the span group
 /// - an [`id`](Self::id) that, together with its `name`, uniquely identifies the span group
 /// - a [`props`](Self::props) field that contains the list of name-value pairs (which may be empty) which is common to all the spans in the group
 /// - a [`code_line`](Self::code_line) field that contains the file name and line number where all the spans in the group were defined *or*,
 ///   in case debug information is not available, the corresponding [`tracing::callsite::Identifier`].
 /// - a [`parent_id`](Self::parent_id) that is the `id` field of the parent span group, if any.
-/// - its [`depth`](Self::depth) that is the number of ancestor span groups this span group has
+/// - its [`depth`](Self::depth), i.e., the number of ancestor span groups this span group has
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Hash, Clone)]
 pub struct SpanGroup {
-    name: &'static str,
-    id: Arc<str>,
-    code_line: Arc<str>,
-    props: Arc<Props>,
-    parent_id: Option<Arc<str>>,
-    depth: usize,
-}
-
-impl SpanGroup {
-    /// Returns the span group's name.
-    pub fn name(&self) -> &'static str {
-        self.name
-    }
-
-    /// Returns the span group's ID.
-    pub fn id(&self) -> &str {
-        &self.id
-    }
-
-    /// Returns the span group's file name and code line.
-    pub fn code_line(&self) -> &str {
-        &self.code_line
-    }
-
-    /// Returns the span group's properties list.
-    ///
-    /// This list can be empty as is the case with the default span grouper.
-    pub fn props(&self) -> &[(String, String)] {
-        &self.props
-    }
-
-    /// Returns the ID of the span group's parent.
-    pub fn parent_id(&self) -> Option<&str> {
-        self.parent_id.iter().map(|x| x.as_ref()).next()
-    }
-
-    /// Returns the number of ancestor span groups this span group has.
-    pub fn depth(&self) -> usize {
-        self.depth
-    }
+    pub(crate) name: &'static str,
+    pub(crate) id: Arc<str>,
+    pub(crate) code_line: Arc<str>,
+    pub(crate) props: Arc<Props>,
+    pub(crate) parent_id: Option<Arc<str>>,
+    pub(crate) depth: usize,
 }
 
 /// Intermediate form of [`SpanGroup`] used in post-processing when transforming from [`SpanGroupPriv`]
@@ -115,115 +80,8 @@ impl SpanGroupTemp {
 /// [`Wrapper`] of [`BTreeMap`]`<K, `[`Timing`]`>`; inherits all [`BTreeMap`] methods.
 pub type TimingsView<K> = Wrapper<BTreeMap<K, Timing>>;
 
-impl<K> TimingsView<K> {
-    /// Combines histogram values according to sets of keys that yield the same value when `f`
-    /// is applied.
-    pub fn aggregate<G>(&self, f: impl Fn(&K) -> G) -> TimingsView<G>
-    where
-        G: Ord,
-    {
-        let mut res: BTreeMap<G, Histogram<u64>> = BTreeMap::new();
-        for (k, v) in self.iter() {
-            // Construct aggregation map.
-            let g = f(k);
-            let hist = match res.get_mut(&g) {
-                Some(hist) => hist,
-                None => {
-                    res.insert(g, Histogram::new_from(v));
-                    res.get_mut(&f(k))
-                        .expect("key `g == f(k)` was just inserted in `res`")
-                }
-            };
-            hist.add(v)
-                .expect("should not happen given histogram construction");
-        }
-        res.into()
-    }
-
-    /// Combines the histograms of `self` with those of another [`TimingsView`].
-    pub fn add(&mut self, mut other: TimingsView<K>)
-    where
-        K: Ord,
-    {
-        // Combine into self the values in other that have keys in self.
-        for (k, h) in self.iter_mut() {
-            let other_h = other.remove(k);
-            if let Some(other_h) = other_h {
-                h.add(other_h)
-                    .expect("should not happen given histogram construction");
-            }
-        }
-
-        // Insert into self the entries in other that don't have keys in self.
-        for (k, h) in other.0.into_iter() {
-            self.insert(k, h);
-        }
-    }
-
-    /// Produces a map whose values are the [`SummaryStats`] of `self`'s histogram values.
-    pub fn summary_stats(&self) -> Wrapper<BTreeMap<K, SummaryStats>>
-    where
-        K: Ord + Clone,
-    {
-        self.map_values(summary_stats)
-    }
-}
-
 /// Mapping of [`SpanGroup`]s to the [`Timing`] information recorded for them; inherits all [`BTreeMap`] methods.
 pub type Timings = TimingsView<SpanGroup>;
-
-impl Timings {
-    /// Checks whether an aggregation function `f` used in [`Self::aggregate`] is consistent according to the following
-    /// definition:
-    /// - the values resulting from applying `f` to span groups are called ***aggregate key***s
-    /// - the sets of span groups corresponding to each *aggregate key* are called ***aggregates***.
-    ///
-    /// An aggregation function is consistent if and only if, for each *aggregate*, all the span groups in the
-    /// *aggregate* have the same callsite.
-    pub fn aggregator_is_consistent<G>(&self, f: impl Fn(&SpanGroup) -> G) -> bool
-    where
-        G: Ord,
-    {
-        let mut aggregates: BTreeMap<G, Arc<str>> = BTreeMap::new();
-        let mut is_consistent = true;
-        for k in self.keys() {
-            let g = f(k);
-            if is_consistent {
-                is_consistent = match aggregates.get(&g) {
-                    Some(code_line) => code_line.as_ref() == k.code_line(),
-                    None => {
-                        aggregates.insert(g, k.code_line.clone());
-                        true
-                    }
-                };
-            }
-        }
-        is_consistent
-    }
-
-    /// Returns a map from span group ID to [`SpanGroup`].
-    fn id_to_span_group(&self) -> BTreeMap<String, SpanGroup> {
-        self.keys()
-            .map(|k| (k.id().to_owned(), k.clone()))
-            .collect()
-    }
-
-    /// Returns a map from [`SpanGroup`] to its parent.
-    pub fn span_group_to_parent(&self) -> BTreeMap<SpanGroup, Option<SpanGroup>> {
-        let id_to_sg = self.id_to_span_group();
-        self.keys()
-            .map(|sg| {
-                let parent = sg.parent_id().map(|pid| {
-                    id_to_sg
-                        .get(pid)
-                        .expect("`id_to_sg` must have key `pid` by construction")
-                        .clone()
-                });
-                (sg.clone(), parent)
-            })
-            .collect()
-    }
-}
 
 /// Intermediate form of latency information collected for span groups, used during post-processing while
 /// transforming [`SpanGroupPriv`] to [`SpanGroup`].

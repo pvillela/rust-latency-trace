@@ -1,6 +1,6 @@
 //! Provides the ability to obtain interim timing information before the target function terminates.
 
-use crate::{collect::LatencyTrace, refine::Timings};
+use crate::{lt_collect::LatencyTrace, lt_refine::Timings};
 use std::{
     sync::{Arc, Mutex},
     thread::JoinHandle,

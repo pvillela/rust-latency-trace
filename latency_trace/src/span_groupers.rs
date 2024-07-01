@@ -34,7 +34,8 @@ pub fn group_by_all_fields(attrs: &Attributes) -> Vec<(String, String)> {
         .collect()
 }
 
-/// Custom span grouper used to group spans by callsite, ancestors, and a given list of span fields and their values.
+/// Custom span grouper used to group spans by callsite, ancestors, and a given list of span field names. Spans with the same
+/// callsites, ancestors, and values for the specified fields are grouped together.
 pub fn group_by_given_fields<'a>(
     given_names: &'a [&'a str],
 ) -> impl Fn(&Attributes) -> Vec<(String, String)> + Send + Sync + 'a {

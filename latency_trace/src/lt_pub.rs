@@ -1,14 +1,14 @@
-//! Types, methods, and functions exported publicly.
+//! Core [`LatencyTrace`]-related types, methods, and functions exported publicly.
 
+use hdrhistogram::{CreationError, Histogram};
 use std::{
+    collections::BTreeMap,
     error::Error,
     fmt::{Debug, Display},
     future::Future,
     sync::Arc,
     thread,
 };
-
-use hdrhistogram::CreationError;
 use tracing::span::Attributes;
 use tracing_subscriber::{
     layer::{Layered, SubscriberExt},
@@ -16,12 +16,16 @@ use tracing_subscriber::{
     Registry,
 };
 
+use crate::{default_span_grouper, summary_stats, ProbedTrace, SummaryStats, Wrapper};
 pub use crate::{
-    collect::{LatencyTrace, LatencyTraceCfg, Timing},
-    refine::{SpanGroup, Timings, TimingsView},
+    lt_collect::{LatencyTrace, LatencyTraceCfg, Timing},
+    lt_refine::{SpanGroup, Timings, TimingsView},
 };
-use crate::{default_span_grouper, ProbedTrace};
 
+//==============
+// Errors
+
+/// Error returned by [`LatencyTrace`] activation methods.
 #[derive(Debug)]
 pub enum ActivationError {
     HistogramConfigError,
@@ -47,6 +51,9 @@ impl From<TryInitError> for ActivationError {
         Self::TracingSubscriberInitError
     }
 }
+
+//==============
+// pub impl for LatencyTraceCfg
 
 impl Default for LatencyTraceCfg {
     /// Instantiates a default [LatencyTraceCfg]. The defaults are:
@@ -111,6 +118,9 @@ impl LatencyTraceCfg {
     }
 }
 
+//==============
+// pub impl for LatencyTrace
+
 impl LatencyTrace {
     /// Returns the active instance of `Self` if it exists.
     pub fn active() -> Option<LatencyTrace> {
@@ -171,17 +181,6 @@ impl LatencyTrace {
 
     /// Executes the instrumented async function `f`, running on the `tokio` runtime; after `f` completes,
     /// returns the observed latencies.
-    ///
-    /// If a [`LatencyTrace`] has been previously used in the same process with the same `hist_high` and
-    /// `hist_sigfic` but a different `span_grouper` then the previous `span_grouper` will be used instead of
-    /// the new one.
-    ///
-    /// # Panics
-    ///
-    /// If a global default [`tracing::Subscriber`] not provided by this package has been been previously set.
-    ///
-    /// If a [`LatencyTrace`] has been previously used in the same process with different `hist_high` or
-    /// different `hist_sigfic`.
     pub fn measure_latencies_tokio<F>(self, f: impl FnOnce() -> F) -> Timings
     where
         F: Future<Output = ()> + Send,
@@ -197,17 +196,6 @@ impl LatencyTrace {
 
     /// Executes the instrumented function `f`, returning a [`ProbedTrace`] that allows partial latencies to be
     /// reported before `f` completes.
-    ///
-    /// If a [`LatencyTrace`] has been previously used in the same process with the same `hist_high` and
-    /// `hist_sigfic` but a different `span_grouper` then the previous `span_grouper` will be used instead of
-    /// the new one.
-    ///
-    /// # Panics
-    ///
-    /// If a global default [`tracing::Subscriber`] not provided by this package has been been previously set.
-    ///
-    /// If a [`LatencyTrace`] has been previously used in the same process with different `hist_high` or
-    /// different `hist_sigfic`.
     pub fn measure_latencies_probed(
         self,
         f: impl FnOnce() + Send + 'static,
@@ -220,17 +208,6 @@ impl LatencyTrace {
 
     /// Executes the instrumented async function `f`, running on the `tokio` runtime; returns a [`ProbedTrace`]
     /// that allows partial latencies to be reported before `f` completes.
-    ///
-    /// If a [`LatencyTrace`] has been previously used in the same process with the same `hist_high` and
-    /// `hist_sigfic` but a different `span_grouper` then the previous `span_grouper` will be used instead of
-    /// the new one.
-    ///
-    /// # Panics
-    ///
-    /// If a global default [`tracing::Subscriber`] not provided by this package has been been previously set.
-    ///
-    /// If a [`LatencyTrace`] has been previously used in the same process with different `hist_high` or
-    /// different `hist_sigfic`.
     pub fn measure_latencies_probed_tokio<F>(
         self,
         f: impl FnOnce() -> F + Send + 'static,
@@ -245,5 +222,154 @@ impl LatencyTrace {
                 .expect("Tokio runtime error")
                 .block_on(f());
         })
+    }
+}
+
+//==============
+// pub impl for SpanGroup
+
+impl SpanGroup {
+    /// Returns the span group's name.
+    pub fn name(&self) -> &'static str {
+        self.name
+    }
+
+    /// Returns the span group's ID.
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Returns the span group's file name and code line.
+    pub fn code_line(&self) -> &str {
+        &self.code_line
+    }
+
+    /// Returns the span group's properties list.
+    ///
+    /// This list can be empty as is the case with the default span grouper.
+    pub fn props(&self) -> &[(String, String)] {
+        &self.props
+    }
+
+    /// Returns the ID of the span group's parent.
+    pub fn parent_id(&self) -> Option<&str> {
+        self.parent_id.iter().map(|x| x.as_ref()).next()
+    }
+
+    /// Returns the number of ancestor span groups this span group has.
+    pub fn depth(&self) -> usize {
+        self.depth
+    }
+}
+
+//==============
+// pub impl for TimingsView
+
+impl<K> TimingsView<K> {
+    /// Combines histogram values according to sets of keys that yield the same value when `f`
+    /// is applied.
+    pub fn aggregate<G>(&self, f: impl Fn(&K) -> G) -> TimingsView<G>
+    where
+        G: Ord,
+    {
+        let mut res: BTreeMap<G, Histogram<u64>> = BTreeMap::new();
+        for (k, v) in self.iter() {
+            // Construct aggregation map.
+            let g = f(k);
+            let hist = match res.get_mut(&g) {
+                Some(hist) => hist,
+                None => {
+                    res.insert(g, Histogram::new_from(v));
+                    res.get_mut(&f(k))
+                        .expect("key `g == f(k)` was just inserted in `res`")
+                }
+            };
+            hist.add(v)
+                .expect("should not happen given histogram construction");
+        }
+        res.into()
+    }
+
+    /// Combines the histograms of `self` with those of another [`TimingsView`].
+    pub fn add(&mut self, mut other: TimingsView<K>)
+    where
+        K: Ord,
+    {
+        // Combine into self the values in other that have keys in self.
+        for (k, h) in self.iter_mut() {
+            let other_h = other.remove(k);
+            if let Some(other_h) = other_h {
+                h.add(other_h)
+                    .expect("should not happen given histogram construction");
+            }
+        }
+
+        // Insert into self the entries in other that don't have keys in self.
+        for (k, h) in other.0.into_iter() {
+            self.insert(k, h);
+        }
+    }
+
+    /// Produces a map whose values are the [`SummaryStats`] of `self`'s histogram values.
+    pub fn summary_stats(&self) -> Wrapper<BTreeMap<K, SummaryStats>>
+    where
+        K: Ord + Clone,
+    {
+        self.map_values(summary_stats)
+    }
+}
+
+//==============
+// pub impl for Timings
+
+impl Timings {
+    /// Checks whether an aggregation function `f` used in [`Self::aggregate`] is consistent according to the following
+    /// definition:
+    /// - the values resulting from applying `f` to span groups are called ***aggregate key***s
+    /// - the sets of span groups corresponding to each *aggregate key* are called ***aggregates***.
+    /// - an aggregation function is consistent if and only if, for each *aggregate*, all the span groups in the
+    /// *aggregate* have the same callsite.
+    pub fn aggregator_is_consistent<G>(&self, f: impl Fn(&SpanGroup) -> G) -> bool
+    where
+        G: Ord,
+    {
+        let mut aggregates: BTreeMap<G, Arc<str>> = BTreeMap::new();
+        let mut is_consistent = true;
+        for k in self.keys() {
+            let g = f(k);
+            if is_consistent {
+                is_consistent = match aggregates.get(&g) {
+                    Some(code_line) => code_line.as_ref() == k.code_line(),
+                    None => {
+                        aggregates.insert(g, k.code_line.clone());
+                        true
+                    }
+                };
+            }
+        }
+        is_consistent
+    }
+
+    /// Returns a map from span group ID to [`SpanGroup`].
+    fn id_to_span_group(&self) -> BTreeMap<String, SpanGroup> {
+        self.keys()
+            .map(|k| (k.id().to_owned(), k.clone()))
+            .collect()
+    }
+
+    /// Returns a map that associates each [`SpanGroup`] to its parent.
+    pub fn span_group_to_parent(&self) -> BTreeMap<SpanGroup, Option<SpanGroup>> {
+        let id_to_sg = self.id_to_span_group();
+        self.keys()
+            .map(|sg| {
+                let parent = sg.parent_id().map(|pid| {
+                    id_to_sg
+                        .get(pid)
+                        .expect("`id_to_sg` must have key `pid` by construction")
+                        .clone()
+                });
+                (sg.clone(), parent)
+            })
+            .collect()
     }
 }

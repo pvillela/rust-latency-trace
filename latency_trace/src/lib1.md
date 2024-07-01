@@ -10,7 +10,7 @@ Latencies are collected in **microseconds** for all spans with level `trace` or 
 
 This framework should:
 
-- Be **easy to use**. Is should only require a handful of framework lines of code to provide default latency metrics for code instrumented with the Rust [tracing](https://crates.io/crates/tracing) library.
+- Be **easy to use**. It should only require a handful of lines of code to get latency metrics for code instrumented with the Rust [tracing](https://crates.io/crates/tracing) library.
 - Be **self-contained**, i.e., should not depend on the use of external tools like OpenTelemetry collectors, Jaeger, Grafana, etc.
 - **Support** both **sync and async** code.
 - Have **low overhead**, i.e., the latency associated with the collection of latency information should be low.
@@ -34,7 +34,7 @@ This framework uses [`hdrhistogram`](https://docs.rs/hdrhistogram/latest/hdrhist
 Two other design choices support the low overhead goal.
 
 - The _tracing_ library's [`Registry`](https://docs.rs/tracing-subscriber/0.3.17/tracing_subscriber/registry/struct.Registry.html#) is used to store temporary timing data at runtime. As noted in the documentation, "This registry is implemented using a [lock-free sharded slab](https://docs.rs/sharded-slab/0.1.4/x86_64-unknown-linux-gnu/sharded_slab/index.html), and is highly optimized for concurrent access."
-- Runtime data collection takes place independently on each thread, overwhelmingly without the need for inter-thread coordination. The only inter-thread coordination involved is one mutex lock request per thread for the entire duration of the measurement, regardless of the number of spans executed. _After_ the test execution has completed, information is extracted from the various threads, with zero impact on the latency measurements. The [thread_local_collect](https://crates.io/crates/thread_local_collect) library is used to support this design approach.
+- Runtime data collection takes place independently on each thread, overwhelmingly without the need for inter-thread coordination. The only inter-thread coordination involves two mutex lock request per thread (at the beginning of data collection for the thread and at the end) for the entire duration of the measurement, regardless of the number of spans executed. _After_ the test execution has completed, information is post-processed for presentation purposes, with zero impact on the latency measurements. The [thread_local_collect](https://crates.io/crates/thread_local_collect) library is used to support this design approach.
 
 ## Usage modes
 
@@ -55,5 +55,5 @@ Include this library as a dependency in your Cargo.toml:
 
 ```toml
 [dependencies]
-latency_trace = "1.0"
+latency_trace = "0.5"
 ```

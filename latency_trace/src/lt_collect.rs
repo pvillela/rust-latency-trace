@@ -143,7 +143,8 @@ pub(crate) fn op_r(acc1: RawTrace, acc2: RawTrace) -> RawTrace {
 //=================
 // LatencyTraceCfg
 
-/// Configuration information used by both [`LatencyTrace`] and [`crate::LatencyTrace`].
+/// Configuration information for [`LatencyTrace`]. It is instantiated with its [`LatencyTraceCfg::default`] method
+/// and can be customized with its other methods.
 pub struct LatencyTraceCfg {
     pub(crate) span_grouper: SpanGrouper,
     pub(crate) hist_high: u64,
@@ -159,7 +160,7 @@ type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Syn
 //=================
 // LatencyTrace
 
-/// Implements [Layer] and provides access to the latencies collected for different span groups.
+/// Implements [`tracing_subscriber::Layer`] and provides access to the latencies collected for different span groups.
 /// This is the central struct in this framework's implementation.
 ///
 /// There should be a single instance of [`LatencyTrace`] in a process. That instance is set

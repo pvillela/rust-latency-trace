@@ -27,11 +27,11 @@
 #![doc = include_str!("lib2.md")]
 #![deny(clippy::unwrap_used)]
 
-mod collect;
-mod refine;
+mod lt_collect;
+mod lt_refine;
 
-mod publish;
-pub use publish::*;
+mod lt_pub;
+pub use lt_pub::*;
 
 mod span_groupers;
 pub use span_groupers::*;
