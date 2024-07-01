@@ -7,3 +7,4 @@ pub mod examples_support;
 pub mod gater;
 pub mod simple_fns;
 pub mod test_support;
+pub mod work_fns;
