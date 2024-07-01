@@ -33,6 +33,10 @@ name = "bench_simple_divan"
 harness = false
 
 [[bench]]
+name = "bench_simple_real_divan"
+harness = false
+
+[[bench]]
 name = "bench_deep_divan"
 harness = false
 

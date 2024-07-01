@@ -1,27 +1,45 @@
 //! Simple functions for tests and examples.
 
+use crate::work_fns::{lazy_work, real_work};
 use futures::future::join_all;
 use std::{hint::black_box, thread, time::Duration};
 use tracing::{instrument, trace_span, Instrument, Span};
 
+pub fn simple_sync(nrepeats: usize, ntasks: usize, extent: u64) {
+    simple_sync_p(nrepeats, ntasks, extent, lazy_work)
+}
+
+pub fn simple_sync_un(nrepeats: usize, ntasks: usize, extent: u64) {
+    simple_sync_un_p(nrepeats, ntasks, extent, lazy_work)
+}
+
+pub fn simple_real_sync(nrepeats: usize, ntasks: usize, extent: u64) {
+    simple_sync_p(nrepeats, ntasks, extent, real_work)
+}
+
+pub fn simple_real_sync_un(nrepeats: usize, ntasks: usize, extent: u64) {
+    simple_sync_un_p(nrepeats, ntasks, extent, real_work)
+}
+
 /// Instrumented simple sync function
-#[instrument(level = "trace", skip(nrepeats, sleep_micros))]
-pub fn simple_sync(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
-    #[instrument(level = "trace", skip(sleep_micros))]
-    fn g_sync(i: usize, sleep_micros: u64) {
-        // Simulated work
-        thread::sleep(Duration::from_micros(sleep_micros * 2));
-        black_box(i);
-    }
+#[instrument(level = "trace", skip_all)]
+pub fn simple_sync_p(nrepeats: usize, ntasks: usize, extent: u64, work_fn: fn(u64)) {
+    let g_sync = move |i: usize, extent: u64| {
+        trace_span!("g_sync").in_scope(|| {
+            // Simulated work
+            work_fn(extent * 2);
+            black_box(i);
+        });
+    };
 
     let f = move || {
         trace_span!("f").in_scope(|| {
             for i in 0..nrepeats {
                 trace_span!("loop_body", foo = i % 2).in_scope(|| {
                     // Simulated work
-                    thread::sleep(Duration::from_micros(sleep_micros * 3));
+                    work_fn(extent * 3);
 
-                    g_sync(i, sleep_micros);
+                    g_sync(i, extent);
                 });
             }
         });
@@ -45,20 +63,20 @@ pub fn simple_sync(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
 }
 
 /// Uninstrumented simple sync function
-pub fn simple_sync_un(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
-    fn g_sync_un(i: usize, sleep_micros: u64) {
+pub fn simple_sync_un_p(nrepeats: usize, ntasks: usize, extent: u64, work_fn: fn(u64)) {
+    let g_sync_un = move |i: usize, extent: u64| {
         // Simulated work
-        thread::sleep(Duration::from_micros(sleep_micros * 2));
+        work_fn(extent * 2);
         black_box(i);
-    }
+    };
 
     let f = move || {
         for i in 0..nrepeats {
             {
                 // Simulated work
-                thread::sleep(Duration::from_micros(sleep_micros * 3));
+                work_fn(extent * 3);
 
-                g_sync_un(i, sleep_micros);
+                g_sync_un(i, extent);
             };
         }
     };
