@@ -171,7 +171,7 @@ type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Syn
 /// as the global default [`tracing::Subscriber`], of which there can be only one and it can't be changed once
 /// it is set.
 #[derive(Clone)]
-pub struct LatencyTrace<P>
+pub struct LatencyTraceG<P>
 where
     P: TlcParam,
 {
@@ -181,13 +181,13 @@ where
     pub(crate) hist_sigfig: u8,
 }
 
-impl<P> LatencyTrace<P>
+impl<P> LatencyTraceG<P>
 where
     P: TlcParam,
     P::Control: TlcBase,
 {
     pub(crate) fn new(config: LatencyTraceCfg) -> Self {
-        LatencyTrace {
+        LatencyTraceG {
             control: P::Control::new(),
             span_grouper: config.span_grouper,
             hist_high: config.hist_high,
@@ -243,7 +243,7 @@ where
     }
 }
 
-impl<P> LatencyTrace<P>
+impl<P> LatencyTraceG<P>
 where
     P: TlcParam,
     P::Control: TlcJoined,
@@ -256,7 +256,7 @@ where
     }
 }
 
-impl<P> LatencyTrace<P>
+impl<P> LatencyTraceG<P>
 where
     P: TlcParam,
     P::Control: TlcProbed,
@@ -267,7 +267,7 @@ where
     }
 }
 
-impl<S, P> Layer<S> for LatencyTrace<P>
+impl<S, P> Layer<S> for LatencyTraceG<P>
 where
     S: Subscriber,
     S: for<'lookup> LookupSpan<'lookup>,

@@ -21,11 +21,15 @@ use crate::{
     tlc_param::{Probed, TlcBase, TlcJoined, TlcParam, TlcProbed},
     SummaryStats, Wrapper,
 };
-use crate::{
-    lt_collect_g::{LatencyTrace, LatencyTraceCfg, Timing},
+use crate::{lt_collect_g::LatencyTraceG, probed_trace_g::ProbedTraceG};
+
+pub use crate::{
+    lt_collect_g::{LatencyTraceCfg, Timing},
     lt_refine_g::{SpanGroup, Timings, TimingsView},
-    probed_trace_g::ProbedTrace,
 };
+
+pub type LatencyTrace = LatencyTraceG<Probed>;
+pub type ProbedTrace = ProbedTraceG<Probed>;
 
 //==============
 // Errors
@@ -126,11 +130,11 @@ impl LatencyTraceCfg {
 //==============
 // pub impl for LatencyTrace
 
-impl<P> LatencyTrace<P>
+impl<P> LatencyTraceG<P>
 where
     P: TlcParam + Clone + 'static,
     P::Control: TlcBase + Clone,
-    Layered<LatencyTrace<P>, Registry>: Into<Dispatch>,
+    Layered<LatencyTraceG<P>, Registry>: Into<Dispatch>,
 {
     /// Returns the active instance of `Self` if it exists.
     pub fn active() -> Option<Self> {
@@ -157,7 +161,7 @@ where
         let default_dispatch_exists =
             tracing::dispatcher::get_default(|disp| disp.is::<Layered<Self, Registry>>());
         let lt = if !default_dispatch_exists {
-            let lt_new = LatencyTrace::new(config);
+            let lt_new = LatencyTraceG::new(config);
             let reg: Layered<Self, Registry> = Registry::default().with(lt_new.clone());
             reg.try_init()?;
             lt_new
@@ -182,7 +186,7 @@ where
     }
 }
 
-impl<P> LatencyTrace<P>
+impl<P> LatencyTraceG<P>
 where
     P: TlcParam,
     P::Control: TlcJoined,
@@ -210,7 +214,7 @@ where
     }
 }
 
-impl<P> LatencyTrace<P>
+impl<P> LatencyTraceG<P>
 where
     P: TlcParam,
     P::Control: TlcProbed + Clone,
@@ -220,8 +224,8 @@ where
     pub fn measure_latencies_probed(
         self,
         f: impl FnOnce() + Send + 'static,
-    ) -> Result<ProbedTrace<P>, ActivationError> {
-        let pt = ProbedTrace::new(self);
+    ) -> Result<ProbedTraceG<P>, ActivationError> {
+        let pt = ProbedTraceG::new(self);
         let jh = thread::spawn(f);
         pt.set_join_handle(jh);
         Ok(pt)
@@ -232,7 +236,7 @@ where
     pub fn measure_latencies_probed_tokio<F>(
         self,
         f: impl FnOnce() -> F + Send + 'static,
-    ) -> Result<ProbedTrace<P>, ActivationError>
+    ) -> Result<ProbedTraceG<P>, ActivationError>
     where
         F: Future<Output = ()> + Send,
     {

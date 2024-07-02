@@ -1,7 +1,5 @@
 //! Defines traits and impls to support generic [`crate::LatencyTrace`].
 
-use std::marker::PhantomData;
-
 use thread_local_collect::tlm::probed::{Control as ControlP, Holder as HolderP};
 
 use crate::lt_collect_g::{op, AccRawTrace, RawTrace};
@@ -36,27 +34,27 @@ impl TlcBase for ControlP<RawTrace, AccRawTrace> {
     }
 
     fn with_data_mut<V>(&self, f: impl FnOnce(&mut RawTrace) -> V) -> V {
-        ControlP::with_data_mut(&self, f)
+        ControlP::with_data_mut(self, f)
     }
 }
 
-// impl TlcJoined for ControlP<RawTrace, AccRawTrace> {
-//     fn take_tls(&self) {
-//         ControlP::take_tls(&self)
-//     }
+impl TlcJoined for ControlP<RawTrace, AccRawTrace> {
+    fn take_tls(&self) {
+        ControlP::take_tls(self)
+    }
 
-//     fn take_acc(&self, replacement: AccRawTrace) -> AccRawTrace {
-//         ControlP::take_acc(&self, replacement)
-//     }
-// }
+    fn take_acc(&self, replacement: AccRawTrace) -> AccRawTrace {
+        ControlP::take_acc(self, replacement)
+    }
+}
 
-// impl TlcProbed for ControlP<RawTrace, AccRawTrace> {
-//     fn probe_tls(&self) -> AccRawTrace {
-//         ControlP::probe_tls(&self)
-//     }
-// }
+impl TlcProbed for ControlP<RawTrace, AccRawTrace> {
+    fn probe_tls(&self) -> AccRawTrace {
+        ControlP::probe_tls(self)
+    }
+}
 
-// #[derive(Clone)]
+#[derive(Clone)]
 pub struct Probed;
 
 impl TlcParam for Probed {

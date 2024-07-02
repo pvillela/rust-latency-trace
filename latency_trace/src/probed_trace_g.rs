@@ -1,7 +1,7 @@
 //! Provides the ability to obtain interim timing information before the target function terminates.
 
 use crate::{
-    lt_collect_g::LatencyTrace,
+    lt_collect_g::LatencyTraceG,
     lt_refine_g::Timings,
     tlc_param::{TlcBase, TlcParam, TlcProbed},
 };
@@ -13,21 +13,21 @@ use std::{
 /// Represents an ongoing collection of latency information with the ability to report on partial latencies
 /// before the instrumented function completes.
 #[derive(Clone)]
-pub struct ProbedTrace<P>
+pub struct ProbedTraceG<P>
 where
     P: TlcParam,
     P::Control: TlcBase + Clone,
 {
-    ltp: LatencyTrace<P>,
+    ltp: LatencyTraceG<P>,
     join_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
-impl<P> ProbedTrace<P>
+impl<P> ProbedTraceG<P>
 where
     P: TlcParam,
     P::Control: TlcProbed + Clone,
 {
-    pub(crate) fn new(ltp: LatencyTrace<P>) -> Self {
+    pub(crate) fn new(ltp: LatencyTraceG<P>) -> Self {
         Self {
             ltp,
             join_handle: Mutex::new(None).into(),

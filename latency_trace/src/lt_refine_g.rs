@@ -3,7 +3,7 @@
 
 use crate::{
     lt_collect_g::{
-        new_timing, op_r, AccRawTrace, CallsiteInfo, LatencyTrace, Props, RawTrace, SpanGroupPriv,
+        new_timing, op_r, AccRawTrace, CallsiteInfo, LatencyTraceG, Props, RawTrace, SpanGroupPriv,
         Timing,
     },
     tlc_param::{TlcBase, TlcParam},
@@ -91,7 +91,7 @@ type TimingsTemp = HashMap<SpanGroupTemp, Timing>;
 //=================
 // Post-processing
 
-impl<P> LatencyTrace<P>
+impl<P> LatencyTraceG<P>
 where
     P: TlcParam,
     P::Control: TlcBase,
