@@ -9,9 +9,10 @@ use std::{
     thread::{self, ThreadId},
     time::Instant,
 };
-use thread_local_collect::tlm::probed::{Control, Holder};
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
+
+use crate::tlc_param::{TlcBase, TlcJoined, TlcParam, TlcProbed};
 
 //=================
 // Callsite
@@ -73,11 +74,12 @@ pub(crate) fn new_timing(hist_high: u64, hist_sigfig: u8) -> Timing {
     hist
 }
 
+#[doc(hidden)]
 /// Type of latency information internally collected for span groups. The key is [SpanGroupPriv], which is as
 /// light as possible to minimize processing overhead when accessing the map. Therefore, part of the information
 /// required to produce the ultimate results is kept as a separate `callsite_infos` map keyed by [`Identifier`].
 #[derive(Clone)]
-pub(crate) struct RawTrace {
+pub struct RawTrace {
     pub(crate) timings: HashMap<SpanGroupPriv, Timing>,
     pub(crate) callsite_infos: HashMap<Identifier, CallsiteInfo>,
 }
@@ -109,7 +111,7 @@ struct SpanTiming {
     created_at: Instant,
 }
 
-fn op(raw_trace: RawTrace, acc: &mut AccRawTrace, tid: ThreadId) {
+pub(crate) fn op(raw_trace: RawTrace, acc: &mut AccRawTrace, tid: ThreadId) {
     log::debug!("executing `op` for {:?}", tid);
     acc.push(raw_trace);
 }
@@ -169,17 +171,24 @@ type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Syn
 /// as the global default [`tracing::Subscriber`], of which there can be only one and it can't be changed once
 /// it is set.
 #[derive(Clone)]
-pub struct LatencyTrace {
-    control: Control<RawTrace, AccRawTrace>,
+pub struct LatencyTrace<P>
+where
+    P: TlcParam,
+{
+    control: P::Control,
     span_grouper: SpanGrouper,
     pub(crate) hist_high: u64,
     pub(crate) hist_sigfig: u8,
 }
 
-impl LatencyTrace {
-    pub(crate) fn new(config: LatencyTraceCfg) -> LatencyTrace {
+impl<P> LatencyTrace<P>
+where
+    P: TlcParam,
+    P::Control: TlcBase,
+{
+    pub(crate) fn new(config: LatencyTraceCfg) -> Self {
         LatencyTrace {
-            control: Control::new(&LOCAL_INFO, AccRawTrace::new(), RawTrace::new, op),
+            control: P::Control::new(),
             span_grouper: config.span_grouper,
             hist_high: config.hist_high,
             hist_sigfig: config.hist_sigfig,
@@ -232,24 +241,38 @@ impl LatencyTrace {
             }
         });
     }
+}
 
+impl<P> LatencyTrace<P>
+where
+    P: TlcParam,
+    P::Control: TlcJoined,
+{
     /// Extracts the accumulated timings.
     pub(crate) fn take_acc_timings(&self) -> AccRawTrace {
         log::trace!("entering `take_acc_timings`");
         self.control.take_tls();
         self.control.take_acc(AccRawTrace::new())
     }
+}
 
+impl<P> LatencyTrace<P>
+where
+    P: TlcParam,
+    P::Control: TlcProbed,
+{
     pub(crate) fn probe_acc_timings(&self) -> AccRawTrace {
         log::trace!("entering `take_acc_timings`");
         self.control.probe_tls()
     }
 }
 
-impl<S> Layer<S> for LatencyTrace
+impl<S, P> Layer<S> for LatencyTrace<P>
 where
     S: Subscriber,
     S: for<'lookup> LookupSpan<'lookup>,
+    P: TlcParam + 'static,
+    P::Control: TlcBase,
 {
     fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
         let span = ctx
@@ -335,11 +358,4 @@ where
 
         log::trace!("`on_close` end: name={}, id={:?}", span.name(), id);
     }
-}
-
-//=================
-// Thread-locals
-
-thread_local! {
-    static LOCAL_INFO: Holder<RawTrace, AccRawTrace> = Holder::new();
 }

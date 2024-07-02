@@ -9,17 +9,22 @@ use std::{
     sync::Arc,
     thread,
 };
-use tracing::span::Attributes;
+use tracing::{span::Attributes, Dispatch};
 use tracing_subscriber::{
     layer::{Layered, SubscriberExt},
     util::{SubscriberInitExt, TryInitError},
     Registry,
 };
 
-use crate::{default_span_grouper, summary_stats, ProbedTrace, SummaryStats, Wrapper};
-pub use crate::{
-    lt_collect::{LatencyTrace, LatencyTraceCfg, Timing},
-    lt_refine::{SpanGroup, Timings, TimingsView},
+use crate::{
+    default_span_grouper, summary_stats,
+    tlc_param::{Probed, TlcBase, TlcJoined, TlcParam, TlcProbed},
+    SummaryStats, Wrapper,
+};
+use crate::{
+    lt_collect_g::{LatencyTrace, LatencyTraceCfg, Timing},
+    lt_refine_g::{SpanGroup, Timings, TimingsView},
+    probed_trace_g::ProbedTrace,
 };
 
 //==============
@@ -121,11 +126,16 @@ impl LatencyTraceCfg {
 //==============
 // pub impl for LatencyTrace
 
-impl LatencyTrace {
+impl<P> LatencyTrace<P>
+where
+    P: TlcParam + Clone + 'static,
+    P::Control: TlcBase + Clone,
+    Layered<LatencyTrace<P>, Registry>: Into<Dispatch>,
+{
     /// Returns the active instance of `Self` if it exists.
-    pub fn active() -> Option<LatencyTrace> {
+    pub fn active() -> Option<Self> {
         tracing::dispatcher::get_default(|disp| {
-            let lt: &LatencyTrace = disp.downcast_ref()?;
+            let lt: &Self = disp.downcast_ref()?;
             Some(lt.clone())
         })
     }
@@ -142,14 +152,13 @@ impl LatencyTrace {
     /// [`hdrhistogram::Histogram::new_with_bounds`]`(1, hist_high, hist_sigfig)` to fail.
     /// - [`ActivationError::TracingSubscriberInitError`] if a global [`tracing::Subscriber`] is already set and its
     /// type is not the same as `Self`.
-    pub fn activated(config: LatencyTraceCfg) -> Result<LatencyTrace, ActivationError> {
+    pub fn activated(config: LatencyTraceCfg) -> Result<Self, ActivationError> {
         config.validate_hist_high_sigfig()?;
         let default_dispatch_exists =
-            tracing::dispatcher::get_default(|disp| disp.is::<Layered<LatencyTrace, Registry>>());
+            tracing::dispatcher::get_default(|disp| disp.is::<Layered<Self, Registry>>());
         let lt = if !default_dispatch_exists {
             let lt_new = LatencyTrace::new(config);
-            let reg: tracing_subscriber::layer::Layered<LatencyTrace, Registry> =
-                Registry::default().with(lt_new.clone());
+            let reg: Layered<Self, Registry> = Registry::default().with(lt_new.clone());
             reg.try_init()?;
             lt_new
         } else {
@@ -168,10 +177,16 @@ impl LatencyTrace {
     /// # Errors
     /// - [`ActivationError::TracingSubscriberInitError`] if a global [`tracing::Subscriber`] is already set and its
     /// type is not the same as `Self`.
-    pub fn activated_default() -> Result<LatencyTrace, ActivationError> {
+    pub fn activated_default() -> Result<Self, ActivationError> {
         Self::activated(LatencyTraceCfg::default())
     }
+}
 
+impl<P> LatencyTrace<P>
+where
+    P: TlcParam,
+    P::Control: TlcJoined,
+{
     /// Executes the instrumented function `f` and, after `f` completes, returns the observed latencies.
     pub fn measure_latencies(&self, f: impl FnOnce()) -> Timings {
         f();
@@ -193,13 +208,19 @@ impl LatencyTrace {
                 .block_on(f());
         })
     }
+}
 
+impl<P> LatencyTrace<P>
+where
+    P: TlcParam,
+    P::Control: TlcProbed + Clone,
+{
     /// Executes the instrumented function `f`, returning a [`ProbedTrace`] that allows partial latencies to be
     /// reported before `f` completes.
     pub fn measure_latencies_probed(
         self,
         f: impl FnOnce() + Send + 'static,
-    ) -> Result<ProbedTrace, ActivationError> {
+    ) -> Result<ProbedTrace<P>, ActivationError> {
         let pt = ProbedTrace::new(self);
         let jh = thread::spawn(f);
         pt.set_join_handle(jh);
@@ -211,7 +232,7 @@ impl LatencyTrace {
     pub fn measure_latencies_probed_tokio<F>(
         self,
         f: impl FnOnce() -> F + Send + 'static,
-    ) -> Result<ProbedTrace, ActivationError>
+    ) -> Result<ProbedTrace<P>, ActivationError>
     where
         F: Future<Output = ()> + Send,
     {
@@ -265,59 +286,59 @@ impl SpanGroup {
 //==============
 // pub impl for TimingsView
 
-// impl<K> TimingsView<K> {
-//     /// Combines histogram values according to sets of keys that yield the same value when `f`
-//     /// is applied.
-//     pub fn aggregate<G>(&self, f: impl Fn(&K) -> G) -> TimingsView<G>
-//     where
-//         G: Ord,
-//     {
-//         let mut res: BTreeMap<G, Histogram<u64>> = BTreeMap::new();
-//         for (k, v) in self.iter() {
-//             // Construct aggregation map.
-//             let g = f(k);
-//             let hist = match res.get_mut(&g) {
-//                 Some(hist) => hist,
-//                 None => {
-//                     res.insert(g, Histogram::new_from(v));
-//                     res.get_mut(&f(k))
-//                         .expect("key `g == f(k)` was just inserted in `res`")
-//                 }
-//             };
-//             hist.add(v)
-//                 .expect("should not happen given histogram construction");
-//         }
-//         res.into()
-//     }
+impl<K> TimingsView<K> {
+    /// Combines histogram values according to sets of keys that yield the same value when `f`
+    /// is applied.
+    pub fn aggregate<G>(&self, f: impl Fn(&K) -> G) -> TimingsView<G>
+    where
+        G: Ord,
+    {
+        let mut res: BTreeMap<G, Histogram<u64>> = BTreeMap::new();
+        for (k, v) in self.iter() {
+            // Construct aggregation map.
+            let g = f(k);
+            let hist = match res.get_mut(&g) {
+                Some(hist) => hist,
+                None => {
+                    res.insert(g, Histogram::new_from(v));
+                    res.get_mut(&f(k))
+                        .expect("key `g == f(k)` was just inserted in `res`")
+                }
+            };
+            hist.add(v)
+                .expect("should not happen given histogram construction");
+        }
+        res.into()
+    }
 
-//     /// Combines the histograms of `self` with those of another [`TimingsView`].
-//     pub fn add(&mut self, mut other: TimingsView<K>)
-//     where
-//         K: Ord,
-//     {
-//         // Combine into self the values in other that have keys in self.
-//         for (k, h) in self.iter_mut() {
-//             let other_h = other.remove(k);
-//             if let Some(other_h) = other_h {
-//                 h.add(other_h)
-//                     .expect("should not happen given histogram construction");
-//             }
-//         }
+    /// Combines the histograms of `self` with those of another [`TimingsView`].
+    pub fn add(&mut self, mut other: TimingsView<K>)
+    where
+        K: Ord,
+    {
+        // Combine into self the values in other that have keys in self.
+        for (k, h) in self.iter_mut() {
+            let other_h = other.remove(k);
+            if let Some(other_h) = other_h {
+                h.add(other_h)
+                    .expect("should not happen given histogram construction");
+            }
+        }
 
-//         // Insert into self the entries in other that don't have keys in self.
-//         for (k, h) in other.0.into_iter() {
-//             self.insert(k, h);
-//         }
-//     }
+        // Insert into self the entries in other that don't have keys in self.
+        for (k, h) in other.0.into_iter() {
+            self.insert(k, h);
+        }
+    }
 
-//     /// Produces a map whose values are the [`SummaryStats`] of `self`'s histogram values.
-//     pub fn summary_stats(&self) -> Wrapper<BTreeMap<K, SummaryStats>>
-//     where
-//         K: Ord + Clone,
-//     {
-//         self.map_values(summary_stats)
-//     }
-// }
+    /// Produces a map whose values are the [`SummaryStats`] of `self`'s histogram values.
+    pub fn summary_stats(&self) -> Wrapper<BTreeMap<K, SummaryStats>>
+    where
+        K: Ord + Clone,
+    {
+        self.map_values(summary_stats)
+    }
+}
 
 //==============
 // pub impl for Timings

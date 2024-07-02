@@ -28,9 +28,13 @@
 #![deny(clippy::unwrap_used)]
 
 mod lt_collect;
+mod lt_collect_g;
 mod lt_refine;
+mod lt_refine_g;
+mod tlc_param;
 
 mod lt_pub;
+mod lt_pub_g;
 pub use lt_pub::*;
 
 mod span_groupers;
@@ -40,6 +44,7 @@ mod summary_stats;
 pub use summary_stats::*;
 
 mod probed_trace;
+mod probed_trace_g;
 pub use probed_trace::*;
 
 mod wrapper;
