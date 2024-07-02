@@ -21,11 +21,11 @@ use crate::{
     tlc_param::{Probed, TlcBase, TlcJoined, TlcParam, TlcProbed},
     SummaryStats, Wrapper,
 };
-use crate::{lt_collect_g::LatencyTraceG, probed_trace_g::ProbedTraceG};
 
 pub use crate::{
-    lt_collect_g::{LatencyTraceCfg, Timing},
+    lt_collect_g::{LatencyTraceCfg, LatencyTraceG, Timing},
     lt_refine_g::{SpanGroup, Timings, TimingsView},
+    probed_trace_g::ProbedTraceG,
 };
 
 pub type LatencyTrace = LatencyTraceG<Probed>;
