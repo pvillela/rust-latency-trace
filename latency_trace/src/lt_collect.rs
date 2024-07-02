@@ -160,8 +160,9 @@ type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Syn
 //=================
 // LatencyTrace
 
+/// Core type supporting latency mesurements.
+///
 /// Implements [`tracing_subscriber::Layer`] and provides access to the latencies collected for different span groups.
-/// This is the central struct in this framework's implementation.
 ///
 /// There should be a single instance of [`LatencyTrace`] in a process. That instance is set
 /// (by method [`Self::activated`] or [`Self::activated_default`])
