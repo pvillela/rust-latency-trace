@@ -33,7 +33,7 @@ impl ProbedTrace {
 
     /// Returns partial latencies collected when the call is made.
     pub fn probe_latencies(&self) -> Timings {
-        let acc = self.lt.0.probe_acc_timings();
+        let acc = self.lt.0.control.probe_tls();
         self.lt.0.report_timings(acc)
     }
 

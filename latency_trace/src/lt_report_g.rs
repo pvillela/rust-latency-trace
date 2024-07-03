@@ -18,7 +18,7 @@ use crate::{
     default_span_grouper,
     lt_collect_g::{LatencyTraceCfg, LatencyTraceG, Timing},
     lt_refine_g::Timings,
-    tlc_param::{TlcBase, TlcJoined, TlcParam},
+    tlc_param::{TlcBase, TlcDirect, TlcParam},
 };
 
 //==============
@@ -147,7 +147,7 @@ where
 impl<P> LatencyTraceG<P>
 where
     P: TlcParam,
-    P::Control: TlcJoined,
+    P::Control: TlcDirect,
 {
     /// Executes the instrumented function `f` and, after `f` completes, returns the observed latencies.
     pub fn measure_latencies(&self, f: impl FnOnce()) -> Timings {

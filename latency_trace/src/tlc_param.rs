@@ -4,12 +4,11 @@
 //! These traits are used internally only but have to be public because they are used in benchmarks
 //! involving [`crate::LatencyTraceJ`] (which is hidden from generated documentation).
 
+use crate::lt_collect_g::{op, AccRawTrace, RawTrace};
 use thread_local_collect::tlm::{
     joined::{Control as ControlJ, Holder as HolderJ},
     probed::{Control as ControlP, Holder as HolderP},
 };
-
-use crate::lt_collect_g::{op, AccRawTrace, RawTrace};
 
 pub trait TlcParam {
     type Control;
@@ -20,17 +19,20 @@ pub trait TlcBase {
     fn with_data_mut<V>(&self, f: impl FnOnce(&mut RawTrace) -> V) -> V;
 }
 
-pub trait TlcJoined: TlcBase {
+pub trait TlcDirect: TlcBase {
     fn take_tls(&self);
     fn take_acc(&self, replacement: AccRawTrace) -> AccRawTrace;
 }
 
-pub trait TlcProbed: TlcJoined {
-    fn probe_tls(&self) -> AccRawTrace;
-}
-
 //==============
 // Impl for Probed
+
+#[derive(Clone)]
+pub(crate) struct Probed;
+
+impl TlcParam for Probed {
+    type Control = ControlP<RawTrace, AccRawTrace>;
+}
 
 thread_local! {
     static LOCAL_INFO_PROBED: HolderP<RawTrace, AccRawTrace> = HolderP::new();
@@ -46,7 +48,7 @@ impl TlcBase for ControlP<RawTrace, AccRawTrace> {
     }
 }
 
-impl TlcJoined for ControlP<RawTrace, AccRawTrace> {
+impl TlcDirect for ControlP<RawTrace, AccRawTrace> {
     fn take_tls(&self) {
         ControlP::take_tls(self)
     }
@@ -56,21 +58,15 @@ impl TlcJoined for ControlP<RawTrace, AccRawTrace> {
     }
 }
 
-impl TlcProbed for ControlP<RawTrace, AccRawTrace> {
-    fn probe_tls(&self) -> AccRawTrace {
-        ControlP::probe_tls(self)
-    }
-}
-
-#[derive(Clone)]
-pub struct Probed;
-
-impl TlcParam for Probed {
-    type Control = ControlP<RawTrace, AccRawTrace>;
-}
-
 //==============
 // Impl for Joined
+
+#[derive(Clone)]
+pub struct Joined;
+
+impl TlcParam for Joined {
+    type Control = ControlJ<RawTrace, AccRawTrace>;
+}
 
 thread_local! {
     static LOCAL_INFO_JOINED: HolderJ<RawTrace, AccRawTrace> = HolderJ::new();
@@ -86,7 +82,7 @@ impl TlcBase for ControlJ<RawTrace, AccRawTrace> {
     }
 }
 
-impl TlcJoined for ControlJ<RawTrace, AccRawTrace> {
+impl TlcDirect for ControlJ<RawTrace, AccRawTrace> {
     fn take_tls(&self) {
         ControlJ::take_own_tl(self)
     }
@@ -94,11 +90,4 @@ impl TlcJoined for ControlJ<RawTrace, AccRawTrace> {
     fn take_acc(&self, replacement: AccRawTrace) -> AccRawTrace {
         ControlJ::take_acc(self, replacement)
     }
-}
-
-#[derive(Clone)]
-pub struct Joined;
-
-impl TlcParam for Joined {
-    type Control = ControlJ<RawTrace, AccRawTrace>;
 }

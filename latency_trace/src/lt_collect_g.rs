@@ -12,7 +12,7 @@ use std::{
 use tracing::{callsite::Identifier, span::Attributes, Id, Subscriber};
 use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
-use crate::tlc_param::{TlcBase, TlcJoined, TlcParam, TlcProbed};
+use crate::tlc_param::{TlcBase, TlcDirect, TlcParam};
 
 //=================
 // Callsite
@@ -177,7 +177,7 @@ pub struct LatencyTraceG<P>
 where
     P: TlcParam,
 {
-    control: P::Control,
+    pub(crate) control: P::Control,
     span_grouper: SpanGrouper,
     pub(crate) hist_high: u64,
     pub(crate) hist_sigfig: u8,
@@ -248,24 +248,13 @@ where
 impl<P> LatencyTraceG<P>
 where
     P: TlcParam,
-    P::Control: TlcJoined,
+    P::Control: TlcDirect,
 {
     /// Extracts the accumulated timings.
     pub(crate) fn take_acc_timings(&self) -> AccRawTrace {
         log::trace!("entering `take_acc_timings`");
         self.control.take_tls();
         self.control.take_acc(AccRawTrace::new())
-    }
-}
-
-impl<P> LatencyTraceG<P>
-where
-    P: TlcParam,
-    P::Control: TlcProbed,
-{
-    pub(crate) fn probe_acc_timings(&self) -> AccRawTrace {
-        log::trace!("entering `take_acc_timings`");
-        self.control.probe_tls()
     }
 }
 
