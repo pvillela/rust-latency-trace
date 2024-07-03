@@ -98,5 +98,5 @@ impl TlcJoined for ControlJ<RawTrace, AccRawTrace> {
 pub struct Joined;
 
 impl TlcParam for Joined {
-    type Control = ControlP<RawTrace, AccRawTrace>;
+    type Control = ControlJ<RawTrace, AccRawTrace>;
 }
