@@ -49,3 +49,7 @@ pub use wrapper::*;
 #[cfg(feature = "dev")]
 #[doc(hidden)]
 pub mod bench_support;
+
+#[cfg(feature = "dev")]
+#[doc(hidden)]
+pub mod bench_support_j;

@@ -1,6 +1,9 @@
 //! Defines traits and impls to support generic [`crate::LatencyTrace`].
 
-use thread_local_collect::tlm::probed::{Control as ControlP, Holder as HolderP};
+use thread_local_collect::tlm::{
+    joined::{Control as ControlJ, Holder as HolderJ},
+    probed::{Control as ControlP, Holder as HolderP},
+};
 
 use crate::lt_collect_g::{op, AccRawTrace, RawTrace};
 
@@ -23,6 +26,9 @@ pub trait TlcJoined: TlcBase {
 pub trait TlcProbed: TlcJoined {
     fn probe_tls(&self) -> AccRawTrace;
 }
+
+//==============
+// Impl for Probed
 
 thread_local! {
     static LOCAL_INFO_PROBED: HolderP<RawTrace, AccRawTrace> = HolderP::new();
@@ -58,5 +64,39 @@ impl TlcProbed for ControlP<RawTrace, AccRawTrace> {
 pub struct Probed;
 
 impl TlcParam for Probed {
+    type Control = ControlP<RawTrace, AccRawTrace>;
+}
+
+//==============
+// Impl for Joined
+
+thread_local! {
+    static LOCAL_INFO_JOINED: HolderJ<RawTrace, AccRawTrace> = HolderJ::new();
+}
+
+impl TlcBase for ControlJ<RawTrace, AccRawTrace> {
+    fn new() -> Self {
+        ControlJ::new(&LOCAL_INFO_JOINED, AccRawTrace::new(), RawTrace::new, op)
+    }
+
+    fn with_data_mut<V>(&self, f: impl FnOnce(&mut RawTrace) -> V) -> V {
+        ControlJ::with_data_mut(self, f)
+    }
+}
+
+impl TlcJoined for ControlJ<RawTrace, AccRawTrace> {
+    fn take_tls(&self) {
+        ControlJ::take_own_tl(self)
+    }
+
+    fn take_acc(&self, replacement: AccRawTrace) -> AccRawTrace {
+        ControlJ::take_acc(self, replacement)
+    }
+}
+
+#[derive(Clone)]
+pub struct Joined;
+
+impl TlcParam for Joined {
     type Control = ControlP<RawTrace, AccRawTrace>;
 }

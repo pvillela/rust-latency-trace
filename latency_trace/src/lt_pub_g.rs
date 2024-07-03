@@ -18,7 +18,7 @@ use tracing_subscriber::{
 
 use crate::{
     default_span_grouper, summary_stats,
-    tlc_param::{Probed, TlcBase, TlcJoined, TlcParam, TlcProbed},
+    tlc_param::{Joined, Probed, TlcBase, TlcJoined, TlcParam, TlcProbed},
     SummaryStats, Wrapper,
 };
 
@@ -28,8 +28,12 @@ pub use crate::{
     probed_trace_g::ProbedTraceG,
 };
 
+//==============
+// Exported aliases
+
 pub type LatencyTrace = LatencyTraceG<Probed>;
 pub type ProbedTrace = ProbedTraceG<Probed>;
+pub type LatencyTraceJ = LatencyTraceG<Joined>;
 
 //==============
 // Errors
