@@ -145,7 +145,7 @@ pub(crate) fn op_r(acc1: RawTrace, acc2: RawTrace) -> RawTrace {
 //=================
 // LatencyTraceCfg
 
-/// Configuration information for [`LatencyTraceG`]. It is instantiated with its [`LatencyTraceCfg::default`] method
+/// Configuration information for [`LatencyTrace`](crate::LatencyTrace). It is instantiated with its [`LatencyTraceCfg::default`] method
 /// and can be customized with its other methods.
 pub struct LatencyTraceCfg {
     pub(crate) span_grouper: SpanGrouper,
@@ -162,7 +162,9 @@ type SpanGrouper = Arc<dyn Fn(&Attributes) -> Vec<(String, String)> + Send + Syn
 //=================
 // LatencyTrace
 
-/// Core type supporting latency mesurements.
+#[doc(hidden)]
+/// Core generic type supporting latency mesurements. Supports latency collection and aggregation with different
+/// [`thread_local_collect::tlm`] modules.
 ///
 /// Implements [`tracing_subscriber::Layer`] and provides access to the latencies collected for different span groups.
 ///

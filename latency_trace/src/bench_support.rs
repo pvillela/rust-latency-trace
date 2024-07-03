@@ -11,7 +11,7 @@ pub fn measure_latencies1(lt: LatencyTrace) {
 /// Executes tracing up to completion of instrumnted function, before final collection and aggregation.
 pub fn measure_latencies2(lt: LatencyTrace, f: impl FnOnce()) -> usize {
     f();
-    black_box(lt.take_acc_timings().len())
+    black_box(lt.0.take_acc_timings().len())
 }
 
 /// Executes tracing up to completion of instrumnted async function, before final collection and aggregation.

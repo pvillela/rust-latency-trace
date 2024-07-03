@@ -1,35 +1,24 @@
 //! Provides the ability to obtain interim timing information before the target function terminates.
 
-use crate::{
-    lt_collect_g::LatencyTraceG,
-    lt_refine_g::Timings,
-    tlc_param::{TlcBase, TlcParam, TlcProbed},
-};
 use std::{
     sync::{Arc, Mutex},
     thread::JoinHandle,
 };
 
+use crate::{LatencyTrace, Timings};
+
 /// Represents an ongoing collection of latency information with the ability to report on partial latencies
 /// before the instrumented function completes.
 #[derive(Clone)]
-pub struct ProbedTraceG<P>
-where
-    P: TlcParam,
-    P::Control: TlcBase + Clone,
-{
-    ltp: LatencyTraceG<P>,
+pub struct ProbedTrace {
+    lt: LatencyTrace,
     join_handle: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
-impl<P> ProbedTraceG<P>
-where
-    P: TlcParam,
-    P::Control: TlcProbed + Clone,
-{
-    pub(crate) fn new(ltp: LatencyTraceG<P>) -> Self {
+impl ProbedTrace {
+    pub(crate) fn new(lt: LatencyTrace) -> Self {
         Self {
-            ltp,
+            lt,
             join_handle: Mutex::new(None).into(),
         }
     }
@@ -44,8 +33,8 @@ where
 
     /// Returns partial latencies collected when the call is made.
     pub fn probe_latencies(&self) -> Timings {
-        let acc = self.ltp.probe_acc_timings();
-        self.ltp.report_timings(acc)
+        let acc = self.lt.0.probe_acc_timings();
+        self.lt.0.report_timings(acc)
     }
 
     /// Blocks until the function being measured completes, and then returns the collected latency information.
@@ -63,7 +52,7 @@ where
         join_handle
             .join()
             .expect("ProbedTrace execution thread exited abnormally");
-        let acc = self.ltp.take_acc_timings();
-        self.ltp.report_timings(acc)
+        let acc = self.lt.0.take_acc_timings();
+        self.lt.0.report_timings(acc)
     }
 }
