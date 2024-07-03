@@ -8,13 +8,13 @@ repository = "https://github.com/pvillela/rust-latency-trace/tree/main"
 readme = "README.md"
 keywords = ["latency", "observability", "measurement", "tracing", "performance"]
 categories = ["development-tools::profiling"]
-exclude = ["src/bench_support.rs"]
+exclude = ["src/bench_support*.rs"]
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thread_local_collect = { path = "../../thread-local-collect", version = "1.0" }
+thread_local_collect = { path = "../../thread-local-collect", version = "0.6" }
 # thread_local_collect = "0.5"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
