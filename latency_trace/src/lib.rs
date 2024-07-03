@@ -28,8 +28,8 @@
 #![deny(clippy::unwrap_used)]
 
 mod lt_collect_g;
-mod lt_report_g;
 mod lt_refine_g;
+mod lt_report_g;
 mod probed_trace;
 mod tlc_param;
 

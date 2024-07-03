@@ -13,8 +13,8 @@ use crate::{
 };
 pub use crate::{
     lt_collect_g::{LatencyTraceCfg, Timing},
-    lt_report_g::ActivationError,
     lt_refine_g::{SpanGroup, Timings, TimingsView},
+    lt_report_g::ActivationError,
     probed_trace::ProbedTrace,
 };
 

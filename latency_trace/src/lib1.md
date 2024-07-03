@@ -49,6 +49,10 @@ The following modes of latency information reporting are supported:
 
 This framework supports [tokio](https://crates.io/crates/tokio) out-of-the-box (see [`LatencyTrace::measure_latencies_tokio`] and [`LatencyTrace::measure_latencies_probed_tokio`]) but other async runtimes can be used as well by simply wrapping the async code with the chosen async runtime and using one of the sync methods ([`LatencyTrace::measure_latencies`] or [`LatencyTrace::measure_latencies_probed`]). The source code for the above-mentioned _tokio_ variants shows exactly how to do it.
 
+## Rust version requirements
+
+This version of this library can be compiled with rustc 1.79.0 or higher. It may work with earlier rustc versions but that is not guaranteed.
+
 ## Usage
 
 Include this library as a dependency in your Cargo.toml:
