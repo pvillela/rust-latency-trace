@@ -1,4 +1,8 @@
-//! Defines traits and impls to support generic [`crate::LatencyTrace`].
+//! Defines traits and impls to support generic [`crate::lt_collect_g::LatencyTraceG`] parameterized by
+//! `Control` objects from different [`thread_local_collect::tlm`] sub-modules.
+//!
+//! These traits are used internally only but have to be public because they are used in benchmarks
+//! involving [`crate::LatencyTraceJ`] (which is hidden from generated documentation).
 
 use thread_local_collect::tlm::{
     joined::{Control as ControlJ, Holder as HolderJ},
@@ -7,12 +11,10 @@ use thread_local_collect::tlm::{
 
 use crate::lt_collect_g::{op, AccRawTrace, RawTrace};
 
-#[doc(hidden)]
 pub trait TlcParam {
     type Control;
 }
 
-#[doc(hidden)]
 pub trait TlcBase {
     fn new() -> Self;
     fn with_data_mut<V>(&self, f: impl FnOnce(&mut RawTrace) -> V) -> V;
