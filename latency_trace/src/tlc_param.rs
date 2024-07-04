@@ -100,7 +100,7 @@ impl TlcDirect for ControlJ<RawTrace, AccRawTrace> {
 #[derive(Clone)]
 pub struct Either;
 
-const PROBED_SELECTED: AtomicBool = AtomicBool::new(true);
+static PROBED_SELECTED: AtomicBool = AtomicBool::new(true);
 
 impl Either {
     pub fn select_probed() {
