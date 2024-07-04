@@ -1,11 +1,10 @@
 //! Provides the ability to obtain interim timing information before the target function terminates.
 
+use crate::{LatencyTrace, Timings};
 use std::{
     sync::{Arc, Mutex},
     thread::JoinHandle,
 };
-
-use crate::{LatencyTrace, Timings};
 
 /// Represents an ongoing collection of latency information with the ability to report on partial latencies
 /// before the instrumented function completes.

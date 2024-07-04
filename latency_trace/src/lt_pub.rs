@@ -1,6 +1,6 @@
 //! Publicly exported core [`LatencyTrace`]-related types and methods.
 
-use std::{collections::BTreeMap, future::Future, sync::Arc, thread};
+use std::{collections::BTreeMap, sync::Arc, thread};
 
 use hdrhistogram::Histogram;
 use tracing::span::Attributes;
@@ -132,15 +132,6 @@ impl LatencyTrace {
         self.0.measure_latencies(f)
     }
 
-    /// Executes the instrumented async function `f`, running on the `tokio` runtime; after `f` completes,
-    /// returns the observed latencies.
-    pub fn measure_latencies_tokio<F>(&self, f: impl FnOnce() -> F) -> Timings
-    where
-        F: Future<Output = ()> + Send,
-    {
-        self.0.measure_latencies_tokio(f)
-    }
-
     /// Executes the instrumented function `f`, returning a [`ProbedTrace`] that allows partial latencies to be
     /// reported before `f` completes.
     pub fn measure_latencies_probed(
@@ -151,24 +142,6 @@ impl LatencyTrace {
         let jh = thread::spawn(f);
         pt.set_join_handle(jh);
         Ok(pt)
-    }
-
-    /// Executes the instrumented async function `f`, running on the `tokio` runtime; returns a [`ProbedTrace`]
-    /// that allows partial latencies to be reported before `f` completes.
-    pub fn measure_latencies_probed_tokio<F>(
-        self,
-        f: impl FnOnce() -> F + Send + 'static,
-    ) -> Result<ProbedTrace, ActivationError>
-    where
-        F: Future<Output = ()> + Send,
-    {
-        self.measure_latencies_probed(|| {
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .expect("Tokio runtime error")
-                .block_on(f());
-        })
     }
 }
 

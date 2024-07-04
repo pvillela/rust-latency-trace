@@ -20,6 +20,6 @@ cargo makedocs \
 
 popd
 
-cargo doc -p latency_trace --no-deps
+cargo doc -p latency_trace --no-deps --all-features
 
 git status

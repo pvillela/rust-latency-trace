@@ -19,6 +19,7 @@ hdrhistogram = "7.5"
 
 latency_trace = { path = "../latency_trace", version = "0.5", features = [
     "dev",
+    "tokio",
 ] }
 
 [[bench]]

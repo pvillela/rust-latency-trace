@@ -45,6 +45,9 @@ pub use summary_stats::*;
 mod wrapper;
 pub use wrapper::*;
 
+#[cfg(feature = "tokio")]
+mod lt_pub_tokio;
+
 #[cfg(feature = "dev")]
 #[doc(hidden)]
 pub mod bench_support;

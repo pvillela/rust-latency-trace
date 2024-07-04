@@ -1,3 +1,5 @@
+//! Requires `feature="tokio"`.
+
 use latency_trace::{summary_stats, LatencyTrace};
 use std::time::Duration;
 use tracing::{instrument, trace_span, Instrument};

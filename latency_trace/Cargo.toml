@@ -16,7 +16,7 @@ exclude = ["src/bench_support*.rs"]
 [dependencies]
 thread_local_collect = { path = "../../thread-local-collect", version = "0.6" }
 # thread_local_collect = "0.5"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["full"], optional = true }
 tracing = "0.1"
 
 # Removed "log" feature to prevent `tracng-log` from being pulled in and causing issues with `env_logger`
@@ -33,5 +33,9 @@ sha2 = "0.10"
 base64ct = { version = "1", features = ["alloc"] }
 
 [features]
+tokio = ["dep:tokio"]
 # intended only to be used by crate 'dev_support' for code downloaded from the repo
 dev = []
+
+[package.metadata.docs.rs]
+all-features = true
