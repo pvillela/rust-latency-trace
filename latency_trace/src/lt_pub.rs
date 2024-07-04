@@ -8,7 +8,7 @@ use tracing::span::Attributes;
 use crate::{
     lt_collect_g::LatencyTraceG,
     summary_stats,
-    tlc_param::{Joined, Probed},
+    tlc_param::{Either, Joined, Probed},
     SummaryStats, Wrapper,
 };
 pub use crate::{
@@ -24,6 +24,20 @@ pub use crate::{
 #[doc(hidden)]
 /// Used for benchmarking purposes only
 pub type LatencyTraceJ = LatencyTraceG<Joined>;
+
+#[doc(hidden)]
+/// Used for benchmarking purposes only
+pub type LatencyTraceE = LatencyTraceG<Either>;
+
+impl LatencyTraceE {
+    pub fn select_probed() {
+        Either::select_probed();
+    }
+
+    pub fn select_joined() {
+        Either::select_joined()
+    }
+}
 
 //==============
 // pub impl for LatencyTraceCfg
