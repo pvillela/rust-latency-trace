@@ -15,7 +15,7 @@ exclude = ["src/bench_support*.rs"]
 
 [dependencies]
 thread_local_collect = { path = "../../thread-local-collect", version = "0.6" }
-# thread_local_collect = "0.5"
+# thread_local_collect = "0.6"
 tokio = { version = "1", features = ["full"], optional = true }
 tracing = "0.1"
 

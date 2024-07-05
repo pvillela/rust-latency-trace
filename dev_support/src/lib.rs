@@ -1,5 +1,6 @@
 //! Code to support development of examples, tests, and benchmarks.
 
+pub mod bench_diff;
 pub mod bench_support;
 pub mod deep_fns;
 pub mod elab_fns;

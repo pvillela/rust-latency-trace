@@ -46,6 +46,9 @@ mod wrapper;
 pub use wrapper::*;
 
 #[cfg(feature = "tokio")]
+mod lt_report_g_tokio;
+
+#[cfg(feature = "tokio")]
 mod lt_pub_tokio;
 
 #[cfg(feature = "dev")]

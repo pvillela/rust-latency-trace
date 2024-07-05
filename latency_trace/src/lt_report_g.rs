@@ -1,10 +1,9 @@
-//! [`LatencyTraceG`] activation and measurment methods.
+//! [`LatencyTraceG`] activation and measurment methods, other supporting types and/or impls.
 
 use hdrhistogram::CreationError;
 use std::{
     error::Error,
     fmt::{Debug, Display},
-    future::Future,
     sync::Arc,
 };
 use tracing::Dispatch;
@@ -154,20 +153,5 @@ where
         f();
         let acc = self.take_acc_timings();
         self.report_timings(acc)
-    }
-
-    /// Executes the instrumented async function `f`, running on the `tokio` runtime; after `f` completes,
-    /// returns the observed latencies.
-    pub fn measure_latencies_tokio<F>(&self, f: impl FnOnce() -> F) -> Timings
-    where
-        F: Future<Output = ()> + Send,
-    {
-        self.measure_latencies(move || {
-            tokio::runtime::Builder::new_multi_thread()
-                .enable_all()
-                .build()
-                .expect("Tokio runtime error")
-                .block_on(f());
-        })
     }
 }
