@@ -4,8 +4,8 @@
 //! and [`latency_trace::LatencyTraceJ`] which uses
 //! [`thread_local_collect::tlm::joined`](https://docs.rs/thread_local_collect/latest/thread_local_collect/tlm/joined/index.html).
 //!
-//! Running `cargo run -r --example simple_real_sync_probed_vs_joined 200 10 100 5 20000` shows quite conclusively that there is
-//! no measurable difference in overhead with one `thread_local_collect` module versus the other. That command
+//! Running `cargo bench --bench bench_diff_simple_real_sync_probed_vs_joined -- 200 10 100 5 20000` shows quite conclusively
+//! that there is no measurable difference in overhead with one `thread_local_collect` module versus the other. That command
 //! could take up to a couple of minutes to finish.
 
 use dev_support::{bench_diff::bench_diff, simple_fns::simple_real_sync};
@@ -48,8 +48,10 @@ fn cmd_line_args() -> Option<(usize, usize, usize, usize, u64)> {
 }
 
 fn main() {
-    let (outer_loop, inner_loop, nrepeats, ntasks, extent) =
-        cmd_line_args().unwrap_or((20, 10, 100, 5, 20_000));
+    let args = cmd_line_args().unwrap_or((20, 10, 100, 5, 20_000));
+    println!("\nargs: {args:?}");
+
+    let (outer_loop, inner_loop, nrepeats, ntasks, extent) = args;
 
     let lt = LatencyTraceE::activated_default().unwrap();
 

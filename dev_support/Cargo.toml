@@ -49,3 +49,11 @@ harness = false
 [[bench]]
 name = "bench_real_work_divan"
 harness = false
+
+[[bench]]
+name = "bench_overhead_simple_real_sync"
+harness = false
+
+[[bench]]
+name = "bench_diff_simple_real_sync_probed_vs_joined"
+harness = false

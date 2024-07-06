@@ -71,7 +71,7 @@ The optional feature `tokio` enables the `tokio`-related methods of [`LatencyTra
 latency_trace = { version = "0.5", features = "tokio" }
 ```
 
-To run the `*_async_*` examples from the cloned/downloaded source [repo](https://github.com/pvillela/rust-latency-trace/tree/main) (under either the `latency_trace` or `dev_support` directory), specify `--features tokio` or `--all-features` when invoking `cargo run`. For the example, to run `doc_async_probed.rs`, do as follows:
+To run the `doc_async_*` examples from the `latency_trace` crate (see source [repo](https://github.com/pvillela/rust-latency-trace/tree/main)), specify `--features tokio` or `--all-features` when invoking `cargo run`. For the example, to run `doc_async_probed.rs`, do as follows:
 
 ```bash
 cargo run --features tokio --example doc_async_probed
@@ -82,7 +82,5 @@ or
 ```bash
 cargo run --all-features --example doc_async_probed
 ```
-
-Likewise, specify `--features tokio` or `--all-features` when executing benchmarks involving async code.
 
 ## Usage examples
