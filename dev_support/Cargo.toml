@@ -16,6 +16,7 @@ env_logger = "0.11"
 criterion = { version = "0.5", features = ["html_reports"] }
 divan = "0.1.14"
 hdrhistogram = "7.5"
+regex = "1.10"
 
 latency_trace = { path = "../latency_trace", version = "0.5", features = [
     "dev",
