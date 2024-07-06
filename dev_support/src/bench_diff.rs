@@ -1,10 +1,10 @@
-//! Compares the difference of total latency for two closures.
+//! Module to compare the difference of total latency for two closures and parse its output into CSV format.
 
 use hdrhistogram::Histogram;
 use latency_trace::summary_stats;
 use std::{
     hint::black_box,
-    io::{self, Write},
+    io::{stdout, Write},
     time::Instant,
 };
 
@@ -22,9 +22,17 @@ use std::{
 /// target closure for the inner loop. The mean difference `(total_latency(f1) - total_latency(f2)) / inner_loop` is
 /// calculated. Depending on whether the mean difference is positive or negative, it is recorded on the histogram
 /// `hist_f1_ge_f2` or `hist_f1_lt_f2`, respectively.
+/// - `f_args_str` - string that documents relevant arguments enclosed by the closures `f1` and `f2` (e.g., using the
+/// `format!` macro). It is printed together with `outer_loop` and `inner_loop` to provide context for the benchmark.
 ///
 /// The benchmark is warmed-up with one additional initial outer loop iteration for which measurements are not collected.
-pub fn bench_diff<U>(f1: impl Fn() -> U, f2: impl Fn() -> U, outer_loop: usize, inner_loop: usize) {
+pub fn bench_diff<U>(
+    f1: impl Fn() -> U,
+    f2: impl Fn() -> U,
+    outer_loop: usize,
+    inner_loop: usize,
+    f_args_str: &str,
+) {
     let mut hist_f1_lt_f2 = Histogram::<u64>::new_with_bounds(1, 20 * 1000 * 1000, 2).unwrap();
     let mut hist_f1_ge_f2 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
     let mut hist_f1 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
@@ -48,14 +56,19 @@ pub fn bench_diff<U>(f1: impl Fn() -> U, f2: impl Fn() -> U, outer_loop: usize, 
         (elapsed1_micros, elapsed2_micros)
     };
 
+    println!(
+        "\nContext: (outer_loop={outer_loop}, inner_loop={inner_loop}, f_args=[{f_args_str}])"
+    );
+    println!();
+
     // Warm-up
     print!("Warming up ...");
-    io::stdout().flush().unwrap();
+    stdout().flush().unwrap();
     outer_core();
     println!(" ready to execute");
 
     print!("Executing bench_diff: ");
-    io::stdout().flush().unwrap();
+    stdout().flush().unwrap();
 
     for i in 1..=outer_loop {
         let (elapsed1, elapsed2) = outer_core();
@@ -80,7 +93,7 @@ pub fn bench_diff<U>(f1: impl Fn() -> U, f2: impl Fn() -> U, outer_loop: usize, 
         } else {
             print!(".");
         }
-        io::stdout().flush().unwrap();
+        stdout().flush().unwrap();
     }
 
     println!(" done\n");

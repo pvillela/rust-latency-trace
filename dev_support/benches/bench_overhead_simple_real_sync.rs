@@ -12,8 +12,12 @@ use latency_trace::LatencyTrace;
 fn cmd_line_args() -> Option<(usize, usize, usize, usize, u64)> {
     let mut args = std::env::args();
 
-    let outer_loop = args
-        .nth(1)?
+    let arg1 = match args.nth(1) {
+        Some(arg1) if &arg1 != "--bench" => arg1,
+        _ => return None,
+    };
+
+    let outer_loop = arg1
         .parse::<usize>()
         .expect("1st argument (`outer_repeats`), must be integer");
 
@@ -45,10 +49,8 @@ fn cmd_line_args() -> Option<(usize, usize, usize, usize, u64)> {
 }
 
 fn main() {
-    let args = cmd_line_args().unwrap_or((20, 10, 100, 5, 20_000));
-    println!("\nargs: {args:?}");
-
-    let (outer_loop, inner_loop, nrepeats, ntasks, extent) = args;
+    let (outer_loop, inner_loop, nrepeats, ntasks, extent) =
+        cmd_line_args().unwrap_or((20, 10, 100, 5, 20_000));
 
     let f_instrumented = || {
         let lt = LatencyTrace::activated_default().unwrap();
@@ -58,5 +60,13 @@ fn main() {
 
     let f_uninstrumented = || simple_real_sync_un(nrepeats, ntasks, extent);
 
-    bench_diff(f_instrumented, f_uninstrumented, outer_loop, inner_loop);
+    let f_args_str = format!("nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
+
+    bench_diff(
+        f_instrumented,
+        f_uninstrumented,
+        outer_loop,
+        inner_loop,
+        &f_args_str,
+    );
 }
