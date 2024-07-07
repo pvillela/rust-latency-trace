@@ -64,7 +64,7 @@ fn print_summary(name: &str, s: &SummaryStats) {
 }
 
 fn output_csv(sections: &[Section]) {
-    println!("Args,Summaries,count,mean,stdev,min,p1,p5,p10,p25,median,p75,p90,p95,p99,max");
+    println!("Context,Summaries,count,mean,stdev,min,p1,p5,p10,p25,median,p75,p90,p95,p99,max");
     println!();
 
     for section in sections {
