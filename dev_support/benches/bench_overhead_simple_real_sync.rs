@@ -1,12 +1,12 @@
 //! Compares the overhead for the measurement of latencies for [`dev_support::simple_fns::simple_real_sync`],
 //! vs. the latency of [`dev_support::simple_fns::simple_real_sync_un`].
 
-use criterion::black_box;
 use dev_support::{
     bench_diff::bench_diff,
     simple_fns::{simple_real_sync, simple_real_sync_un},
 };
 use latency_trace::LatencyTrace;
+use std::hint::black_box;
 
 /// Returns command line arguments (`outer_repeats`, `inner_repeats`, `ntasks`, `extent`).
 fn cmd_line_args() -> Option<(usize, usize, usize, usize, u64)> {

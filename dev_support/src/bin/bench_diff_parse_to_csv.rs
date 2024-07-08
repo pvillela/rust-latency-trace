@@ -160,7 +160,7 @@ fn parse_section(section_text: &str) -> Section {
 
 fn read_infile(infile: &str) -> Vec<Section> {
     // Open the file
-    let file = File::open(&infile).expect("Failed to open file");
+    let file = File::open(infile).expect("Failed to open file");
     let reader = BufReader::new(file);
     let mut lines = reader.lines();
 
@@ -168,7 +168,7 @@ fn read_infile(infile: &str) -> Vec<Section> {
     let mut section_text = String::with_capacity(1600);
 
     while let Some(Ok(line)) = lines.next() {
-        if line.is_empty() || line.starts_with(" ") {
+        if line.is_empty() || line.starts_with(' ') {
             continue;
         }
 
