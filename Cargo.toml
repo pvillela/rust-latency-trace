@@ -1,5 +1,4 @@
 [workspace]
-# members = ["*"]
-members = ["latency_trace"]
+members = ["*"]
 exclude = ["target", ".git", ".idea", "out"]
 resolver = "2"
