@@ -1,6 +1,6 @@
 [package]
 name = "latency_trace"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 license = "MIT"
 description = "supports latency measurement for functions and code blocks, both sync and async."
@@ -8,14 +8,13 @@ repository = "https://github.com/pvillela/rust-latency-trace/tree/main"
 readme = "README.md"
 keywords = ["latency", "observability", "measurement", "tracing", "performance"]
 categories = ["development-tools::profiling"]
-exclude = ["src/bench_support*.rs"]
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # thread_local_collect = { path = "../../thread-local-collect", version = "1.0" }
-thread_local_collect = "0.5"
+thread_local_collect = "1.0"
 tokio = { version = "1", features = ["full"], optional = true }
 tracing = "0.1"
 
