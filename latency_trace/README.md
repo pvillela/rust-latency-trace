@@ -1,10 +1,10 @@
 # latency_trace
 
-This library supports latency measurement for functions and code blocks, both sync and async. Given code instrumented with the Rust [tracing](https://crates.io/crates/tracing) library, this library uses histograms from the [hdrhistogram](https://crates.io/crates/hdrhistogram) library to capture span latency timings. Latencies are collected in **microseconds** for all spans with level `trace` or higher. See the documentation for details.
+This library supports latency measurement for functions and code blocks, both sync and async. Given code instrumented with the Rust [`tracing`](https://crates.io/crates/tracing) library, this library uses histograms from the [`hdrhistogram`](https://crates.io/crates/hdrhistogram) library to capture span latency timings. Latencies are collected in **microseconds** for all spans with level `trace` or higher. See the documentation for details.
 
 ## Documentation
 
-See the [API documentation](https://docs.rs/latency_trace/latest/latency_trace/) on docs.rs, which includes  a comprehensive overview and usage examples. The source [repo](https://github.com/pvillela/rust-latency-trace/tree/main) also contains benchmarks and additional examples.
+See the [API documentation](https://docs.rs/latency_trace/latest/latency_trace/) on docs.rs, which includes a comprehensive overview and usage examples. The source [repo](https://github.com/pvillela/rust-latency-trace/tree/main) also contains benchmarks and additional examples.
 
 ## Support
 

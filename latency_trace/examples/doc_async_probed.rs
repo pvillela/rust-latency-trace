@@ -1,4 +1,4 @@
-//! Requires `feature="tokio"`.
+//! Requires feature flag "tokio".
 
 use latency_trace::{summary_stats, LatencyTrace};
 use std::{thread, time::Duration};

@@ -14,8 +14,8 @@ exclude = ["src/bench_support*.rs"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thread_local_collect = { path = "../../thread-local-collect", version = "0.6" }
-# thread_local_collect = "0.6"
+# thread_local_collect = { path = "../../thread-local-collect", version = "1.0" }
+thread_local_collect = "0.5"
 tokio = { version = "1", features = ["full"], optional = true }
 tracing = "0.1"
 

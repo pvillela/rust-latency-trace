@@ -1,5 +1,5 @@
-//! This module is supported on **`feature="tokio"`** only.
 //! `tokio`-related latency reporting methods of [`crate::lt_collect_g::LatencyTraceG`].
+//! Present only when the **"tokio"** feature flag is enabled.
 
 use crate::{
     lt_collect_g::LatencyTraceG,
@@ -15,6 +15,7 @@ where
 {
     /// Executes the instrumented async function `f`, running on the `tokio` runtime; after `f` completes,
     /// returns the observed latencies.
+    /// Present only when the **"tokio"** feature flag is enabled.
     pub fn measure_latencies_tokio<F>(&self, f: impl FnOnce() -> F) -> Timings
     where
         F: Future<Output = ()> + Send,
