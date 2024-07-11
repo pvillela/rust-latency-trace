@@ -5,7 +5,7 @@ use std::{future::Future, hint::black_box};
 
 /// Set-up for measurement of latencies.
 pub fn measure_latencies1(lt: LatencyTraceJ) {
-    black_box(measure_latencies2(lt, || ()));
+    black_box(measure_latencies2(lt, || black_box(())));
 }
 
 /// Executes tracing up to completion of instrumnted function, before final collection and aggregation.

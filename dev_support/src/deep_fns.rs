@@ -30,7 +30,7 @@ pub fn deep_sync(nrepeats: usize, ntasks: usize) {
                                             black_box(i);
                                         });
 
-                                        black_box(g(i));
+                                        black_box(g(black_box(i)));
                                     });
                                 });
                             });
@@ -67,7 +67,7 @@ pub fn deep_sync_un(nrepeats: usize, ntasks: usize) {
         for i in 0..nrepeats {
             black_box(i);
 
-            black_box(g(i));
+            black_box(g(black_box(i)));
         }
     };
 

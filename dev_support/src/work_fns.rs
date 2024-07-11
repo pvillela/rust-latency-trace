@@ -10,7 +10,7 @@ pub fn lazy_work(extent: u64) {
 
 /// Function that does a significant amount of computation to support benchmarks.
 pub fn real_work(extent: u64) {
-    let buf = black_box(extent.to_be_bytes());
+    let buf = extent.to_be_bytes();
     let mut hasher = Sha256::new();
     for _ in 0..extent {
         hasher.update(buf);

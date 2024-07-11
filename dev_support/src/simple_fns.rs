@@ -27,7 +27,7 @@ pub fn simple_sync_p(nrepeats: usize, ntasks: usize, extent: u64, work_fn: fn(u6
     let g_sync = move |i: usize, extent: u64| {
         trace_span!("g_sync").in_scope(|| {
             // Simulated work
-            work_fn(extent * 2);
+            work_fn(black_box(extent) * 2);
             black_box(i);
         });
     };
@@ -37,9 +37,9 @@ pub fn simple_sync_p(nrepeats: usize, ntasks: usize, extent: u64, work_fn: fn(u6
             for i in 0..nrepeats {
                 trace_span!("loop_body", foo = i % 2).in_scope(|| {
                     // Simulated work
-                    work_fn(extent * 3);
+                    work_fn(black_box(extent) * 3);
 
-                    g_sync(i, extent);
+                    g_sync(black_box(i), black_box(extent));
                 });
             }
         });
@@ -66,7 +66,7 @@ pub fn simple_sync_p(nrepeats: usize, ntasks: usize, extent: u64, work_fn: fn(u6
 pub fn simple_sync_un_p(nrepeats: usize, ntasks: usize, extent: u64, work_fn: fn(u64)) {
     let g_sync_un = move |i: usize, extent: u64| {
         // Simulated work
-        work_fn(extent * 2);
+        work_fn(black_box(extent) * 2);
         black_box(i);
     };
 
@@ -74,9 +74,9 @@ pub fn simple_sync_un_p(nrepeats: usize, ntasks: usize, extent: u64, work_fn: fn
         for i in 0..nrepeats {
             {
                 // Simulated work
-                work_fn(extent * 3);
+                work_fn(black_box(extent * 3));
 
-                g_sync_un(i, extent);
+                g_sync_un(black_box(i), black_box(extent));
             };
         }
     };
@@ -103,7 +103,7 @@ pub async fn simple_async(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
                     // Simulated work
                     thread::sleep(Duration::from_micros(sleep_micros * 3));
 
-                    g_async(i, sleep_micros).await;
+                    g_async(black_box(i), black_box(sleep_micros)).await;
                 }
                 .instrument(trace_span!("loop_body", foo = i % 2))
                 .await;
@@ -132,7 +132,7 @@ pub async fn simple_async_un(nrepeats: usize, ntasks: usize, sleep_micros: u64) 
                     // Simulated work
                     thread::sleep(Duration::from_micros(sleep_micros * 3));
 
-                    g_async_un(i, sleep_micros).await;
+                    g_async_un(black_box(i), black_box(sleep_micros)).await;
                 }
                 .await;
             }

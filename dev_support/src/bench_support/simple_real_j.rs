@@ -12,27 +12,55 @@ pub fn set_up() {
 
 pub fn sync_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     let lt = LatencyTraceJ::activated_default().unwrap();
-    measure_latencies2(lt, move || simple_real_sync(nrepeats, ntasks, sleep_micros));
+    measure_latencies2(lt, move || {
+        simple_real_sync(
+            black_box(nrepeats),
+            black_box(ntasks),
+            black_box(sleep_micros),
+        )
+    });
 }
 
 pub fn sync_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) -> Timings {
     let lt = LatencyTraceJ::activated_default().unwrap();
-    let timings = lt.measure_latencies(move || simple_real_sync(nrepeats, ntasks, sleep_micros));
+    let timings = lt.measure_latencies(move || {
+        simple_real_sync(
+            black_box(nrepeats),
+            black_box(ntasks),
+            black_box(sleep_micros),
+        )
+    });
     black_box(timings)
 }
 
 pub fn sync_un_direct(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
-    simple_real_sync_un(nrepeats, ntasks, sleep_micros);
+    simple_real_sync_un(
+        black_box(nrepeats),
+        black_box(ntasks),
+        black_box(sleep_micros),
+    );
 }
 
 pub fn sync_un_completion(nrepeats: usize, ntasks: usize, sleep_micros: u64) {
     let lt = LatencyTraceJ::activated_default().unwrap();
-    measure_latencies2(lt, move || simple_real_sync(nrepeats, ntasks, sleep_micros));
+    measure_latencies2(lt, move || {
+        simple_real_sync(
+            black_box(nrepeats),
+            black_box(ntasks),
+            black_box(sleep_micros),
+        )
+    });
 }
 
 pub fn sync_un_all_in(nrepeats: usize, ntasks: usize, sleep_micros: u64) -> Timings {
     let lt = LatencyTraceJ::activated_default().unwrap();
-    let timings = lt.measure_latencies(move || simple_real_sync(nrepeats, ntasks, sleep_micros));
+    let timings = lt.measure_latencies(move || {
+        simple_real_sync(
+            black_box(nrepeats),
+            black_box(ntasks),
+            black_box(sleep_micros),
+        )
+    });
     black_box(timings)
 }
 

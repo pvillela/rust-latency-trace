@@ -10,30 +10,35 @@ pub fn set_up() {
 
 pub fn sync_completion(nrepeats: usize, ntasks: usize) {
     let lt = LatencyTrace::activated_default().unwrap();
-    let nthreads = measure_latencies2(lt, move || deep_sync(nrepeats, ntasks));
+    let nthreads = measure_latencies2(lt, move || {
+        deep_sync(black_box(nrepeats), black_box(ntasks))
+    });
     assert_eq!(nthreads, ntasks + 1, "nthreads == ntasks+1");
 }
 
 pub fn sync_all_in(nrepeats: usize, ntasks: usize, exp_span_count: u64) -> Timings {
     let lt = LatencyTrace::activated_default().unwrap();
-    let timings = lt.measure_latencies(move || deep_sync(nrepeats, ntasks));
+    let timings = lt.measure_latencies(move || deep_sync(black_box(nrepeats), black_box(ntasks)));
     let span_count = timings.values().fold(0, |acc, hist| acc + hist.len());
     assert_eq!(span_count, exp_span_count, "span_count assertion");
-    timings
+    black_box(timings)
 }
 
 pub fn sync_un_direct(nrepeats: usize, ntasks: usize) {
-    deep_sync_un(nrepeats, ntasks);
+    deep_sync_un(black_box(nrepeats), black_box(ntasks));
 }
 
 pub fn sync_un_completion(nrepeats: usize, ntasks: usize) {
     let lt = LatencyTrace::activated_default().unwrap();
-    measure_latencies2(lt, move || deep_sync_un(nrepeats, ntasks));
+    measure_latencies2(lt, move || {
+        deep_sync_un(black_box(nrepeats), black_box(ntasks))
+    });
 }
 
 pub fn sync_un_all_in(nrepeats: usize, ntasks: usize) -> Timings {
     let lt = LatencyTrace::activated_default().unwrap();
-    let timings = lt.measure_latencies(move || deep_sync_un(nrepeats, ntasks));
+    let timings =
+        lt.measure_latencies(move || deep_sync_un(black_box(nrepeats), black_box(ntasks)));
     black_box(timings)
 }
 
