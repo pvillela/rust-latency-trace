@@ -1,6 +1,6 @@
 [package]
 name = "latency_trace"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 license = "MIT"
 description = "supports latency measurement for functions and code blocks, both sync and async."
@@ -14,7 +14,7 @@ categories = ["development-tools::profiling"]
 
 [dependencies]
 # thread_local_collect = { path = "../../thread-local-collect", version = "1.0" }
-thread_local_collect = "1.0"
+thread_local_collect = "1"
 tokio = { version = "1", features = ["full"], optional = true }
 tracing = "0.1"
 
