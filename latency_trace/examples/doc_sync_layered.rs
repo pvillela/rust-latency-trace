@@ -34,13 +34,14 @@ fn main() {
     let lt = LatencyTrace::default();
 
     // Clone of the above that will be used as a `tracing_subscriber::layer::Layer` that can be
-    // composed with other tracing layers.
+    // composed with other tracing layers. Add a filter so that only spans with level `INFO` or
+    // higher priority (lower level) are aggregated.
     let ltl = lt.clone().with_filter(LevelFilter::INFO);
 
     // `tracing_subscriber::fmt::Layer` that can be composed with the above `LatencyTrace` layer.
     let tfmt = tracing_subscriber::fmt::layer()
         .with_span_events(FmtSpan::FULL)
-        .with_filter(LevelFilter::INFO);
+        .with_filter(LevelFilter::TRACE);
 
     // Instantiate a layered subscriber and set it as the global default.
     let layered = Registry::default().with(ltl).with(tfmt);

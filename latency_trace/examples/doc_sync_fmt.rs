@@ -30,7 +30,7 @@ fn main() {
     // Instantiate a `tracing_subscriber::fmt::Subscriber`.
     let subscriber = tracing_subscriber::fmt::Subscriber::builder()
         .with_span_events(FmtSpan::FULL)
-        .with_max_level(tracing::Level::INFO)
+        .with_max_level(tracing::Level::TRACE)
         .finish();
 
     // Set the subscriber as the default
