@@ -1,6 +1,6 @@
 [package]
 name = "latency_trace"
-version = "0.5.2"
+version = "0.6.0"
 edition = "2021"
 license = "MIT"
 description = "supports latency measurement for functions and code blocks, both sync and async."
@@ -30,6 +30,11 @@ hdrhistogram = "7.5"
 log = "0.4"
 sha2 = "0.10"
 base64ct = { version = "1", features = ["alloc"] }
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+    "env-filter",
+] }
 
 [features]
 tokio = ["dep:tokio"]

@@ -3,7 +3,11 @@
 use std::{collections::BTreeMap, sync::Arc, thread};
 
 use hdrhistogram::Histogram;
-use tracing::span::Attributes;
+use tracing::{
+    span::{Attributes, Id},
+    Subscriber,
+};
+use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
 use crate::{
     lt_collect_g::LatencyTraceG,
@@ -92,6 +96,11 @@ impl LatencyTraceCfg {
 pub struct LatencyTrace(pub(crate) LatencyTraceG<Probed>);
 
 impl LatencyTrace {
+    /// Constructs `Self` with the given configuration.
+    pub fn new(config: LatencyTraceCfg) -> Self {
+        Self(LatencyTraceG::new(config))
+    }
+
     /// Returns the active instance of `Self` if it exists.
     pub fn active() -> Option<Self> {
         Some(Self(LatencyTraceG::active()?))
@@ -142,6 +151,29 @@ impl LatencyTrace {
         let jh = thread::spawn(f);
         pt.set_join_handle(jh);
         Ok(pt)
+    }
+}
+
+impl Default for LatencyTrace {
+    fn default() -> Self {
+        Self::new(LatencyTraceCfg::default())
+    }
+}
+impl<S> Layer<S> for LatencyTrace
+where
+    S: Subscriber,
+    S: for<'lookup> LookupSpan<'lookup>,
+{
+    fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
+        self.0.on_new_span(attrs, id, ctx);
+    }
+
+    // No need for fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
+
+    // No need for fn on_exit(&self, id: &Id, ctx: Context<'_, S>)
+
+    fn on_close(&self, id: Id, ctx: Context<'_, S>) {
+        self.0.on_close(id, ctx);
     }
 }
 
