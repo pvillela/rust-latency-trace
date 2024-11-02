@@ -1,14 +1,19 @@
+//! Demonstrates how to use [`LatencyTrace`] as a [`Layer`](tracing_subscriber::layer::Layer)
+//! that can be composed with other layers to make a [`Subscriber`](tracing::Subscriber).
+//!
+//! Compare with examples `doc_sync` and `doc_sync_fmt`.
+
 use latency_trace::{summary_stats, LatencyTrace};
 use std::{thread, time::Duration};
-use tracing::{instrument, level_filters::LevelFilter, trace, trace_span};
+use tracing::{info, instrument, level_filters::LevelFilter, trace, trace_span};
 use tracing_subscriber::{fmt::format::FmtSpan, prelude::*, Registry};
 
-#[instrument(level = "trace")]
+#[instrument(level = "info")]
 fn f() {
     trace!("in f");
     for _ in 0..10 {
         trace_span!("loop_body").in_scope(|| {
-            trace!("in loop body");
+            info!("in loop body");
             // Simulated work
             thread::sleep(Duration::from_micros(1200));
 
@@ -17,7 +22,7 @@ fn f() {
     }
 }
 
-#[instrument(level = "trace")]
+#[instrument(level = "info")]
 fn g() {
     trace!("in g");
     // Simulated work
@@ -30,12 +35,12 @@ fn main() {
 
     // Clone of the above that will be used as a `tracing_subscriber::layer::Layer` that can be
     // composed with other tracing layers.
-    let ltl = lt.clone();
+    let ltl = lt.clone().with_filter(LevelFilter::INFO);
 
     // `tracing_subscriber::fmt::Layer` that can be composed with the above `LatencyTrace` layer.
     let tfmt = tracing_subscriber::fmt::layer()
         .with_span_events(FmtSpan::FULL)
-        .with_filter(LevelFilter::TRACE);
+        .with_filter(LevelFilter::INFO);
 
     // Instantiate a layered subscriber and set it as the global default.
     let layered = Registry::default().with(ltl).with(tfmt);
