@@ -1,28 +1,38 @@
 #![doc = include_str!("lib1.md")]
 //!
-//! ### Simple sync example
+//! ### Simple sync Subscriber example
 //!
 //! ```rust
 #![doc = include_str!("../examples/doc_sync.rs")]
 //! ```
 //!
-//! ### Simple async example
+//! ### Simple async Subscriber example
 //!
 //! ```rust
 #![doc = include_str!("../examples/doc_async.rs")]
 //! ```
 //!
-//! ### Simple sync probed example
+//! ### Simple sync probed Subscriber example
 //!
 //! ```rust
 #![doc = include_str!("../examples/doc_sync_probed.rs")]
 //! ```
 //!
-//! ### Simple async probed example
+//! ### Simple async probed Subscriber example
 //!
 //! ```rust
 #![doc = include_str!("../examples/doc_async_probed.rs")]
 //! ```
+//!
+//! ### Simple sync Layer example
+//!
+//! ```rust
+#![doc = include_str!("../examples/doc_sync_layered.rs")]
+//! ```
+//!
+//! ### Other Layer examples
+//! The above Subscriber examples can be easily modified based on the above Layer example to create analogous layered examples.
+//! See also `test_layer_sync.rs` and `test_layer_async.rs` in the GitHub repo under the `dev_support/tests` directory.
 //!
 #![doc = include_str!("lib2.md")]
 #![deny(clippy::unwrap_used)]

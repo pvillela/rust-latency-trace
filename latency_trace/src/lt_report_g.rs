@@ -65,9 +65,9 @@ impl LatencyTraceCfg {
 impl Default for LatencyTraceCfg {
     /// Instantiates a default [LatencyTraceCfg]. The defaults are:
     /// - Grouping of spans using the [`default_span_grouper`], which simply groups by the span's
-    /// callsite information, which distills the *tracing* framework's Callsite concept
-    /// (see [Metadata and Callsite](https://docs.rs/tracing-core/0.1.31/tracing_core/)). This default can be
-    /// modified by using the [`Self::with_span_grouper`] method.
+    ///   callsite information, which distills the *tracing* framework's Callsite concept
+    ///   (see [Metadata and Callsite](https://docs.rs/tracing-core/0.1.31/tracing_core/)). This default can be
+    ///   modified by using the [`Self::with_span_grouper`] method.
     /// - `hist_high` of `20,000,000` (20 seconds). This default can be modified by using the [`Self::with_hist_high`] method.
     /// - `hist_sigfig` of 2. This default can be modified by using the [`Self::with_hist_sigfig`] method.
     ///
@@ -110,9 +110,9 @@ where
     ///
     /// # Errors
     /// - [`ActivationError::HistogramConfigError`] if the `config`'s `hist_high` and `hist_sigfig` would cause
-    /// [`hdrhistogram::Histogram::new_with_bounds`]`(1, hist_high, hist_sigfig)` to fail.
+    ///   [`hdrhistogram::Histogram::new_with_bounds`]`(1, hist_high, hist_sigfig)` to fail.
     /// - [`ActivationError::TracingSubscriberInitError`] if a global [`tracing::Subscriber`] is already set and its
-    /// type is not the same as `Self`.
+    ///   type is not the same as `Self`.
     pub fn activated(config: LatencyTraceCfg) -> Result<Self, ActivationError> {
         config.validate_hist_high_sigfig()?;
         let default_dispatch_exists =
@@ -137,7 +137,7 @@ where
     ///
     /// # Errors
     /// - [`ActivationError::TracingSubscriberInitError`] if a global [`tracing::Subscriber`] is already set and its
-    /// type is not the same as `Self`.
+    ///   type is not the same as `Self`.
     pub fn activated_default() -> Result<Self, ActivationError> {
         Self::activated(LatencyTraceCfg::default())
     }

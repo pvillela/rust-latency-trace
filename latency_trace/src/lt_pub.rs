@@ -85,10 +85,11 @@ impl LatencyTraceCfg {
 
 /// Core type supporting latency mesurements.
 ///
-/// Encapsulates an implementation of [`tracing_subscriber::Layer`] and provides access to the latencies collected
+/// An implementation of [`tracing_subscriber::Layer`] that provides access to the latencies collected
 /// for different span groups.
 ///
-/// There should be a single instance of [`LatencyTrace`] in a process. That instance is set
+/// If directly instantiated as a [`tracing::Subscriber`] using the `activated*` methods,
+/// there should be a single instance (except for its clones) of [`LatencyTrace`] in a process. That instance is set
 /// (by method [`Self::activated`] or [`Self::activated_default`])
 /// as the global default [`tracing::Subscriber`], of which there can be only one and it can't be changed once
 /// it is set.
@@ -96,16 +97,18 @@ impl LatencyTraceCfg {
 pub struct LatencyTrace(pub(crate) LatencyTraceG<Probed>);
 
 impl LatencyTrace {
-    /// Constructs `Self` with the given configuration.
+    /// Constructs `Self` with the given configuration. Can be used to construct an instance for use as a [`Layer`].
     pub fn new(config: LatencyTraceCfg) -> Self {
         Self(LatencyTraceG::new(config))
     }
 
-    /// Returns the active instance of `Self` if it exists.
+    /// Returns the active instance of `Self` if it exists. An active instance is an instance that is registered as
+    /// the global default [`tracing::Subscriber`].
     pub fn active() -> Option<Self> {
         Some(Self(LatencyTraceG::active()?))
     }
 
+    /// Convenience method that creates a layered [`tracing::Subscriber`] with a [`LatencyTrace`] as the single layer.
     /// Returns the active instance of `Self` if it exists or activates a new instance with the given `config` otherwise.
     /// Activation entails setting the global default [`tracing::Subscriber`], of which there can be only one and it can't
     /// be changed once it is set.
@@ -115,13 +118,14 @@ impl LatencyTrace {
     ///
     /// # Errors
     /// - [`ActivationError::HistogramConfigError`] if the `config`'s `hist_high` and `hist_sigfig` would cause
-    /// [`hdrhistogram::Histogram::new_with_bounds`]`(1, hist_high, hist_sigfig)` to fail.
+    ///   [`hdrhistogram::Histogram::new_with_bounds`]`(1, hist_high, hist_sigfig)` to fail.
     /// - [`ActivationError::TracingSubscriberInitError`] if a global [`tracing::Subscriber`] is already set and its
-    /// type is not the same as `Self`.
+    ///   type is not the same as `Self`.
     pub fn activated(config: LatencyTraceCfg) -> Result<Self, ActivationError> {
         Ok(Self(LatencyTraceG::activated(config)?))
     }
 
+    /// Convenience method that creates a layered [`tracing::Subscriber`] with a [`LatencyTrace`] as the single layer.
     /// Returns the active instance of `Self` if it exists or activates a new instance with the default configuration otherwise.
     /// Activation entails setting the global default [`tracing::Subscriber`], of which there can be only one and it can't
     /// be changed once it is set.
@@ -131,7 +135,7 @@ impl LatencyTrace {
     ///
     /// # Errors
     /// - [`ActivationError::TracingSubscriberInitError`] if a global [`tracing::Subscriber`] is already set and its
-    /// type is not the same as `Self`.
+    ///   type is not the same as `Self`.
     pub fn activated_default() -> Result<Self, ActivationError> {
         Ok(Self(LatencyTraceG::activated_default()?))
     }
@@ -155,6 +159,7 @@ impl LatencyTrace {
 }
 
 impl Default for LatencyTrace {
+    /// Constructs `Self` with default configuration. Can be used to construct an instance for use as a [`Layer`].
     fn default() -> Self {
         Self::new(LatencyTraceCfg::default())
     }
@@ -280,7 +285,7 @@ impl Timings {
     /// - the values resulting from applying `f` to span groups are called ***aggregate key***s
     /// - the sets of span groups corresponding to each *aggregate key* are called ***aggregates***.
     /// - an aggregation function is consistent if and only if, for each *aggregate*, all the span groups in the
-    /// *aggregate* have the same callsite.
+    ///   *aggregate* have the same callsite.
     pub fn aggregator_is_consistent<G>(&self, f: impl Fn(&SpanGroup) -> G) -> bool
     where
         G: Ord,

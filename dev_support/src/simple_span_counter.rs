@@ -48,6 +48,12 @@ impl SimpleSpanCounter {
     }
 }
 
+impl Default for SimpleSpanCounter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Clone for SimpleSpanCounter {
     fn clone(&self) -> Self {
         Self(self.0.clone())

@@ -1,7 +1,7 @@
 //! Demonstrates how to use [`LatencyTrace`] as a [`Layer`](tracing_subscriber::layer::Layer)
-//! that can be composed with other layers to make a [`Subscriber`](tracing::Subscriber).
+//! that can be composed with other layers to make a layered [`Subscriber`](tracing::Subscriber).
 //!
-//! Compare with examples `doc_sync` and `doc_sync_fmt`.
+//! Compare with examples `doc_sync` and `doc_sync_fmt` in the GitHub repo.
 
 use latency_trace::{summary_stats, LatencyTrace};
 use std::{thread, time::Duration};
@@ -39,6 +39,7 @@ fn main() {
     let ltl = lt.clone().with_filter(LevelFilter::INFO);
 
     // `tracing_subscriber::fmt::Layer` that can be composed with the above `LatencyTrace` layer.
+    // Spans with level `TRACE` or higher priority (lower level) are displayed.
     let tfmt = tracing_subscriber::fmt::layer()
         .with_span_events(FmtSpan::FULL)
         .with_filter(LevelFilter::TRACE);
