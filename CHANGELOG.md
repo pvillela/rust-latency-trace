@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.2] - 2024-07-XX
+## [0.6.0] - 2024-12-20
+
+This version is fully backwards compatible with the previous version.
+
+### Added
+
+- Support for `LatencyTrace` to be used as a `tracing_subscriber::Layer` in addition to its use as a `tracing::Subscriber`.
+
+### Changed
+
+- Doc comments
+
+## [0.5.2] - 2024-07-11
 
 ### Changed
 

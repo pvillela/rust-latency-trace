@@ -16,14 +16,14 @@ use std::{
 /// - `f1` - first target for comparison.
 /// - `f2` - second target for comparison.
 /// - `outer_loop` - number of outer loop repetitions. For each iteration, the inner loop (see below) is executed for
-/// each of the target closures.
+///   each of the target closures.
 /// - `inner_loop` - number of inner loop repetitions. Within each outer loop iteration and for each of the target closures,
-/// the target closure is executed `inner_loop times`, the total latency for the inner loop is measured for the
-/// target closure for the inner loop. The mean difference `(total_latency(f1) - total_latency(f2)) / inner_loop` is
-/// calculated. Depending on whether the mean difference is positive or negative, it is recorded on the histogram
-/// `hist_f1_ge_f2` or `hist_f1_lt_f2`, respectively.
+///   the target closure is executed `inner_loop times`, the total latency for the inner loop is measured for the
+///   target closure for the inner loop. The mean difference `(total_latency(f1) - total_latency(f2)) / inner_loop` is
+///   calculated. Depending on whether the mean difference is positive or negative, it is recorded on the histogram
+///   `hist_f1_ge_f2` or `hist_f1_lt_f2`, respectively.
 /// - `f_args_str` - string that documents relevant arguments enclosed by the closures `f1` and `f2` (e.g., using the
-/// `format!` macro). It is printed together with `outer_loop` and `inner_loop` to provide context for the benchmark.
+///   `format!` macro). It is printed together with `outer_loop` and `inner_loop` to provide context for the benchmark.
 ///
 /// The benchmark is warmed-up with one additional initial outer loop iteration for which measurements are not collected.
 pub fn bench_diff<U>(

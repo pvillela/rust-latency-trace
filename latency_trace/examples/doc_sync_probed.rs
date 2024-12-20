@@ -1,11 +1,13 @@
 use latency_trace::{summary_stats, LatencyTrace};
 use std::{thread, time::Duration};
-use tracing::{instrument, trace_span};
+use tracing::{info, instrument, trace, trace_span};
 
-#[instrument(level = "trace")]
+#[instrument(level = "info")]
 fn f() {
-    for _ in 0..1000 {
+    trace!("in f");
+    for _ in 0..10 {
         trace_span!("loop_body").in_scope(|| {
+            info!("in loop body");
             // Simulated work
             thread::sleep(Duration::from_micros(1200));
 
@@ -14,8 +16,9 @@ fn f() {
     }
 }
 
-#[instrument(level = "trace")]
+#[instrument(level = "info")]
 fn g() {
+    trace!("in g");
     // Simulated work
     thread::sleep(Duration::from_micros(800));
 }
@@ -27,7 +30,7 @@ fn main() {
         .unwrap();
 
     // Let the function run for some time before probing latencies.
-    thread::sleep(Duration::from_micros(48000));
+    thread::sleep(Duration::from_micros(16000));
 
     let latencies1 = probed.probe_latencies();
     let latencies2 = probed.wait_and_report();

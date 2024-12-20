@@ -40,6 +40,8 @@ Two other design choices support the low overhead goal.
 
 This framework is used to measure latencies for a sync or async function `f` that takes no arguments and contains code instrumented with the [`tracing`](https://crates.io/crates/tracing) framework. Any code to be measured can be wrapped by such a function.
 
+The core [`LatencyTrace`] struct can be used directly as a **_[Subscriber](tracing::Subscriber)_** or indirectly as a **_[Layer](tracing_subscriber::Layer)_**. The former usage is most straightforward, while the latter allows [`LatencyTrace`] to be combined with other [`tracing_subscriber::Layer`]s to form a layered subscriber in more elaborate tracing scenarios. Using [`LatencyTrace`] as a [`tracing_subscriber::Layer`] also allows filtering to be added, regardless of whether it is combined with other layers.
+
 The following modes of latency information reporting are supported:
 
 - **_Direct_** -- Executes the instrumented function `f` and, after `f` terminates, returns with the reporting of latencies.
@@ -59,7 +61,7 @@ To include this library as a dependency without optional features in your Cargo.
 
 ```toml
 [dependencies]
-latency_trace = "0.5"
+latency_trace = "0"
 ```
 
 ## Optional cargo features
@@ -68,7 +70,7 @@ The optional feature flag "tokio" enables the [`tokio`](https://crates.io/crates
 
 ```toml
 [dependencies]
-latency_trace = { version = "0.5", features = ["tokio"] }
+latency_trace = { version = "0", features = ["tokio"] }
 ```
 
 To run the `doc_async_*` examples from the `latency_trace` crate (see source [repo](https://github.com/pvillela/rust-latency-trace/tree/main)), specify `--features tokio` or `--all-features` when invoking `cargo run`. For the example, to run `doc_async_probed.rs`, do as follows:
