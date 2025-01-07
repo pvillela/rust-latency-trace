@@ -1,4 +1,4 @@
-//! Module to compare the difference of total latency for two closures and parse its output into CSV format.
+//! Module to compare the difference in latency between two closures.
 
 use hdrhistogram::Histogram;
 use latency_trace::summary_stats;
@@ -8,6 +8,32 @@ use std::{
     time::Instant,
 };
 
+fn latency<U>(f: impl Fn() -> U, inner_count: usize) -> u64 {
+    let start = Instant::now();
+    for _ in 0..inner_count {
+        black_box(f());
+    }
+    let elapsed = Instant::now().duration_since(start);
+    elapsed.as_micros() as u64
+}
+
+fn outer_core<U, V>(
+    i: usize,
+    f1: impl Fn() -> U,
+    f2: impl Fn() -> V,
+    inner_count: usize,
+) -> (u64, u64) {
+    if i % 2 == 1 {
+        let l1 = latency(f1, inner_count);
+        let l2 = latency(f2, inner_count);
+        (l1, l2)
+    } else {
+        let l2 = latency(f2, inner_count);
+        let l1 = latency(f1, inner_count);
+        (l1, l2)
+    }
+}
+
 /// Compares the difference of total latency for two closures `f1` and `f2` in ***microseconds***.
 /// Differences (latency(f1) - latency(f2)) are collected in two [`Histogram`]s, one for positive differences and the
 /// other for negative differences.
@@ -15,22 +41,22 @@ use std::{
 /// Arguments:
 /// - `f1` - first target for comparison.
 /// - `f2` - second target for comparison.
-/// - `outer_loop` - number of outer loop repetitions. For each iteration, the inner loop (see below) is executed for
+/// - `outer_count` - number of outer loop repetitions. For each iteration, the inner loop (see below) is executed for
 ///   each of the target closures.
-/// - `inner_loop` - number of inner loop repetitions. Within each outer loop iteration and for each of the target closures,
-///   the target closure is executed `inner_loop times`, the total latency for the inner loop is measured for the
-///   target closure for the inner loop. The mean difference `(total_latency(f1) - total_latency(f2)) / inner_loop` is
+/// - `inner_count` - number of inner loop repetitions. Within each outer loop iteration and for each of the target closures,
+///   the target closure is executed `inner_count times`, the total latency for the inner loop is measured for the
+///   target closure for the inner loop. The mean difference `(total_latency(f1) - total_latency(f2)) / inner_count` is
 ///   calculated. Depending on whether the mean difference is positive or negative, it is recorded on the histogram
 ///   `hist_f1_ge_f2` or `hist_f1_lt_f2`, respectively.
 /// - `f_args_str` - string that documents relevant arguments enclosed by the closures `f1` and `f2` (e.g., using the
-///   `format!` macro). It is printed together with `outer_loop` and `inner_loop` to provide context for the benchmark.
+///   `format!` macro). It is printed together with `outer_count` and `inner_count` to provide context for the benchmark.
 ///
 /// The benchmark is warmed-up with one additional initial outer loop iteration for which measurements are not collected.
 pub fn bench_diff<U>(
     f1: impl Fn() -> U,
     f2: impl Fn() -> U,
-    outer_loop: usize,
-    inner_loop: usize,
+    outer_count: usize,
+    inner_count: usize,
     f_args_str: &str,
 ) {
     let mut hist_f1_lt_f2 = Histogram::<u64>::new_with_bounds(1, 20 * 1000 * 1000, 2).unwrap();
@@ -38,40 +64,22 @@ pub fn bench_diff<U>(
     let mut hist_f1 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
     let mut hist_f2 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
 
-    let outer_core = || {
-        let start1 = Instant::now();
-        for _ in 0..inner_loop {
-            black_box(f1());
-        }
-        let elapsed1 = Instant::now().duration_since(start1);
-        let elapsed1_micros = elapsed1.as_micros() as u64;
-
-        let start2 = Instant::now();
-        for _ in 0..inner_loop {
-            black_box(f2());
-        }
-        let elapsed2 = Instant::now().duration_since(start2);
-        let elapsed2_micros = elapsed2.as_micros() as u64;
-
-        (elapsed1_micros, elapsed2_micros)
-    };
-
     println!(
-        "\nContext: (outer_loop={outer_loop}, inner_loop={inner_loop}, f_args=[{f_args_str}])"
+        "\nContext: (outer_count={outer_count}, inner_count={inner_count}, f_args=[{f_args_str}])"
     );
     println!();
 
     // Warm-up
     print!("Warming up ...");
     stdout().flush().unwrap();
-    outer_core();
+    outer_core(0, &f1, &f2, inner_count);
     println!(" ready to execute");
 
     print!("Executing bench_diff: ");
     stdout().flush().unwrap();
 
-    for i in 1..=outer_loop {
-        let (elapsed1, elapsed2) = outer_core();
+    for i in 1..=outer_count {
+        let (elapsed1, elapsed2) = outer_core(i, &f1, &f2, inner_count);
 
         hist_f1.record(elapsed1).unwrap();
         hist_f2.record(elapsed2).unwrap();
@@ -80,16 +88,16 @@ pub fn bench_diff<U>(
 
         if diff >= 0 {
             hist_f1_ge_f2
-                .record((diff / (inner_loop as i64)) as u64)
+                .record((diff / (inner_count as i64)) as u64)
                 .unwrap();
         } else {
             hist_f1_lt_f2
-                .record((-diff / inner_loop as i64) as u64)
+                .record((-diff / inner_count as i64) as u64)
                 .unwrap();
         }
 
         if i % 20 == 0 {
-            print!("{i}/{outer_loop}");
+            print!("{i}/{outer_count}");
         } else {
             print!(".");
         }
