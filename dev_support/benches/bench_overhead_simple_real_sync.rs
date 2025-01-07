@@ -2,7 +2,7 @@
 //! vs. the latency of [`dev_support::simple_fns::simple_real_sync_un`].
 
 use dev_support::{
-    bench_diff::bench_diff,
+    bench_diff::{bench_diff, bench_diff_chained},
     simple_fns::{simple_real_sync, simple_real_sync_un},
 };
 use latency_trace::LatencyTrace;
@@ -60,13 +60,48 @@ fn main() {
 
     let f_uninstrumented = || simple_real_sync_un(nrepeats, ntasks, extent);
 
-    let f_args_str = format!("nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
+    let f1_str =
+        format!("simple_real_sync -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
+    let f2_str =
+        format!("simple_real_sync_un -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
 
     bench_diff(
         f_instrumented,
         f_uninstrumented,
         outer_loop,
         inner_loop,
-        &f_args_str,
+        0,
+        &f1_str,
+        &f2_str,
+    );
+
+    bench_diff(
+        f_instrumented,
+        f_uninstrumented,
+        outer_loop,
+        inner_loop,
+        1,
+        &f1_str,
+        &f2_str,
+    );
+
+    bench_diff_chained(
+        f_instrumented,
+        f_uninstrumented,
+        outer_loop,
+        inner_loop,
+        0,
+        &f1_str,
+        &f2_str,
+    );
+
+    bench_diff_chained(
+        f_instrumented,
+        f_uninstrumented,
+        outer_loop,
+        inner_loop,
+        1,
+        &f1_str,
+        &f2_str,
     );
 }
