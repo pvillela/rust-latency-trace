@@ -9,7 +9,7 @@
 //! could take up to a couple of minutes to finish.
 
 use dev_support::{
-    bench_diff::{bench_diff, bench_diff_chained},
+    bench_diff::{bench_diff_chained_stats_print, bench_diff_stats_print},
     simple_fns::simple_real_sync,
 };
 use latency_trace::LatencyTraceE;
@@ -73,16 +73,16 @@ fn main() {
     let f1_str = format!("f_probed -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
     let f2_str = format!("f_joined -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
 
-    bench_diff(
+    bench_diff_stats_print(
         f_probed, f_joined, outer_loop, inner_loop, 0, &f1_str, &f2_str,
     );
-    bench_diff(
+    bench_diff_stats_print(
         f_probed, f_joined, outer_loop, inner_loop, 1, &f1_str, &f2_str,
     );
-    bench_diff_chained(
+    bench_diff_chained_stats_print(
         f_probed, f_joined, outer_loop, inner_loop, 0, &f1_str, &f2_str,
     );
-    bench_diff_chained(
+    bench_diff_chained_stats_print(
         f_probed, f_joined, outer_loop, inner_loop, 1, &f1_str, &f2_str,
     );
 }
