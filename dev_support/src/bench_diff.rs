@@ -43,13 +43,13 @@ struct ChainedOutput {
 }
 
 fn outer_core_chained<U, V>(
-    i: usize,
+    k: usize,
     f1: impl Fn() -> U,
     f2: impl Fn() -> V,
     inner_count: usize,
     shift: usize,
 ) -> ChainedOutput {
-    if i % 2 != shift % 2 {
+    if k % 2 == shift % 2 {
         let l1 = latency(f1, inner_count);
         ChainedOutput {
             fn_idx: 1,
@@ -265,32 +265,38 @@ fn bench_diff_chained_hists_x<U, V>(
     let (mut elapsed1, mut elapsed2): (u64, u64) = (0, 0);
 
     // Warm-up
-    for i in 0..WARMUP_COUNT {
-        let ChainedOutput { fn_idx, latency } = outer_core_chained(i, &f1, &f2, inner_count, shift);
-        let elapseds = [&mut elapsed1, &mut elapsed2];
-        *elapseds[fn_idx - 1] = latency;
+    for _ in 0..WARMUP_COUNT {
+        for k in 0..2 {
+            let ChainedOutput { fn_idx, latency } =
+                outer_core_chained(k, &f1, &f2, inner_count, shift);
+            let elapseds = [&mut elapsed1, &mut elapsed2];
+            *elapseds[fn_idx - 1] = latency;
+        }
     }
 
     outer_loop_pre();
 
     for i in 1..=outer_count {
-        let ChainedOutput { fn_idx, latency } = outer_core_chained(i, &f1, &f2, inner_count, shift);
+        for k in 0..2 {
+            let ChainedOutput { fn_idx, latency } =
+                outer_core_chained(k, &f1, &f2, inner_count, shift);
 
-        let hs_f = [&mut hist_f1, &mut hist_f2];
-        hs_f[fn_idx - 1].record(latency).unwrap();
-        let elapseds = [&mut elapsed1, &mut elapsed2];
-        *elapseds[fn_idx - 1] = latency;
+            let hs_f = [&mut hist_f1, &mut hist_f2];
+            hs_f[fn_idx - 1].record(latency).unwrap();
+            let elapseds = [&mut elapsed1, &mut elapsed2];
+            *elapseds[fn_idx - 1] = latency;
 
-        let diff = elapsed1 as i64 - elapsed2 as i64;
+            let diff = elapsed1 as i64 - elapsed2 as i64;
 
-        if diff >= 0 {
-            hist_f1_ge_f2
-                .record((diff / (inner_count as i64)) as u64)
-                .unwrap();
-        } else {
-            hist_f1_lt_f2
-                .record((-diff / (inner_count as i64)) as u64)
-                .unwrap();
+            if diff >= 0 {
+                hist_f1_ge_f2
+                    .record((diff / (inner_count as i64)) as u64)
+                    .unwrap();
+            } else {
+                hist_f1_lt_f2
+                    .record((-diff / (inner_count as i64)) as u64)
+                    .unwrap();
+            }
         }
 
         outer_loop_tail(i);
