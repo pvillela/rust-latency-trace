@@ -63,7 +63,7 @@ impl BenchDiffOut {
 /// Arguments:
 /// - `f1` - first target for comparison.
 /// - `f2` - second target for comparison.
-/// - `outer_count` - number of outer loop repetitions. For each iteration, the inner loop (see below) is executed for
+/// - `exec_count` - number of outer loop repetitions. For each iteration, the inner loop (see below) is executed for
 ///   each of the target closures.
 /// - `inner_count` - number of inner loop repetitions. Within each outer loop iteration and for each of the target closures,
 ///   the target closure is executed `inner_count times`, the total latency for the inner loop is measured for the
@@ -71,13 +71,13 @@ impl BenchDiffOut {
 ///   calculated. Depending on whether the mean difference is positive or negative, it is recorded on the histogram
 ///   `hist_f1_ge_f2` or `hist_f1_lt_f2`, respectively.
 /// - `f_args_str` - string that documents relevant arguments enclosed by the closures `f1` and `f2` (e.g., using the
-///   `format!` macro). It is printed together with `outer_count` and `inner_count` to provide context for the benchmark.
+///   `format!` macro). It is printed together with `exec_count` and `inner_count` to provide context for the benchmark.
 ///
 /// The benchmark is warmed-up with one additional initial outer loop iteration for which measurements are not collected.
 pub fn bench_diff_x(
     f1: impl Fn(),
     f2: impl Fn(),
-    outer_count: usize,
+    exec_count: usize,
     outer_loop_pre: impl Fn(),
     outer_loop_tail: impl Fn(usize),
 ) -> BenchDiffOut {
@@ -93,7 +93,7 @@ pub fn bench_diff_x(
 
     outer_loop_pre();
 
-    for i in 1..=outer_count / 4 {
+    for i in 1..=exec_count / 4 {
         let pairs = quad_exec(&f1, &f2);
 
         for (elapsed1, elapsed2) in pairs {
@@ -120,21 +120,19 @@ pub fn bench_diff_x(
     }
 }
 
-pub fn bench_diff(f1: impl Fn(), f2: impl Fn(), outer_count: usize) -> BenchDiffOut {
-    bench_diff_x(f1, f2, outer_count, || (), |_| ())
+pub fn bench_diff(f1: impl Fn(), f2: impl Fn(), exec_count: usize) -> BenchDiffOut {
+    bench_diff_x(f1, f2, exec_count, || (), |_| ())
 }
 
 pub fn bench_diff_print(
     f1: impl Fn(),
     f2: impl Fn(),
-    outer_count: usize,
-    f1_str: &str,
-    f2_str: &str,
+    exec_count: usize,
+    print_sub_header: impl Fn(),
     print_stats: impl Fn(BenchDiffOut),
 ) {
-    println!("\nbench_diff: outer_count={outer_count}");
-    println!("f1: {f1_str}");
-    println!("f2: {f2_str}");
+    println!("\nbench_diff: exec_count={exec_count}");
+    print_sub_header();
     println!();
     print!("Warming up ...");
     stdout().flush().unwrap();
@@ -147,14 +145,14 @@ pub fn bench_diff_print(
 
     let outer_loop_tail = |i| {
         if i % 20 == 0 {
-            print!("{i}/{outer_count}");
+            print!("{i}/{exec_count}");
         } else {
             print!(".");
         }
         stdout().flush().unwrap();
     };
 
-    let diff_out = bench_diff_x(f1, f2, outer_count, outer_loop_pre, outer_loop_tail);
+    let diff_out = bench_diff_x(f1, f2, exec_count, outer_loop_pre, outer_loop_tail);
 
     println!(" done\n");
 

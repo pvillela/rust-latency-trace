@@ -18,33 +18,33 @@ fn cmd_line_args() -> Option<(usize, usize, usize, u64)> {
         _ => return None,
     };
 
-    let outer_loop = arg1
+    let exec_count = arg1
         .parse::<usize>()
-        .expect("1st argument (`outer_repeats`), must be integer");
+        .expect("1st argument (`exec_count`), must be integer");
 
     let nrepeats = args
         .next()
         .expect("3 more integer arguments must be provided")
         .parse::<usize>()
-        .expect("3rd argument (`inner_repeats`), must be integer");
+        .expect("2nd argument (`nrepeats`), must be integer");
 
     let ntasks = args
         .next()
         .expect("2 more integer arguments must be provided")
         .parse::<usize>()
-        .expect("4th argument (`ntasks`), must be integer");
+        .expect("3rd argument (`ntasks`), must be integer");
 
     let extent = args
         .next()
         .expect("1 more integer argument must be provided")
         .parse::<u64>()
-        .expect("5th argument (`extent`), must be integer");
+        .expect("4th argument (`extent`), must be integer");
 
-    Some((outer_loop, nrepeats, ntasks, extent))
+    Some((exec_count, nrepeats, ntasks, extent))
 }
 
 fn main() {
-    let (outer_loop, nrepeats, ntasks, extent) = cmd_line_args().unwrap_or((200, 100, 5, 20_000));
+    let (exec_count, nrepeats, ntasks, extent) = cmd_line_args().unwrap_or((200, 100, 5, 20_000));
 
     let f_instrumented = || {
         let lt = LatencyTrace::activated_default().unwrap();
@@ -54,26 +54,24 @@ fn main() {
 
     let f_uninstrumented = || simple_real_sync_un(nrepeats, ntasks, extent);
 
-    let f1_str =
-        format!("simple_real_sync -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
-    let f2_str =
-        format!("simple_real_sync_un -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
+    let print_sub_header = || {
+        println!("simple_real_sync -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
+        println!("simple_real_sync_un -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
+    };
 
     bench_diff_print(
         f_instrumented,
         f_uninstrumented,
-        outer_loop,
-        &f1_str,
-        &f2_str,
+        exec_count,
+        &print_sub_header,
         print_diff_out,
     );
 
     bench_diff_print(
         f_instrumented,
         f_uninstrumented,
-        outer_loop,
-        &f1_str,
-        &f2_str,
+        exec_count,
+        &print_sub_header,
         print_diff_out,
     );
 }
