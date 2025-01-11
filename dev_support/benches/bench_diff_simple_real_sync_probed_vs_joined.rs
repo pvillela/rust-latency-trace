@@ -8,7 +8,8 @@
 //! that there is no measurable difference in overhead with one `thread_local_collect` module versus the other. That command
 //! could take up to a couple of minutes to finish.
 
-use dev_support::{bench_diff::bench_diff_stats_print, simple_fns::simple_real_sync};
+use bench_diff::bench_diff_stats_print;
+use dev_support::simple_fns::simple_real_sync;
 use latency_trace::LatencyTraceE;
 
 /// Returns command line arguments (`outer_repeats`, `inner_repeats`, `ntasks`, `extent`).

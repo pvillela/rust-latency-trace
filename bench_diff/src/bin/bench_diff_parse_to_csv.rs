@@ -1,6 +1,6 @@
 //! Parses a file containing the outputs of successive [`bench_diff`] runs converts it to CSV format to `stdout`.
 
-use latency_trace::SummaryStats;
+use bench_diff::SummaryStats;
 use regex::Regex;
 use std::{
     fs::File,

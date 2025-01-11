@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
+bench_diff = { path = "../bench_diff" }
 criterion = { version = "0.5", features = ["html_reports"] }
 divan = "0.1.14"
 env_logger = "0.11"

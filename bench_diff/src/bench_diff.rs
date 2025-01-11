@@ -1,7 +1,7 @@
 //! Module to compare the difference in latency between two closures.
 
+use crate::{new_timing, summary_stats, SummaryStats, Timing};
 use hdrhistogram::Histogram;
-use latency_trace::{summary_stats, SummaryStats, Timing};
 use std::{
     io::{stdout, Write},
     time::Instant,
@@ -71,7 +71,7 @@ fn bench_diff_hists_x(
     outer_loop_pre: impl Fn(),
     outer_loop_tail: impl Fn(usize),
 ) -> BenchDiffHists {
-    let mut hist_f1_lt_f2 = Histogram::<u64>::new_with_bounds(1, 20 * 1000 * 1000, 2).unwrap();
+    let mut hist_f1_lt_f2 = new_timing(20 * 1000 * 1000, 2);
     let mut hist_f1_ge_f2 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
     let mut hist_f1 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
     let mut hist_f2 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
