@@ -1,3 +1,4 @@
+pub mod bench_diff;
 pub mod common;
 pub mod deep;
 pub mod simple;

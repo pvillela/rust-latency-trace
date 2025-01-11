@@ -32,18 +32,28 @@ fn quad_exec(f1: impl Fn(), f2: impl Fn()) -> [(u64, u64); 4] {
     [(l01, l02), (l11, l12), (l21, l22), (l31, l32)]
 }
 
-struct BenchDiffHists {
+pub struct BenchDiffOut {
     hist_f1: Timing,
     hist_f2: Timing,
-    hist_f1_lt_f2: Timing,
-    hist_f1_ge_f2: Timing,
+    hist_f1_lt_f2: Timing, //todo: replace with count, sum and sum of squares of ratios
+    hist_f1_ge_f2: Timing, //todo: replace with count, sum and sum of squares of ratios
 }
 
-pub struct BenchDiffStats {
-    pub stats_f1: SummaryStats,
-    pub stats_f2: SummaryStats,
-    pub stats_f1_lt_f2: SummaryStats,
-    pub stats_f1_ge_f2: SummaryStats,
+impl BenchDiffOut {
+    pub fn summary_f1(&self) -> SummaryStats {
+        summary_stats(&self.hist_f1)
+    }
+
+    pub fn summary_f2(&self) -> SummaryStats {
+        summary_stats(&self.hist_f2)
+    }
+
+    pub fn count_f1_lt_f2(&self) -> u64 {
+        self.hist_f1_lt_f2.len()
+    }
+    pub fn count_f1_ge_f2(&self) -> u64 {
+        self.hist_f1_ge_f2.len()
+    }
 }
 
 /// Compares the difference of total latency for two closures `f1` and `f2` in ***microseconds***.
@@ -64,13 +74,13 @@ pub struct BenchDiffStats {
 ///   `format!` macro). It is printed together with `outer_count` and `inner_count` to provide context for the benchmark.
 ///
 /// The benchmark is warmed-up with one additional initial outer loop iteration for which measurements are not collected.
-fn bench_diff_hists_x(
+pub fn bench_diff_x(
     f1: impl Fn(),
     f2: impl Fn(),
     outer_count: usize,
     outer_loop_pre: impl Fn(),
     outer_loop_tail: impl Fn(usize),
-) -> BenchDiffHists {
+) -> BenchDiffOut {
     let mut hist_f1_lt_f2 = new_timing(20 * 1000 * 1000, 2);
     let mut hist_f1_ge_f2 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
     let mut hist_f1 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
@@ -102,7 +112,7 @@ fn bench_diff_hists_x(
         outer_loop_tail(i * 4);
     }
 
-    BenchDiffHists {
+    BenchDiffOut {
         hist_f1,
         hist_f2,
         hist_f1_lt_f2,
@@ -110,43 +120,17 @@ fn bench_diff_hists_x(
     }
 }
 
-pub fn bench_diff_stats_x(
-    f1: impl Fn(),
-    f2: impl Fn(),
-    outer_count: usize,
-    outer_loop_pre: impl Fn(),
-    outer_loop_tail: impl Fn(usize),
-) -> BenchDiffStats {
-    let BenchDiffHists {
-        hist_f1,
-        hist_f2,
-        hist_f1_lt_f2,
-        hist_f1_ge_f2,
-    } = bench_diff_hists_x(f1, f2, outer_count, outer_loop_pre, outer_loop_tail);
-
-    let stats_f1 = summary_stats(&hist_f1);
-    let stats_f2 = summary_stats(&hist_f2);
-    let stats_f1_lt_f2 = summary_stats(&hist_f1_lt_f2);
-    let stats_f1_ge_f2 = summary_stats(&hist_f1_ge_f2);
-
-    BenchDiffStats {
-        stats_f1,
-        stats_f2,
-        stats_f1_lt_f2,
-        stats_f1_ge_f2,
-    }
+pub fn bench_diff(f1: impl Fn(), f2: impl Fn(), outer_count: usize) -> BenchDiffOut {
+    bench_diff_x(f1, f2, outer_count, || (), |_| ())
 }
 
-pub fn bench_diff_stats(f1: impl Fn(), f2: impl Fn(), outer_count: usize) -> BenchDiffStats {
-    bench_diff_stats_x(f1, f2, outer_count, || (), |_| ())
-}
-
-pub fn bench_diff_stats_print(
+pub fn bench_diff_print(
     f1: impl Fn(),
     f2: impl Fn(),
     outer_count: usize,
     f1_str: &str,
     f2_str: &str,
+    print_stats: impl Fn(BenchDiffOut),
 ) {
     println!("\nbench_diff: outer_count={outer_count}");
     println!("f1: {f1_str}");
@@ -170,18 +154,9 @@ pub fn bench_diff_stats_print(
         stdout().flush().unwrap();
     };
 
-    let BenchDiffStats {
-        stats_f1,
-        stats_f2,
-        stats_f1_lt_f2,
-        stats_f1_ge_f2,
-    } = bench_diff_stats_x(f1, f2, outer_count, outer_loop_pre, outer_loop_tail);
+    let diff_out = bench_diff_x(f1, f2, outer_count, outer_loop_pre, outer_loop_tail);
 
     println!(" done\n");
 
-    println!("stats_f1={stats_f1:?}");
-    println!("\nstats_f2={stats_f2:?}");
-    println!("\nstats_f1_lt_f2={stats_f1_lt_f2:?}");
-    println!("\nstats_f1_ge_f2={stats_f1_ge_f2:?}");
-    println!();
+    print_stats(diff_out);
 }

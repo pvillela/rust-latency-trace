@@ -32,7 +32,7 @@ pub struct SummaryStats {
 
 impl SummaryStats {
     /// Computes summary statistics from the given histogram.
-    pub fn new(hist: &Timing) -> Self {
+    fn new(hist: &Timing) -> Self {
         Self {
             count: hist.len(),
             mean: hist.mean(),

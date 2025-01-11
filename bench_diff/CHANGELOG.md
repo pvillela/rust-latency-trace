@@ -7,4 +7,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2025-01-XX
 
-Initial release, pulled out from the `latency_trace` crate repo.
+Initial release, pulled out from the `latency_trace` crate repo after significant enhancements.

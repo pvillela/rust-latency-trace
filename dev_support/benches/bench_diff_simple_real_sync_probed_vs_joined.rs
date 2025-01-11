@@ -8,8 +8,8 @@
 //! that there is no measurable difference in overhead with one `thread_local_collect` module versus the other. That command
 //! could take up to a couple of minutes to finish.
 
-use bench_diff::bench_diff_stats_print;
-use dev_support::simple_fns::simple_real_sync;
+use bench_diff::bench_diff_print;
+use dev_support::{bench_support::bench_diff::print_diff_out, simple_fns::simple_real_sync};
 use latency_trace::LatencyTraceE;
 
 /// Returns command line arguments (`outer_repeats`, `inner_repeats`, `ntasks`, `extent`).
@@ -64,6 +64,20 @@ fn main() {
     let f1_str = format!("f_probed -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
     let f2_str = format!("f_joined -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
 
-    bench_diff_stats_print(f_probed, f_joined, outer_loop, &f1_str, &f2_str);
-    bench_diff_stats_print(f_probed, f_joined, outer_loop, &f1_str, &f2_str);
+    bench_diff_print(
+        f_probed,
+        f_joined,
+        outer_loop,
+        &f1_str,
+        &f2_str,
+        print_diff_out,
+    );
+    bench_diff_print(
+        f_probed,
+        f_joined,
+        outer_loop,
+        &f1_str,
+        &f2_str,
+        print_diff_out,
+    );
 }

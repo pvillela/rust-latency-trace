@@ -1,8 +1,11 @@
 //! Compares the overhead for the measurement of latencies for [`dev_support::simple_fns::simple_real_sync`],
 //! vs. the latency of [`dev_support::simple_fns::simple_real_sync_un`].
 
-use bench_diff::bench_diff_stats_print;
-use dev_support::simple_fns::{simple_real_sync, simple_real_sync_un};
+use bench_diff::bench_diff_print;
+use dev_support::{
+    bench_support::bench_diff::print_diff_out,
+    simple_fns::{simple_real_sync, simple_real_sync_un},
+};
 use latency_trace::LatencyTrace;
 use std::hint::black_box;
 
@@ -56,19 +59,21 @@ fn main() {
     let f2_str =
         format!("simple_real_sync_un -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
 
-    bench_diff_stats_print(
+    bench_diff_print(
         f_instrumented,
         f_uninstrumented,
         outer_loop,
         &f1_str,
         &f2_str,
+        print_diff_out,
     );
 
-    bench_diff_stats_print(
+    bench_diff_print(
         f_instrumented,
         f_uninstrumented,
         outer_loop,
         &f1_str,
         &f2_str,
+        print_diff_out,
     );
 }
