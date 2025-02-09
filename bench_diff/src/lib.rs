@@ -1,5 +1,5 @@
 #![doc = include_str!("lib.md")]
-//!
+#![deny(clippy::unwrap_used)]
 
 mod bench_diff;
 pub use bench_diff::*;

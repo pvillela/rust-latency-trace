@@ -70,14 +70,14 @@ fn main() {
         f_probed,
         f_joined,
         exec_count,
-        &print_sub_header,
+        print_sub_header,
         print_diff_out,
     );
     bench_diff_print(
         f_probed,
         f_joined,
         exec_count,
-        &print_sub_header,
+        print_sub_header,
         print_diff_out,
     );
 }

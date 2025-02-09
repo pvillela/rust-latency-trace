@@ -2,6 +2,7 @@
 
 use crate::{new_timing, summary_stats, SummaryStats, Timing};
 use hdrhistogram::Histogram;
+use statrs::distribution::{ContinuousCDF, StudentsT};
 use std::{
     io::{stdout, Write},
     time::Instant,
@@ -37,6 +38,10 @@ pub struct BenchDiffOut {
     hist_f2: Timing,
     hist_f1_lt_f2: Timing, //todo: replace with count, sum and sum of squares of ratios
     hist_f1_ge_f2: Timing, //todo: replace with count, sum and sum of squares of ratios
+    sum_ln_f1: f64,
+    sum2_ln_f1: f64,
+    sum_ln_f2: f64,
+    sum2_ln_f2: f64,
 }
 
 impl BenchDiffOut {
@@ -51,8 +56,90 @@ impl BenchDiffOut {
     pub fn count_f1_lt_f2(&self) -> u64 {
         self.hist_f1_lt_f2.len()
     }
+
     pub fn count_f1_ge_f2(&self) -> u64 {
         self.hist_f1_ge_f2.len()
+    }
+
+    pub fn mean_ln_f1(&self) -> f64 {
+        self.sum2_ln_f1 / self.hist_f1.len() as f64
+    }
+
+    pub fn stdev_ln_f1(&self) -> f64 {
+        let n = self.hist_f1.len() as f64;
+        (self.sum2_ln_f1 - self.sum_ln_f1.powi(2) / n) / (n - 1.0)
+    }
+
+    pub fn mean_ln_f2(&self) -> f64 {
+        self.sum2_ln_f2 / self.hist_f2.len() as f64
+    }
+
+    pub fn stdev_ln_f2(&self) -> f64 {
+        let n = self.hist_f2.len() as f64;
+        (self.sum2_ln_f2 - self.sum_ln_f2.powi(2) / n) / (n - 1.0)
+    }
+
+    /// Welch's t statistic for
+    /// `mean(ln(latency(f1))) - mean(ln(latency(f2)))` (where `ln` is the natural logarithm),
+    ///
+    /// See [Welch's t-test](https://en.wikipedia.org/wiki/Welch%27s_t-test)
+    pub fn welch_ln_t(&self) -> f64 {
+        let n = self.hist_f1.len() as f64;
+        let dx = self.mean_ln_f1() - self.mean_ln_f2();
+        let s2_x1 = self.stdev_ln_f1().powi(2) / n;
+        let s2_x2 = self.stdev_ln_f2().powi(2) / n;
+        let s_dx = (s2_x1 + s2_x2).sqrt();
+        dx / s_dx
+    }
+
+    /// Degrees of freedom for Welch's t-test for
+    /// `mean(ln(latency(f1))) - mean(ln(latency(f2)))` (where `ln` is the natural logarithm),
+    ///
+    /// See [Welch's t-test](https://en.wikipedia.org/wiki/Welch%27s_t-test)
+    pub fn welch_ln_deg_freedom(&self) -> f64 {
+        let n = self.hist_f1.len() as f64;
+        let s2_x1 = self.stdev_ln_f1().powi(2) / n;
+        let s2_x2 = self.stdev_ln_f2().powi(2) / n;
+        let s2_dx = s2_x1 + s2_x2;
+        (n - 1.0) * s2_dx.powi(2) / (s2_x1.powi(2) + s2_x2.powi(2))
+    }
+
+    /// Confidence interval for
+    /// `mean(ln(latency(f1))) - mean(ln(latency(f2)))` (where `ln` is the natural logarithm),
+    /// with confidence level of `(1 - alpha)`.
+    ///
+    /// Assumes that both `latency(f1)` and `latency(f2)` are log-normal. This assumption is widely supported by
+    /// performance analysis theory and empirical data.
+    ///
+    /// This is also the confidence interval for the difference of medians of logarithms under the above assumption.
+    pub fn welch_ln_ci(&self, alpha: f64) -> (f64, f64) {
+        let n = self.hist_f1.len() as f64;
+        let dx = self.mean_ln_f1() - self.mean_ln_f2();
+        let s2_x1 = self.stdev_ln_f1().powi(2) / n;
+        let s2_x2 = self.stdev_ln_f2().powi(2) / n;
+        let nu = self.welch_ln_deg_freedom();
+
+        let stud = StudentsT::new(0.0, 1.0, nu)
+            .expect("can't happen: degrees of freedom is always >= 3 by construction");
+        let t = -stud.inverse_cdf(alpha / 2.0);
+
+        let mid = dx;
+        let radius = (s2_x1 + s2_x2).sqrt() * t;
+
+        (mid - radius, mid + radius)
+    }
+
+    /// Confidence interval for
+    /// `median(latency(f1)) / median(latency(f2))`,
+    /// with confidence level of `(1 - alpha)`.
+    ///
+    /// Assumes that both `latency(f1)` and `latency(f2)` are log-normal. This assumption is widely supported by
+    /// performance analysis theory and empirical data.
+    pub fn welch_ratio_ci(&self, alpha: f64) -> (f64, f64) {
+        let (log_low, log_high) = self.welch_ln_ci(alpha);
+        let low = log_low.exp();
+        let high = log_high.exp();
+        (low, high)
     }
 }
 
@@ -85,6 +172,10 @@ pub fn bench_diff_x(
     let mut hist_f1_ge_f2 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
     let mut hist_f1 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
     let mut hist_f2 = Histogram::<u64>::new_from(&hist_f1_lt_f2);
+    let mut sum_ln_f1 = 0.0_f64;
+    let mut sum2_ln_f1 = 0.0_f64;
+    let mut sum_ln_f2 = 0.0_f64;
+    let mut sum2_ln_f2 = 0.0_f64;
 
     // Warm-up
     for _ in 0..WARMUP_COUNT {
@@ -97,16 +188,32 @@ pub fn bench_diff_x(
         let pairs = quad_exec(&f1, &f2);
 
         for (elapsed1, elapsed2) in pairs {
-            hist_f1.record(elapsed1).unwrap();
-            hist_f2.record(elapsed2).unwrap();
+            hist_f1
+                .record(elapsed1)
+                .expect("can't happen: histogram is auto-resizable");
+            hist_f2
+                .record(elapsed2)
+                .expect("can't happen: histogram is auto-resizable");
 
             let diff = elapsed1 as i64 - elapsed2 as i64;
 
             if diff >= 0 {
-                hist_f1_ge_f2.record(diff as u64).unwrap();
+                hist_f1_ge_f2
+                    .record(diff as u64)
+                    .expect("can't happen: histogram is auto-resizable");
             } else {
-                hist_f1_lt_f2.record(-diff as u64).unwrap();
+                hist_f1_lt_f2
+                    .record(-diff as u64)
+                    .expect("can't happen: histogram is auto-resizable");
             }
+
+            let ln_f1 = (elapsed1 as f64).ln();
+            sum_ln_f1 += ln_f1;
+            sum2_ln_f1 += ln_f1 * ln_f1;
+
+            let ln_f2 = (elapsed1 as f64).ln();
+            sum_ln_f2 += ln_f2;
+            sum2_ln_f2 += ln_f2 * ln_f2;
         }
 
         outer_loop_tail(i * 4);
@@ -117,6 +224,10 @@ pub fn bench_diff_x(
         hist_f2,
         hist_f1_lt_f2,
         hist_f1_ge_f2,
+        sum_ln_f1,
+        sum2_ln_f1,
+        sum_ln_f2,
+        sum2_ln_f2,
     }
 }
 
@@ -135,12 +246,12 @@ pub fn bench_diff_print(
     print_sub_header();
     println!();
     print!("Warming up ...");
-    stdout().flush().unwrap();
+    stdout().flush().expect("unexpected I/O error");
 
     let outer_loop_pre = || {
         println!(" ready to execute");
         print!("Executing bench_diff: ");
-        stdout().flush().unwrap();
+        stdout().flush().expect("unexpected I/O error");
     };
 
     let outer_loop_tail = |i| {
@@ -149,7 +260,7 @@ pub fn bench_diff_print(
         } else {
             print!(".");
         }
-        stdout().flush().unwrap();
+        stdout().flush().expect("unexpected I/O error");
     };
 
     let diff_out = bench_diff_x(f1, f2, exec_count, outer_loop_pre, outer_loop_tail);

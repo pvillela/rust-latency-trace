@@ -63,7 +63,7 @@ fn main() {
         f_instrumented,
         f_uninstrumented,
         exec_count,
-        &print_sub_header,
+        print_sub_header,
         print_diff_out,
     );
 
@@ -71,7 +71,7 @@ fn main() {
         f_instrumented,
         f_uninstrumented,
         exec_count,
-        &print_sub_header,
+        print_sub_header,
         print_diff_out,
     );
 }
