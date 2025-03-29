@@ -1,20 +1,19 @@
 //! Publicly exported core [`LatencyTrace`]-related types and methods.
 
-use std::{collections::BTreeMap, sync::Arc, thread};
-
-use hdrhistogram::Histogram;
-use tracing::{
-    span::{Attributes, Id},
-    Subscriber,
-};
-use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
-
 use crate::{
     lt_collect_g::LatencyTraceG,
     summary_stats,
     tlc_param::{Either, Joined, Probed},
     SummaryStats, Wrapper,
 };
+use hdrhistogram::Histogram;
+use std::{collections::BTreeMap, sync::Arc, thread};
+use tracing::{
+    span::{Attributes, Id},
+    Subscriber,
+};
+use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
+
 pub use crate::{
     lt_collect_g::{LatencyTraceCfg, Timing},
     lt_refine_g::{SpanGroup, Timings, TimingsView},
