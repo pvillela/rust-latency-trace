@@ -62,10 +62,7 @@ struct SpanGroupTemp {
 
 impl SpanGroupTemp {
     fn parent(&self) -> Option<Self> {
-        let parent_sgp = match self.span_group_priv.parent() {
-            None => return None,
-            Some(sgp) => sgp,
-        };
+        let parent_sgp = self.span_group_priv.parent()?;
         let len = self.span_group_priv.callsite_id_path.len();
         let callsite_info_priv_path = self.callsite_info_priv_path[0..len - 1].to_vec();
         Some(SpanGroupTemp {

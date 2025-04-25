@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2025-04-XX
+
+This version is fully backwards compatible with the previous version.
+
+### Changed
+
+- Minor update to documentation to reflect that this library is typically used as a dev-dependency.
+- Updated copyright dates.
+- Use of new `bench_diff` crate instead of internal bench_diff code.
+
 ## [0.6.0] - 2024-12-20
 
 This version is fully backwards compatible with the previous version.

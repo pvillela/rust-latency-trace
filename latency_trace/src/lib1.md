@@ -60,8 +60,8 @@ This version of this library can be compiled with `rustc` 1.79.0 or higher. It m
 To include this library as a dependency without optional features in your Cargo.toml:
 
 ```toml
-[dependencies]
-latency_trace = "0"
+[dev-dependencies]
+latency_trace = "0.6"
 ```
 
 ## Optional cargo features
@@ -69,8 +69,8 @@ latency_trace = "0"
 The optional feature flag "tokio" enables the [`tokio`](https://crates.io/crates/tokio)-related methods of [`LatencyTrace`](https://docs.rs/latency_trace/latest/latency_trace/struct.LatencyTrace.html).
 
 ```toml
-[dependencies]
-latency_trace = { version = "0", features = ["tokio"] }
+[dev-dependencies]
+latency_trace = { version = "1", features = ["tokio"] }
 ```
 
 To run the `doc_async_*` examples from the `latency_trace` crate (see source [repo](https://github.com/pvillela/rust-latency-trace/tree/main)), specify `--features tokio` or `--all-features` when invoking `cargo run`. For the example, to run `doc_async_probed.rs`, do as follows:
