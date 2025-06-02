@@ -1,15 +1,15 @@
 //! Compares the overhead for the measurement of latencies for [`dev_support::simple_fns::simple_real_sync`],
 //! vs. the latency of [`dev_support::simple_fns::simple_real_sync_un`].
 
-use bench_diff::bench_diff_print;
+use bench_diff::{bench_diff_with_status, LatencyUnit};
 use dev_support::{
-    bench_support::bench_diff::print_diff_out,
+    bench_support::print_diff_out::print_diff_out,
     simple_fns::{simple_real_sync, simple_real_sync_un},
 };
 use latency_trace::LatencyTrace;
 use std::hint::black_box;
 
-/// Returns command line arguments (`outer_repeats`, `inner_repeats`, `ntasks`, `extent`).
+/// Returns command line arguments (`exec_count`, `nrepeats`, `ntasks`, `extent`).
 fn cmd_line_args() -> Option<(usize, usize, usize, u64)> {
     let mut args = std::env::args();
 
@@ -54,24 +54,18 @@ fn main() {
 
     let f_uninstrumented = || simple_real_sync_un(nrepeats, ntasks, extent);
 
-    let print_sub_header = || {
+    let print_sub_header = |_, _| {
         println!("simple_real_sync -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
         println!("simple_real_sync_un -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
     };
 
-    bench_diff_print(
+    let out = bench_diff_with_status(
+        LatencyUnit::Nano,
         f_instrumented,
         f_uninstrumented,
         exec_count,
         print_sub_header,
-        print_diff_out,
     );
 
-    bench_diff_print(
-        f_instrumented,
-        f_uninstrumented,
-        exec_count,
-        print_sub_header,
-        print_diff_out,
-    );
+    print_diff_out(&out);
 }

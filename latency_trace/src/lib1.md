@@ -70,7 +70,7 @@ The optional feature flag "tokio" enables the [`tokio`](https://crates.io/crates
 
 ```toml
 [dev-dependencies]
-latency_trace = { version = "1", features = ["tokio"] }
+latency_trace = { version = "0.6", features = ["tokio"] }
 ```
 
 To run the `doc_async_*` examples from the `latency_trace` crate (see source [repo](https://github.com/pvillela/rust-latency-trace/tree/main)), specify `--features tokio` or `--all-features` when invoking `cargo run`. For the example, to run `doc_async_probed.rs`, do as follows:

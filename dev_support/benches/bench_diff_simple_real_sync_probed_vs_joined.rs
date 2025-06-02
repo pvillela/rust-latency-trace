@@ -8,11 +8,11 @@
 //! that there is no measurable difference in overhead with one `thread_local_collect` module versus the other. That command
 //! could take up to a couple of minutes to finish.
 
-use bench_diff::bench_diff_print;
-use dev_support::{bench_support::bench_diff::print_diff_out, simple_fns::simple_real_sync};
+use bench_diff::{bench_diff_with_status, LatencyUnit};
+use dev_support::{bench_support::print_diff_out::print_diff_out, simple_fns::simple_real_sync};
 use latency_trace::LatencyTraceE;
 
-/// Returns command line arguments (`outer_repeats`, `inner_repeats`, `ntasks`, `extent`).
+/// Returns command line arguments (`exec_count`, `nrepeats`, `ntasks`, `extent`).
 fn cmd_line_args() -> Option<(usize, usize, usize, u64)> {
     let mut args = std::env::args();
 
@@ -61,16 +61,18 @@ fn main() {
         lt.measure_latencies(|| simple_real_sync(nrepeats, ntasks, extent));
     };
 
-    let print_sub_header = || {
+    let print_sub_header = |_, _| {
         println!("f_probed -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
         println!("f_joined -- nrepeats={nrepeats}, ntasks={ntasks}, extent={extent}");
     };
 
-    bench_diff_print(
+    let out = bench_diff_with_status(
+        LatencyUnit::Nano,
         f_probed,
         f_joined,
         exec_count,
         print_sub_header,
-        print_diff_out,
     );
+
+    print_diff_out(&out);
 }
