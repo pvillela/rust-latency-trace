@@ -5,7 +5,7 @@
 //! [`thread_local_collect::tlm::joined`](https://docs.rs/thread_local_collect/latest/thread_local_collect/tlm/joined/index.html).
 //!
 //! Running `cargo bench --bench bench_diff_simple_real_sync_probed_vs_joined -- 2000 100 5 20000` shows quite conclusively
-//! that there is no measurable difference in overhead with one `thread_local_collect` module versus the other. That command
+//! that there is no appreciable difference in overhead with one `thread_local_collect` module versus the other. That command
 //! could take up to a couple of minutes to finish.
 
 use bench_diff::{bench_diff_with_status, LatencyUnit};
